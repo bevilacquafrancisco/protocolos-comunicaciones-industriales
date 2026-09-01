@@ -16,7 +16,7 @@ LED", sin conocer los detalles de machine.Pin, machine.ADC ni machine.PWM. Esto
 tiene tres consecuencias practicas:
 
   1. La logica de aplicacion se puede probar en la PC reemplazando estas clases
-     por dobles de prueba, sin hardware (ver tests/).
+     por dobles de prueba, sin hardware.
   2. Un cambio de pin o de rango del ADC se hace en un solo lugar.
   3. El antirrebote y el promediado del ADC quedan resueltos una sola vez y no
      se repiten (ni se olvidan) en cada firmware.
@@ -504,7 +504,7 @@ def adc_a_pwm(valor_adc):
     Convierte una lectura del ADC (0-4095) al rango de PWM de MODBus (0-255).
 
     Es la unica conversion de escala del sistema y por eso vive en un solo lugar,
-    con su factor documentado en docs/MAPA_REGISTROS.md §3.2. El desplazamiento
+    con su factor documentado en docs/mapa-registros.md §5.2. El desplazamiento
     de 4 bits equivale a dividir por 16 y es exacto en ambos extremos del rango
     (4095 >> 4 = 255), sin recurrir a punto flotante.
 

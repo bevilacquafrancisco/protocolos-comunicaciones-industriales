@@ -15,8 +15,9 @@ deben coincidir entre los tres firmwares. Centralizarlo evita la clase de error
 mas cara del trabajo, que es tener un nodo configurado a 9600 baudios y otro a
 19200 y perder horas diagnosticando el bus.
 
-La justificacion numerica de cada valor esta en docs/PINOUT.md (pines y niveles
-electricos) y en docs/MAPA_REGISTROS.md (baudrate, paridad, escalas).
+La justificacion numerica de cada valor esta en docs/arquitectura.md (pines y niveles
+electricos), en docs/protocolo-comunicacion.md (baudrate, paridad, timing) y en
+docs/mapa-registros.md (direcciones, rangos y escalas).
 
 Dependencias externas
 ---------------------
@@ -32,17 +33,25 @@ de analisis de tramas en herramientas/ leen de aca los parametros del bus).
 #: 9600 y no 19200/115200: a 9600 el intervalo inter-caracter permitido antes de
 #: descartar una trama (t1,5) es de 1,72 ms, suficiente para absorber una pausa
 #: del recolector de basura de MicroPython. A 115200 ese margen cae a 143 us y
-#: una sola pausa del GC corrompe la recepcion. Ver docs/MAPA_REGISTROS.md §2.1.
+#: una sola pausa del GC corrompe la recepcion. Ver docs/protocolo-comunicacion.md §3.1.
 BAUDRATE = 9600
 
 #: Bits de datos. En modo RTU son obligatoriamente 8 (el modo ASCII usa 7).
 BITS_DATOS = 8
 
 #: Paridad. None = sin paridad. La trama ya viaja protegida por CRC-16, que es
-#: estrictamente mas fuerte que la paridad. Ver docs/MAPA_REGISTROS.md §2.2.
+#: estrictamente mas fuerte que la paridad. Ver docs/protocolo-comunicacion.md §3.3.
 PARIDAD = None
 
-#: Bits de parada. 1, que es lo que corresponde cuando no se usa paridad.
+#: Bits de parada.
+#: Matiz que conviene conocer: la especificacion de MODBus serie exige que el
+#: caracter ocupe 11 bits, y por eso indica DOS bits de parada cuando no se usa
+#: paridad. En la practica, machine.UART de MicroPython y la mayoria de los
+#: conversores USB-RS485 usan uno solo, dando 10 bits por caracter. La diferencia
+#: afecta el calculo de t1,5/t3,5 en un 10 %, muy por debajo del margen que da
+#: haber elegido 9600 baudios. Los calculos de este proyecto usan el valor
+#: conservador de 11 bits por caracter, que sobreestima los tiempos y deja del
+#: lado seguro. Ver docs/protocolo-comunicacion.md §3.4.
 BITS_PARADA = 1
 
 #: Identificador del periferico UART del ESP32. Se usa el UART2 porque el UART0
@@ -54,7 +63,7 @@ UART_ID = 2
 # =============================================================================
 # 2. ASIGNACION DE PINES
 # =============================================================================
-# Criterios de seleccion y descarte de GPIO documentados en docs/PINOUT.md §2.
+# Criterios de seleccion y descarte de GPIO documentados en docs/arquitectura.md §8.1.
 # Resumen: se evitan GPIO 6-11 (flash SPI interna), GPIO 0/2/12/15 (strapping,
 # afectan el modo de arranque) y se usa ADC1 (GPIO 32-39) por compatibilidad
 # futura con WiFi.
@@ -67,7 +76,7 @@ PIN_UART_TX = 17
 
 #: UART2 RX <- pin RO del MAX485, OBLIGATORIAMENTE a traves del divisor
 #: resistivo 2,2 kOhm / 3,3 kOhm. RO entrega hasta ~5 V y el maximo absoluto del
-#: GPIO del ESP32 es 3,6 V. Ver docs/PINOUT.md §1.2.
+#: GPIO del ESP32 es 3,6 V. Ver docs/arquitectura.md §4.3.
 PIN_UART_RX = 16
 
 #: Pin de control de direccion del transceptor. Se conecta a DE y a RE unidos
@@ -173,7 +182,7 @@ PWM_FRECUENCIA_HZ = 1000
 
 #: Desplazamiento a derecha para convertir una lectura del ADC (0-4095) al rango
 #: de PWM (0-255). Equivale a dividir por 16, es exacto y no requiere punto
-#: flotante: 4095 >> 4 = 255. Ver docs/MAPA_REGISTROS.md §3.2.
+#: flotante: 4095 >> 4 = 255. Ver docs/mapa-registros.md §5.2.
 DESPLAZAMIENTO_ADC_A_PWM = 4
 
 

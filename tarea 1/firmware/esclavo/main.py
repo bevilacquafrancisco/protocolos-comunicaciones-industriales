@@ -263,7 +263,7 @@ def publicar_entradas(cliente, perifericos):
     )
 
     # Input Register 30001: valor CRUDO del ADC, 0-4095, sin escalar.
-    # Decision documentada en docs/MAPA_REGISTROS.md §3.2: el esclavo transporta
+    # Decision documentada en docs/mapa-registros.md §5.1: el esclavo transporta
     # la medicion, no su interpretacion; el escalado a PWM es responsabilidad de
     # quien consume el dato.
     cliente.set_ireg(
