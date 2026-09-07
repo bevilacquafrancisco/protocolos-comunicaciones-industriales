@@ -298,12 +298,28 @@ Longitud crítica con tR típico:   L_c = tR × v / 2 = 15 ns × 2×10⁸ / 2 = 
 Longitud crítica con tR mínimo:   L_c = 3 ns × 2×10⁸ / 2 = 0,3 m
 ```
 
-> **Conclusión que sorprende y conviene defender:** un bus de banco de 1 a 2
-> metros, con tres nodos en protoboard, **ya es eléctricamente largo** para el
-> MAX485. La terminación no es una precaución para instalaciones de cientos de
-> metros: hace falta acá. El MAX485 no tiene limitación de *slew rate* (a
-> diferencia del MAX483/MAX487, que sí la tienen y llegan solo a 250 kbps); sus
-> flancos rápidos son justamente los que vuelven el problema visible en cables cortos.
+**La conclusión depende del largo real del bus, y por eso el criterio se aplica
+en cada etapa en vez de decidirse una vez:**
+
+| Etapa | Nodos | Largo estimado | ¿Supera L_c? | Decisión |
+|---|---|---|---|---|
+| **Parte 1** | 2 (esclavo + conversor USB) | 0,3 a 0,6 m | No, ni con tR típico ni con el mínimo salvo el caso extremo | **Sin terminación** — ver [PARTE-1.md §3.1](../PARTE-1.md#31-sin-resistencias-de-terminación) |
+| **Partes 2 y 3** | 3 a 4 | 1 a 2 m | Sí con tR típico (1,5 m); ampliamente con tR mínimo (0,3 m) | **Terminar** con 120 Ω + polarización |
+
+> **El punto que conviene defender:** la terminación **no** es una precaución
+> reservada a instalaciones de cientos de metros. Con un transceptor de flancos
+> rápidos, la longitud crítica cae al orden del metro, y un bus de banco de tres
+> nodos en protoboard ya la alcanza. El MAX485 no tiene limitación de *slew rate*
+> —a diferencia del MAX483/MAX487, que sí la tienen y por eso llegan solo a
+> 250 kbps—: sus flancos de 15 ns son justamente los que vuelven el problema
+> visible en cables cortos. Un MAX483 en el mismo bus, con flancos del orden de
+> los cientos de nanosegundos, tendría una longitud crítica de decenas de metros
+> y no necesitaría terminación en ninguna de las etapas de este trabajo.
+
+> ⚠️ **Terminación y polarización van juntas.** Instalar los 120 Ω sin la red de
+> polarización de §6 deja A y B unidas por 60 Ω y la tensión diferencial de
+> reposo en ≈0 V, dentro de la zona muerta de ±200 mV: el bus queda **peor** que
+> sin terminar. Se ponen las dos cosas, o ninguna.
 
 ### 5.2 Qué pasa si no se termina: el coeficiente de reflexión
 

@@ -10,6 +10,12 @@ dinámica de destino.
 
 ## 1. Estructura del repositorio
 
+### Guías de ejecución
+
+| Documento | Qué cubre |
+|---|---|
+| [PARTE-1.md](PARTE-1.md) | **Guía de banco de la Parte 1**: paso a paso, conexiones, validación desde PC con Modbus Poll, checklist de 16 pruebas y captura de evidencia |
+
 ### Marco teórico y diseño
 
 | Documento | Qué cubre |
@@ -52,8 +58,8 @@ hay que poder defender oralmente.
 | Paridad | Ninguna (8N1) | El CRC-16 ya es más fuerte que la paridad, y es el valor por defecto de todas las herramientas | [protocolo §3.3](docs/protocolo-comunicacion.md#33-paridad-ninguna-n) |
 | Nivel RO→RX | Divisor 2k2/3k3 | RO da ≈5 V contra un máximo absoluto de 3,6 V del GPIO. Resultado: 3,15 V | [arquitectura §4.3](docs/arquitectura.md#43-sentido-max485--esp32-ro--rx-divisor-resistivo-obligatorio) |
 | Nivel ESP32→DI/DE/RE | Directo | VIH del MAX485 = 2,0 V; el ESP32 da 3,3 V (margen 1,3 V) | [arquitectura §4.2](docs/arquitectura.md#42-sentido-esp32--max485-di-de-re-conexión-directa) |
-| Terminación | 120 Ω en los 2 extremos | Con tR = 15 ns la longitud crítica es 1,5 m: **el bus de banco ya es eléctricamente largo** | [arquitectura §5](docs/arquitectura.md#5-teoría-de-líneas-de-transmisión-por-qué-hay-que-terminar-el-bus) |
-| Polarización del bus | 680 Ω / 680 Ω | Da 211 mV en reposo; con 1 kΩ caería a 145 mV, dentro de la zona muerta de ±200 mV | [arquitectura §6](docs/arquitectura.md#6-polarización-de-reposo-fail-safe-biasing) |
+| Terminación | 120 Ω en los 2 extremos, **desde la Parte 2** | Con tR = 15 ns la longitud crítica es 1,5 m. El bus de 2 nodos de la Parte 1 no la alcanza y va sin terminar | [arquitectura §5](docs/arquitectura.md#5-teoría-de-líneas-de-transmisión-por-qué-hay-que-terminar-el-bus) |
+| Polarización del bus | 680 Ω / 680 Ω sobre bus **terminado** | Da 211 mV en reposo; con 1 kΩ caería a 145 mV, dentro de la zona muerta de ±200 mV. Sin terminación el valor correcto es otro (10 kΩ) | [arquitectura §6](docs/arquitectura.md#6-polarización-de-reposo-fail-safe-biasing) |
 | Período de sondeo | 200 ms | Un ciclo de 4 transacciones ocupa el bus 102 ms; con 100 ms quedaría al 100 % | [protocolo §11.2](docs/protocolo-comunicacion.md#112-cálculo-del-período-de-sondeo) |
 | Escala del ADC | Crudo 0-4095 | El esclavo transporta la medición, no su interpretación | [mapa §5](docs/mapa-registros.md#5-escala-del-potenciómetro) |
 | Unit ID | Jumper en GPIO13 | Es una dirección *física* real, y permite un único firmware para ambos esclavos | [arquitectura §8.2](docs/arquitectura.md#82-esclavo-1-y-esclavo-2--firmware-idéntico) |
@@ -72,7 +78,7 @@ hay que poder defender oralmente.
 | Pregunta 2 — CRC: qué genera, hardware o software | [protocolo-comunicacion.md §7](docs/protocolo-comunicacion.md#7-el-crc-16) |
 | Pregunta 3 — manejo de MSB/LSB en WORDs de 16 bits | [protocolo-comunicacion.md §8](docs/protocolo-comunicacion.md#8-orden-de-bytes-msb-lsb-y-endianness) |
 | Pregunta 4 — terminación, polarización y niveles TTL | [arquitectura.md §4, §5 y §6](docs/arquitectura.md#5-teoría-de-líneas-de-transmisión-por-qué-hay-que-terminar-el-bus) |
-| Análisis Parte 1 — quién es maestro y quién esclavo | [arquitectura.md §1](docs/arquitectura.md#1-ubicación-del-sistema-en-una-arquitectura-industrial) |
+| Análisis Parte 1 — quién es maestro y quién esclavo | [PARTE-1.md §13](PARTE-1.md#13-pregunta-de-análisis-de-la-parte-1) · [arquitectura.md §1](docs/arquitectura.md#1-ubicación-del-sistema-en-una-arquitectura-industrial) |
 
 ## 4. Plan de trabajo por fases
 
@@ -82,8 +88,8 @@ bus funcione con el hardware real) se ataca primero.
 | Fase | Objetivo | Entregable verificable | Estado |
 |---|---|---|---|
 | 0 | Diseño y documentación previa | Arquitectura, protocolo, mapa de registros, diagramas, firmware escrito | ✅ Hecho |
-| 1 | Bring-up eléctrico | Divisor medido en ≈3,1 V · polarización en ≈211 mV · `prueba_perifericos.py` en verde en las 3 placas | ⬜ Pendiente |
-| 2 | Esclavo 1 validado desde PC (Parte 1) | Las 14 pruebas del checklist de [mapa-registros.md §8](docs/mapa-registros.md#8-validación-del-mapa-fase-2-del-plan) + capturas | ⬜ Pendiente |
+| 1 | Bring-up eléctrico ([guía](PARTE-1.md#7-paso-a-paso-de-resolución)) | Divisor medido entre 2,6 y 3,4 V · `prueba_perifericos.py` en verde | ⬜ Pendiente |
+| 2 | Esclavo 1 validado desde PC ([PARTE-1.md](PARTE-1.md)) | Las 16 pruebas del checklist de [PARTE-1.md §10](PARTE-1.md#10-checklist-de-validación) + evidencia capturada | ⬜ Pendiente |
 | 3 | Maestro monoesclavo (Parte 2) | Polling bidireccional estable 5 min sin timeouts | ⬜ Pendiente |
 | 4 | Multiesclavo (Parte 3) | Conmutación en vivo · el no seleccionado retiene estado | ⬜ Pendiente |
 | 5 | Captura y análisis de tramas | Una trama real por cada función (02, 04, 05, 06) desglosada | ⬜ Pendiente |
