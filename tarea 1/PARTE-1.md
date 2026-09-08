@@ -224,6 +224,7 @@ frecuencia. **No es necesario**: el promediado de 8 muestras por software
 | Resistencia | 2 | **330 Ω** (ver tabla) | Limitadora de los LEDs |
 | Resistencia | 1 | **2,2 kΩ** (ver tabla) | R1 del divisor RO→RX |
 | Resistencia | 1 | **3,3 kΩ** (ver tabla) | R2 del divisor RO→RX |
+| Resistencia | 1 | **680 Ω** | **Pull-up de RO — obligatorio, ver §5.3** |
 | Protoboard | 1 | — | Montaje |
 | Cables dupont | ~15 | — | Interconexión |
 
@@ -326,15 +327,68 @@ automáticamente (parámetro `ctrl_pin`).
 ### 5.3 Detalle del divisor en protoboard
 
 ```
-   MAX485 RO ────[ 2,2 kΩ ]────┬──── ESP32 GPIO16
-                               │
-                          [ 3,3 kΩ ]
-                               │
-                              GND
+                        5 V
+                         │
+                    [ 680 Ω ]   ← pull-up: OBLIGATORIO, ver abajo
+                         │
+   MAX485 RO ────────────┴──[ 2,2 kΩ ]────┬──── ESP32 GPIO16
+                                          │
+                                     [ 3,3 kΩ ]
+                                          │
+                                         GND
 ```
 
-El punto de unión de las dos resistencias es el que va al GPIO16. Es el nodo que
-se mide en el paso 2 del §7.
+El punto de unión de la 2,2 kΩ con la 3,3 kΩ es el que va al GPIO16. Es el nodo
+que se mide en el paso 2 del §7.
+
+#### Por qué el pull-up de 680 Ω no es opcional
+
+Del datasheet del MAX485: *"RO is high impedance when RE is high"*. Como RE está
+atado a DE, **mientras el nodo transmite su propio RO queda en alta impedancia**
+— no conduce nada.
+
+Sin pull-up, en ese momento el divisor se vuelve en contra: la 3,3 kΩ tira el
+GPIO16 a masa. Para el UART, RX en bajo es un bit de arranque, y si sigue en
+bajo produce **bytes `0x00` espurios, uno tras otro**, durante toda la
+transmisión. Esos bytes quedan en el buffer de recepción del propio nodo.
+
+Las consecuencias son distintas según el rol, y las dos son graves:
+
+| Nodo | Qué provoca |
+|---|---|
+| **Maestro** | Al terminar de transmitir llama enseguida a leer la respuesta, encuentra los `0x00` en su buffer, los toma por la respuesta del esclavo y falla el CRC. **En el 100 % de los ciclos**, con o sin esclavo conectado |
+| **Esclavo** | Los `0x00` de su propia respuesta quedan en el buffer y se **concatenan** con la siguiente petición si esta llega dentro de los 4 ms de `inter_frame_delay`. La trama unida falla el CRC y la librería la descarta con `return None`, **sin lanzar excepción**: el esclavo simplemente no responde y su consola queda limpia |
+
+El síntoma en el esclavo es especialmente engañoso porque es **selectivo**: las
+peticiones que llegan tras un silencio largo (el período de sondeo) se atienden
+bien, y las que llegan pegadas a su transmisión anterior se pierden. En la
+práctica eso se ve como "la primera transacción del ciclo funciona y la segunda
+da timeout".
+
+> **Los tutoriales que conectan RO directo al GPIO no sufren esto**: sin
+> divisor, el pull-up interno del ESP32 sostiene la línea en alto cuando RO
+> flota. El divisor es necesario para proteger el pin de los 5 V, pero
+> introduce este modo de falla si no se lo acompaña con el pull-up.
+
+#### Valores válidos
+
+El pull-up tiene que sostener el nodo por encima del umbral de entrada alta del
+ESP32 (0,75 × 3,3 V = **2,47 V**) mientras RO está en Hi-Z:
+
+| Pull-up | V en el nodo con RO en Hi-Z | Corriente con RO en bajo | Veredicto |
+|---|---|---|---|
+| 470 Ω | 2,76 V | 9,8 mA | Sirve |
+| **680 Ω** | **2,67 V** | **6,8 mA** | **Recomendado** |
+| 1 kΩ | 2,54 V | 4,6 mA | Sirve, margen ajustado |
+| 1,5 kΩ | 2,36 V | 3,1 mA | ✗ Por debajo del umbral |
+| 10 kΩ | 1,06 V | 0,5 mA | ✗ Muy insuficiente |
+
+Verificación de los otros dos estados con 680 Ω: con RO conduciendo en bajo el
+nodo queda en 0,24 V (BAJO correcto) y con RO conduciendo en alto en 2,70 V
+(ALTO correcto). El pull-up no interfiere con la operación normal.
+
+⚠️ **Va en los tres nodos.** Cualquier nodo que transmita —y todos transmiten—
+tiene este problema.
 
 ### 5.4 Pulsador → Discrete Input 10001
 

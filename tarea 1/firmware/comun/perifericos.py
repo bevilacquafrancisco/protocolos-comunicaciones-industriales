@@ -240,19 +240,37 @@ class EntradaAnalogica:
                 "muestras debe ser una potencia de 2 mayor que cero, se recibio {}".format(cantidad)
             )
 
-        self._adc = ADC(Pin(numero_pin))
-
-        # La API del ADC cambio entre versiones de MicroPython: hasta la 1.22 se
-        # configura con los metodos atten()/width(); en versiones posteriores
-        # esos metodos estan obsoletos y la configuracion va en el constructor,
-        # que ya deja el ancho en 12 bits por defecto. Se intenta la forma
-        # clasica y se ignora su ausencia, de modo que el mismo archivo corre en
-        # ambas familias de firmware sin editarlo.
+        # La API del ADC cambio entre versiones de MicroPython. La forma vigente
+        # pasa la atenuacion como argumento del CONSTRUCTOR (atten=); es la unica
+        # via garantizada en los builds oficiales recientes de ESP32, donde los
+        # metodos .atten()/.width() estan marcados "legacy" en el codigo fuente
+        # de MicroPython y se compilan condicionados a un flag que los builds
+        # oficiales traen DESACTIVADO. Si se llama a .atten() en esa situacion,
+        # el metodo ni siquiera existe: la llamada lanza AttributeError.
+        #
+        # Ese es justamente el bug que tenia esta clase: el intento anterior
+        # llamaba solo a .atten()/.width() dentro de un try/except que tragaba
+        # el AttributeError en silencio. En un build sin los metodos legacy, la
+        # atenuacion nunca se aplicaba y el ADC quedaba en 0 dB (rango util real
+        # 0-1,1 V), tal como advierte el parrafo anterior de este docstring. El
+        # sintoma en el banco: el potenciometro parece "trabado" o saltar de
+        # forma no monotona apenas se supera un tercio del recorrido, y
+        # prueba_perifericos.py lo reporta como FALLA aunque el cableado este
+        # perfecto — el propio machine.ADC(pin) leido con machine.Pin a mano
+        # (sin pasar por esta clase) mostraba el mismo defecto si no se fijaba
+        # la atenuacion explicitamente.
         try:
-            self._adc.atten(ADC.ATTN_11DB)
-            self._adc.width(ADC.WIDTH_12BIT)
-        except AttributeError:
-            pass
+            self._adc = ADC(Pin(numero_pin), atten=ADC.ATTN_11DB)
+        except TypeError:
+            # Firmware anterior a la introduccion de atten= en el constructor:
+            # crear el objeto sin ese argumento y recurrir a los metodos legacy,
+            # que en un firmware de esa antiguedad si estan disponibles.
+            self._adc = ADC(Pin(numero_pin))
+            try:
+                self._adc.atten(ADC.ATTN_11DB)
+                self._adc.width(ADC.WIDTH_12BIT)
+            except AttributeError:
+                pass
 
         self._muestras = cantidad
 

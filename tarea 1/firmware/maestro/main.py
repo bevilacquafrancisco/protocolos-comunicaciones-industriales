@@ -87,11 +87,177 @@ NOMBRES_ESTADO = {
     ESTADO_ESPERA: "ESPERA",
 }
 
+#: Cada cuantos ciclos se emite la linea de estadisticas por consola.
+#: 25 ciclos x 200 ms = un reporte cada 5 segundos: suficiente para seguir el
+#: sistema en vivo sin inundar el Shell de Thonny ni robarle tiempo al lazo.
+CICLOS_ENTRE_REPORTES = 25
+
 #: Cantidad de ciclos consecutivos con fallo tras los cuales se considera que el
 #: esclavo esta ausente y se apagan los replicadores locales. Se eligio 3 y no 1
 #: para no reaccionar a una unica trama perdida por ruido, que en un bus RS-485
 #: es un evento normal y no una falla del dispositivo.
 CICLOS_PARA_DECLARAR_AUSENTE = 3
+
+
+class MaestroRTUConTimeout(ModbusRTUMaster):
+    """
+    Interfaz MODBus RTU maestra con el timeout de respuesta adaptado a un esclavo
+    que corre MicroPython.
+
+    Responsabilidad dentro del sistema
+    ----------------------------------
+    Es la unica adaptacion que este proyecto le hace a la libreria umodbus.
+    Reemplaza el timeout de recepcion por defecto, que es inservible cuando el
+    esclavo tambien es un ESP32 con MicroPython.
+
+    El problema que resuelve
+    ------------------------
+    umodbus calcula su timeout por defecto como el doble del silencio entre
+    tramas:
+
+        t1char             = 1000000 x (8 datos + 1 parada + 2) / 9600 = 1145 us
+        inter_frame_delay  = t1char x 3,5                              = 4007 us
+        timeout por defecto = 2 x inter_frame_delay                    = 8014 us
+
+    **8 ms.** Ese valor asume un esclavo que responde en hardware, casi
+    instantaneamente. Un esclavo MicroPython no puede hacerlo, y no por ser
+    lento: es fisicamente imposible por el propio protocolo.
+
+        Deteccion del fin de la peticion (t3,5, obligatorio)     4007 us
+        Procesamiento en el interprete (optimista)              ~1000 us
+        Activacion de DE en el transceptor                        200 us
+        Transmision de la respuesta (6 bytes x t1char)           6870 us
+                                                              -----------
+        Minimo teorico absoluto                                12077 us
+
+    **12,1 ms de piso contra un presupuesto de 8,0 ms.** Ni siquiera con tiempo
+    de procesamiento cero entraria: solo transmitir la respuesta ya consume
+    6,87 ms, y antes hay que esperar los 4 ms de silencio que la especificacion
+    exige para dar la peticion por terminada. El maestro abandonaba mientras el
+    esclavo todavia estaba por empezar a contestar.
+
+    Por que no se toca `_inter_frame_delay` en su lugar
+    ---------------------------------------------------
+    Seria la otra forma de subir el timeout, pero ese atributo cumple DOS
+    funciones: fija el timeout (x2) y define cuanto silencio hay que ver para dar
+    por completa una trama recibida. Inflarlo a 150 ms daria el timeout deseado,
+    pero agregaria 150 ms a CADA transaccion: el ciclo de cuatro pasaria de
+    ~102 ms a mas de 600 ms y reventaria el periodo de sondeo de 200 ms.
+
+    Sobrescribir solo el timeout mantiene la delimitacion de tramas en los
+    4007 us que manda la especificacion —o sea, el ciclo sigue costando lo
+    calculado— y desacopla la unica variable que habia que mover.
+
+    Trade-off asumido
+    -----------------
+    Se sobrescribe un metodo interno de una libreria de terceros (el guion bajo
+    indica que no es API publica), lo que ata este codigo a esa implementacion.
+    Se acepta porque la alternativa —inflar `_inter_frame_delay`— tambien toca un
+    atributo privado Y ademas rompe el presupuesto temporal del ciclo. Entre dos
+    intervenciones igual de invasivas, se elige la que no degrada el diseno.
+
+    Si una version futura de umodbus renombrara este metodo, el sintoma volveria
+    a ser el mismo timeout permanente, y este docstring es el mapa para
+    encontrarlo.
+
+    Segundo problema resuelto: glitch de conmutacion DE/RE
+    --------------------------------------------------------
+    Con el timeout ya corregido aparecio un sintoma distinto: el maestro fallaba
+    el 100% de las lecturas con "invalid response CRC", mientras un analizador
+    pasivo (herramientas/sniffer_rs485.py) escuchando el MISMO bus al mismo
+    tiempo capturaba las tramas del esclavo perfectamente formadas. Que un
+    observador ajeno vea el bus limpio mientras el propio maestro lo ve corrupto
+    descarta el cableado y el esclavo: el problema tiene que estar en algo que
+    le pasa solo al maestro, en el instante en que deja de transmitir.
+
+    La causa esta en como `_uart_read_frame()` decide cuando empezo a llegar una
+    respuesta: hace polling de `uart.any()` durante el `timeout` configurado, y
+    apenas ve UN byte disponible pasa de inmediato al modo "esperar silencio de
+    inter_frame_delay (4007 us) para dar la trama por completa" — sin distinguir
+    si ese primer byte es una respuesta real o ruido.
+
+    Ahi esta el problema: justo cuando el maestro apaga DE/RE para volver a modo
+    recepcion, el transceptor puede inyectar un byte espurio en el UART — ya sea
+    ruido de conmutacion del propio MAX485, o la cola de su propia transmision
+    si el timing de flush no fue exacto. Ese byte espurio hace que `uart.any()`
+    se satisfaga de inmediato, y el lector pasa a esperar 4007 us de silencio.
+    Como el esclavo recien puede empezar a responder ~12 ms despues (ver arriba:
+    tiene que completar su propia deteccion de t3,5 mas el procesamiento), el
+    bus queda en silencio mucho mas de 4007 us despues de ese byte espurio, y el
+    lector concluye "trama completa" usando solo el byte de ruido — muchisimo
+    antes de que la respuesta real del esclavo siquiera empiece a transmitirse.
+    El CRC de esa "trama" de un byte falla siempre, en el 100% de los ciclos, y
+    la respuesta real del esclavo llega despues sin que nadie la escuche.
+
+    Por que el sniffer no ve este problema: nunca transmite ni conmuta su propio
+    transceptor, asi que no genera (ni sufre) este glitch. Escucha el bus de
+    forma continua y ve la trama real completa, sin la ventana de confusion que
+    solo afecta al nodo que acaba de transmitir.
+
+    La correccion: antes de delegar a la logica original, se espera un margen
+    fijo y se DRENA cualquier byte que haya llegado durante ese margen. Ningun
+    byte que llegue en esa ventana puede ser una respuesta legitima, porque el
+    esclavo esta fisicamente obligado a tardar al menos ~4 ms en darse cuenta de
+    que la peticion termino antes de siquiera empezar a procesarla. Descartar
+    con margen de sobra dentro de esa ventana elimina el glitch sin arriesgar
+    ni un byte de la respuesta real.
+
+    Relaciones con otras clases
+    ---------------------------
+    Hereda de umodbus.serial.Serial. La consume configurar_maestro_modbus().
+    """
+
+    #: Margen de espera-y-descarte tras cada transmision, en microsegundos,
+    #: antes de empezar a escuchar "en serio". Cualquier byte que llegue dentro
+    #: de esta ventana es necesariamente ruido de conmutacion o cola de la
+    #: propia transmision, nunca la respuesta real del esclavo: el esclavo
+    #: recien puede empezar a responder despues de completar su propia
+    #: deteccion de fin de trama (t3,5 = 4007 us a 9600 baudios). Se elige un
+    #: valor bien por debajo de eso (2000 us, la mitad) para no arriesgar
+    #: ningun byte legitimo aunque el timing real tenga variacion, y muy por
+    #: encima de cualquier transitorio de conmutacion del MAX485 (tZH/tZL del
+    #: datasheet: 40-70 ns tipico/maximo, tres ordenes de magnitud menor).
+    _VENTANA_DESCARTE_GLITCH_US = 2000
+
+    def _uart_read_frame(self, timeout=None):
+        """
+        Lee una trama del UART aplicando un piso de timeout y descartando el
+        glitch de conmutacion DE/RE antes de empezar a interpretar la respuesta.
+
+        Se impone un PISO de timeout en lugar de reemplazar el valor: si una
+        version de la libreria pasara un timeout explicito mayor al
+        configurado, se respeta ese valor mayor. Solo se corrigen los timeouts
+        demasiado cortos, que son el problema real.
+
+        Parametros
+        ----------
+        timeout : int, opcional
+            Tiempo maximo de espera en MICROsegundos que pasa la libreria. Si es
+            None o menor que config.TIMEOUT_RESPUESTA_MS, se eleva a ese valor.
+
+        Retorna
+        -------
+        bytearray
+            La trama recibida, o vacia si vencio el tiempo de espera.
+
+        Excepciones
+        -----------
+        Las que propague la implementacion de la clase base.
+        """
+        # config.TIMEOUT_RESPUESTA_MS esta en milisegundos y la libreria trabaja
+        # en microsegundos: de ahi el factor 1000.
+        timeout_minimo_us = config.TIMEOUT_RESPUESTA_MS * 1000
+
+        if timeout is None or timeout < timeout_minimo_us:
+            timeout = timeout_minimo_us
+
+        # Espera fija y descarte de lo acumulado: ver "Segundo problema
+        # resuelto" en el docstring de la clase. Ningun byte legitimo del
+        # esclavo puede llegar dentro de esta ventana.
+        time.sleep_us(self._VENTANA_DESCARTE_GLITCH_US)
+        self._uart.read()
+
+        return super()._uart_read_frame(timeout)
 
 
 class MaestroModbus:
@@ -160,6 +326,33 @@ class MaestroModbus:
         self._fallos_consecutivos = 0
         self._instante_fin_espera = time.ticks_ms()
 
+        # --- Instrumentacion (Parte 2) --------------------------------------
+        # El TP pide registrar el comportamiento temporal del sondeo, y "el LED
+        # respondia rapido" no es un dato. Estos contadores producen la medicion
+        # que va al informe: tiempo real de ciclo y tasa de error sobre una
+        # poblacion de ciclos, no sobre una impresion subjetiva.
+        #
+        # Costo: cuatro enteros y una resta por ciclo. Despreciable frente a los
+        # 200 ms del periodo, y se gana observabilidad de un sistema que de otro
+        # modo solo se puede juzgar mirando LEDs.
+
+        #: Ciclos de sondeo completados desde el arranque.
+        self._ciclos_totales = 0
+
+        #: Ciclos en los que al menos una de las 4 transacciones fallo.
+        self._ciclos_con_fallo = 0
+
+        #: Marca de tiempo del inicio del ciclo en curso.
+        self._instante_inicio_ciclo = time.ticks_ms()
+
+        #: Duracion util del ultimo ciclo (sin contar la espera), en ms. Es el
+        #: tiempo que el bus estuvo efectivamente ocupado con las 4 transacciones.
+        self._duracion_ciclo_ms = 0
+
+        #: Bandera de "este ciclo ya conto como fallido", para no contabilizar
+        #: dos veces un ciclo en el que fallen varias transacciones.
+        self._ciclo_actual_fallido = False
+
         # Despachador estado -> metodo. Reemplaza una cadena de if/elif por una
         # tabla, que es la forma canonica de implementar una maquina de estados
         # y hace que agregar un estado no implique tocar la logica existente.
@@ -209,6 +402,11 @@ class MaestroModbus:
             if self._perifericos["selector"].value()
             else config.ID_ESCLAVO_2
         )
+
+        # Marca de inicio del ciclo, para medir su duracion util (instrumentacion).
+        self._instante_inicio_ciclo = time.ticks_ms()
+        self._ciclo_actual_fallido = False
+
         return ESTADO_INDICAR_SELECCION
 
     # -------------------------------------------------------------------------
@@ -452,7 +650,65 @@ class MaestroModbus:
         except Exception as error:
             self._registrar_fallo("0x06 Write Single Register", error)
 
+        # --- Cierre del ciclo: instrumentacion ------------------------------
+        # Se mide ACA y no en ESPERA porque lo que interesa es el tiempo que las
+        # cuatro transacciones ocuparon el bus, no el periodo completo (que
+        # incluye la espera y por definicion da PERIODO_SONDEO_MS).
+        self._duracion_ciclo_ms = time.ticks_diff(
+            time.ticks_ms(), self._instante_inicio_ciclo
+        )
+        self._ciclos_totales += 1
+        if self._ciclo_actual_fallido:
+            self._ciclos_con_fallo += 1
+
+        if self._ciclos_totales % CICLOS_ENTRE_REPORTES == 0:
+            self._informar_estadisticas()
+
         return ESTADO_ESPERA
+
+    def _informar_estadisticas(self):
+        """
+        Imprime por consola las metricas acumuladas del sondeo.
+
+        Es la fuente de los datos cuantitativos que pide el informe: tiempo real
+        de ocupacion del bus por ciclo y tasa de error medida sobre una poblacion
+        de ciclos. Reemplaza afirmaciones subjetivas del tipo "respondia rapido"
+        por numeros reproducibles.
+
+        Formato de la linea emitida:
+
+            [MAESTRO] ciclos=25 fallos=0 (0.0%) t_ciclo=104ms | ID=1 DI=0 IR=2048 -> PWM=128
+
+        donde t_ciclo es la duracion util del ultimo ciclo (las 4 transacciones,
+        sin la espera), DI e IR son los ultimos valores leidos del esclavo, y PWM
+        el valor replicado en la salida local.
+
+        Parametros
+        ----------
+        Ninguno.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        porcentaje = (self._ciclos_con_fallo * 1000 // self._ciclos_totales) / 10
+        print(
+            "[MAESTRO] ciclos={} fallos={} ({}%) t_ciclo={}ms | "
+            "ID={} DI={} IR={} -> PWM={}".format(
+                self._ciclos_totales,
+                self._ciclos_con_fallo,
+                porcentaje,
+                self._duracion_ciclo_ms,
+                self._id_activo,
+                1 if self._di_remoto else 0,
+                self._ir_remoto,
+                adc_a_pwm(self._ir_remoto),
+            )
+        )
 
     # -------------------------------------------------------------------------
     # BLOQUE M8 — Espera hasta completar el periodo de sondeo
@@ -535,6 +791,12 @@ class MaestroModbus:
         Ninguna.
         """
         self._fallos_consecutivos += 1
+        # Marca el ciclo en curso como fallido. Se usa una bandera y no un
+        # contador para que un ciclo con varias transacciones caidas cuente como
+        # UN ciclo fallido: la metrica que interesa es "que fraccion de los
+        # ciclos de sondeo salio completa", no cuantas tramas se perdieron.
+        self._ciclo_actual_fallido = True
+
         print("[MAESTRO] Fallo {} con Esclavo {} ({} consecutivos): {}".format(
             funcion, self._id_activo, self._fallos_consecutivos, error,
         ))
@@ -648,7 +910,7 @@ def configurar_maestro_modbus():
     trama, solo emisor. Es una diferencia conceptual que conviene tener a mano
     para la defensa oral.
     """
-    return ModbusRTUMaster(
+    return MaestroRTUConTimeout(
         uart_id=config.UART_ID,
         baudrate=config.BAUDRATE,
         data_bits=config.BITS_DATOS,

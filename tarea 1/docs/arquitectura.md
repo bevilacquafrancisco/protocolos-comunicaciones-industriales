@@ -212,11 +212,15 @@ contra un máximo absoluto de 3,6 V del GPIO. Conectarlo directo hace conducir l
 diodos de protección del pin, lo que degrada la entrada y puede destruir el chip.
 
 ```
-   MAX485 RO ──┬── R1 = 2,2 kΩ ──┬──► ESP32 GPIO16 (UART2 RX)
-               │                 │
-            (≈5 V)          R2 = 3,3 kΩ
-                                 │
-                                GND
+                        5 V
+                         │
+                    R_pu = 680 Ω    ← pull-up, obligatorio (ver §4.3.1)
+                         │
+   MAX485 RO ────────────┴── R1 = 2,2 kΩ ──┬──► ESP32 GPIO16 (UART2 RX)
+                                           │
+                                      R2 = 3,3 kΩ
+                                           │
+                                          GND
 ```
 
 **Verificación en el peor caso (VCC = 5,25 V):**
@@ -250,6 +254,36 @@ Distorsión = 145 ns / 104 µs = 0,14 %
 Despreciable. **La verificación importa porque el resultado depende de la
 velocidad:** a 1 Mbaud el tiempo de bit sería 1 µs y esa misma distorsión pasaría
 a ser del 14,5 %, ya inaceptable. Por eso el cálculo se hace y no se asume.
+
+### 4.3.1 El pull-up de 680 Ω: por qué el divisor solo no alcanza
+
+Del datasheet: *"RO is high impedance when RE is high"*. Como RE está atado a DE,
+**mientras el nodo transmite su propio RO queda en alta impedancia**.
+
+Sin pull-up, en ese instante el divisor deja de ser un divisor y pasa a ser una
+resistencia de 3,3 kΩ que tira el GPIO16 a masa. Para el UART, RX en bajo es un
+bit de arranque: mientras dure la transmisión genera **bytes `0x00` espurios**
+que quedan en el buffer de recepción del propio nodo.
+
+| Nodo | Consecuencia |
+|---|---|
+| **Maestro** | Al terminar de transmitir lee enseguida la respuesta, encuentra los `0x00`, los toma por la respuesta del esclavo y falla el CRC en el 100 % de los ciclos |
+| **Esclavo** | Los `0x00` se concatenan con la siguiente petición si esta llega dentro de los 4 ms de `inter_frame_delay`; la trama unida falla el CRC y la librería la descarta con `return None`, **sin excepción**: no responde y su consola queda limpia |
+
+Dimensionamiento: el pull-up debe sostener el nodo por encima del umbral de
+entrada alta del ESP32 (0,75 × 3,3 = **2,47 V**) con RO en Hi-Z.
+
+| Pull-up | Nodo con RO en Hi-Z | Corriente con RO en bajo | Veredicto |
+|---|---|---|---|
+| 470 Ω | 2,76 V | 9,8 mA | Sirve |
+| **680 Ω** | **2,67 V** | **6,8 mA** | **Recomendado** |
+| 1 kΩ | 2,54 V | 4,6 mA | Margen ajustado |
+| ≥ 1,5 kΩ | ≤ 2,36 V | — | ✗ Por debajo del umbral |
+
+Con 680 Ω los otros dos estados siguen correctos: RO en bajo deja el nodo en
+0,24 V y RO en alto en 2,70 V.
+
+⚠️ **Va en los tres nodos**, porque los tres transmiten.
 
 ### 4.4 Alternativas evaluadas y descartadas
 
@@ -611,6 +645,7 @@ Con 4 LEDs a 3,9 mA, el maestro consume 15,6 mA en sus salidas: sin problemas.
 | Conversor USB↔RS-485 | 1 | Validación desde PC (Parte 1) |
 | Resistencia 2,2 kΩ | 3 | Divisor RO→RX (una por nodo) |
 | Resistencia 3,3 kΩ | 3 | Divisor RO→RX (una por nodo) |
+| **Resistencia 680 Ω** | **3** | **Pull-up de RO (una por nodo) — obligatorio, ver §4.3.1** |
 | Resistencia 330 Ω | 8 | LEDs (2 por esclavo + 4 en el maestro) |
 | Resistencia 120 Ω | 2 | Terminación del bus (solo extremos) |
 | Resistencia 680 Ω | 2 | Polarización de reposo (un solo punto) |

@@ -135,10 +135,20 @@ def prueba_led_digital():
     # Estado seguro al terminar: ningun actuador queda activo por accidente.
     led.escribir(False)
     print()
-    print("  Resultado esperado: 5 parpadeos visibles.")
-    print("  Si NO parpadeo: revisar polaridad del LED, resistencia de 330 ohm")
-    print("  y continuidad del cable al GPIO{}.".format(config.PIN_LED_DIGITAL))
-    return True
+
+    # Se pide confirmacion en vez de asumir exito: un GPIO que conmuta sin
+    # excepcion no prueba que el LED encienda. El circuito puede estar cortado
+    # en cualquier punto (polaridad, resistencia, GND de retorno) y esta funcion
+    # jamas se entera si nadie mira el LED y lo confirma.
+    respuesta = input("  ¿Viste parpadear el LED 5 veces? (s/n): ")
+    ok = respuesta.strip().lower().startswith("s")
+
+    if not ok:
+        print("  FALLA: revisar polaridad del LED, resistencia de 330 ohm,")
+        print("  el cable al GPIO{}, y que su retorno llegue realmente".format(
+            config.PIN_LED_DIGITAL))
+        print("  al GND del ESP32 (no a un riel sin puentear).")
+    return ok
 
 
 def prueba_led_pwm():
@@ -164,7 +174,7 @@ def prueba_led_pwm():
     Retorna
     -------
     bool
-        True al completar la rampa.
+        True si el operador confirma que vio la rampa de brillo.
 
     Excepciones
     -----------
@@ -189,9 +199,15 @@ def prueba_led_pwm():
     led.apagar()
     print("  Rampa completada (0 -> {} -> 0).".format(config.PWM_MAXIMO))
     print()
-    print("  Si el LED titila: revisar config.PWM_FRECUENCIA_HZ.")
-    print("  Si solo enciende o solo apaga: el pin puede no admitir PWM.")
-    return True
+
+    respuesta = input("  ¿Viste subir y bajar el brillo, sin titileo? (s/n): ")
+    ok = respuesta.strip().lower().startswith("s")
+
+    if not ok:
+        print("  FALLA: si no se movio nada, revisar polaridad, resistencia de")
+        print("  330 ohm y el GND de retorno del GPIO{}.".format(config.PIN_LED_PWM))
+        print("  Si titila: revisar config.PWM_FRECUENCIA_HZ.")
+    return ok
 
 
 def prueba_switch():

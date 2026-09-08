@@ -15,6 +15,7 @@ dinámica de destino.
 | Documento | Qué cubre |
 |---|---|
 | [PARTE-1.md](PARTE-1.md) | **Guía de banco de la Parte 1**: paso a paso, conexiones, validación desde PC con Modbus Poll, checklist de 16 pruebas y captura de evidencia |
+| [PARTE-2.md](PARTE-2.md) | **Guía de banco de la Parte 2**: maestro ESP32 monoesclavo, la regla de un solo maestro, sniffer pasivo, métricas a registrar y checklist de 14 pruebas |
 
 ### Marco teórico y diseño
 
@@ -36,6 +37,7 @@ dinámica de destino.
 | [firmware/maestro/main.py](firmware/maestro/main.py) | Cliente MODBus RTU con máquina de estados |
 | [firmware/prueba_perifericos.py](firmware/prueba_perifericos.py) | Banco de pruebas de hardware sin MODBus (Fase 1) |
 | [herramientas/modbus_tramas.py](herramientas/modbus_tramas.py) | CRC-16 propio y decodificador de tramas (corre en la PC) |
+| [herramientas/sniffer_rs485.py](herramientas/sniffer_rs485.py) | Analizador pasivo del bus: captura el diálogo maestro↔esclavo (requiere `pyserial`) |
 
 ### Material de cátedra y evidencia
 
@@ -90,7 +92,7 @@ bus funcione con el hardware real) se ataca primero.
 | 0 | Diseño y documentación previa | Arquitectura, protocolo, mapa de registros, diagramas, firmware escrito | ✅ Hecho |
 | 1 | Bring-up eléctrico ([guía](PARTE-1.md#7-paso-a-paso-de-resolución)) | Divisor medido entre 2,6 y 3,4 V · `prueba_perifericos.py` en verde | ⬜ Pendiente |
 | 2 | Esclavo 1 validado desde PC ([PARTE-1.md](PARTE-1.md)) | Las 16 pruebas del checklist de [PARTE-1.md §10](PARTE-1.md#10-checklist-de-validación) + evidencia capturada | ⬜ Pendiente |
-| 3 | Maestro monoesclavo (Parte 2) | Polling bidireccional estable 5 min sin timeouts | ⬜ Pendiente |
+| 3 | Maestro monoesclavo ([PARTE-2.md](PARTE-2.md)) | Las 14 pruebas de [PARTE-2.md §12](PARTE-2.md#12-checklist-de-validación) · sondeo estable 5 min con tasa de error medida | 🟡 Funcionando: 4 caminos de datos OK, 750 ciclos con 0 fallos. Falta checklist y evidencia |
 | 4 | Multiesclavo (Parte 3) | Conmutación en vivo · el no seleccionado retiene estado | ⬜ Pendiente |
 | 5 | Captura y análisis de tramas | Una trama real por cada función (02, 04, 05, 06) desglosada | ⬜ Pendiente |
 | 6 | Informe técnico | PDF con el formato de la cátedra | ⬜ Pendiente |
