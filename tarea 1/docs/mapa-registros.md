@@ -1,6 +1,7 @@
 # Mapa de registros MODBus
 
 **Tarea Nº1 — Red MODBus RTU sobre RS-485** · Protocolos de Comunicaciones Industriales · UNRaf
+**Autores:** Bevilacqua Francisco, Peralta Agustina
 
 Este documento es el **contrato de datos** del sistema: qué variable vive en qué
 dirección, con qué tipo, rango y escala. Es el entregable que hace reproducible y

@@ -1,5 +1,7 @@
 # Diagrama de flujo — Esclavo MODBus RTU
 
+**Autores:** Bevilacqua Francisco, Peralta Agustina
+
 Cada bloque nombra la función de [firmware/esclavo/main.py](../firmware/esclavo/main.py)
 que lo implementa (requerimiento adicional 2 de la consigna: trazabilidad de código).
 

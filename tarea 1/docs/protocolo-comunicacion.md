@@ -1,6 +1,7 @@
 # Protocolo de comunicación — MODBus RTU
 
 **Tarea Nº1 — Red MODBus RTU sobre RS-485** · Protocolos de Comunicaciones Industriales · UNRaf
+**Autores:** Bevilacqua Francisco, Peralta Agustina
 
 Este documento describe **el comportamiento de la red**: cómo se configura el
 puerto serie y por qué, cómo se estructura cada trama que viaja por el bus, cómo

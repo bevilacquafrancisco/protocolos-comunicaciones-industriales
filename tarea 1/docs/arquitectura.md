@@ -1,6 +1,7 @@
 # Arquitectura física del sistema
 
 **Tarea Nº1 — Red MODBus RTU sobre RS-485** · Protocolos de Comunicaciones Industriales · UNRaf
+**Autores:** Bevilacqua Francisco, Peralta Agustina
 
 Este documento centraliza **todo lo físico** del proyecto: dónde se ubica el
 sistema dentro de una arquitectura de automatización, cómo está construido el bus

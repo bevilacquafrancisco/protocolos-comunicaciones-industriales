@@ -1,6 +1,7 @@
 # PARTE 1 — Implementación del Esclavo MODBus RTU y validación desde PC
 
 **Tarea Nº1** · Protocolos de Comunicaciones Industriales · UNRaf
+**Autores:** Bevilacqua Francisco, Peralta Agustina
 
 Guía de ejecución de banco: qué construir, en qué orden, qué medir y cómo
 interpretar lo que se ve. Es el documento operativo; la fundamentación teórica

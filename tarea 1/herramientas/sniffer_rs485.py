@@ -1,6 +1,6 @@
 """
 sniffer_rs485.py
-Autor: Francisco Bevilacqua
+Autores: Bevilacqua Francisco, Peralta Agustina
 Fecha de creacion: 2026-09-07
 Version: 1.0
 

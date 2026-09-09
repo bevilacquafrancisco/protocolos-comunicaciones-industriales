@@ -1,6 +1,7 @@
 # PARTE 2 — Comunicación bidireccional con maestro MODBus monoesclavo
 
 **Tarea Nº1** · Protocolos de Comunicaciones Industriales · UNRaf
+**Autores:** Bevilacqua Francisco, Peralta Agustina
 
 Guía de ejecución de banco de la Parte 2: la PC deja de ser el maestro y ese rol
 pasa a un segundo ESP32. Continúa a [PARTE-1.md](PARTE-1.md), que se da por

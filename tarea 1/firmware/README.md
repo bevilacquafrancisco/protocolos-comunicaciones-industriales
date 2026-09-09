@@ -1,5 +1,7 @@
 # Firmware — Tarea Nº1 MODBus RTU
 
+**Autores:** Bevilacqua Francisco, Peralta Agustina
+
 Tres nodos ESP32 con **MicroPython**, programados desde el **IDE Thonny**, sobre
 un bus RS-485 compartido.
 

@@ -1,6 +1,7 @@
 # Tarea Nº1 — Red de comunicación industrial MODBus RTU sobre RS-485
 
 Protocolos de Comunicaciones Industriales · 4to año, Ingeniería en Computación · UNRaf
+**Autores:** Bevilacqua Francisco, Peralta Agustina
 
 Tres nodos **ESP32 con MicroPython**, programados desde el **IDE Thonny**, sobre
 un bus RS-485 compartido: un maestro MODBus RTU y dos esclavos con selección
@@ -16,6 +17,7 @@ dinámica de destino.
 |---|---|
 | [PARTE-1.md](PARTE-1.md) | **Guía de banco de la Parte 1**: paso a paso, conexiones, validación desde PC con Modbus Poll, checklist de 16 pruebas y captura de evidencia |
 | [PARTE-2.md](PARTE-2.md) | **Guía de banco de la Parte 2**: maestro ESP32 monoesclavo, la regla de un solo maestro, sniffer pasivo, métricas a registrar y checklist de 14 pruebas |
+| [PARTE-3.md](PARTE-3.md) | **Guía de banco de la Parte 3**: arquitectura multiesclavo, por qué no hace falta código nuevo, conexiones del segundo esclavo y del selector, verificación de retención de estado y checklist de 15 pruebas |
 
 ### Marco teórico y diseño
 
@@ -46,6 +48,7 @@ dinámica de destino.
 | [Tarea_1_MODBus_V26.pdf](Tarea_1_MODBus_V26.pdf) | Consigna original |
 | [Marco_Teorico_y_Planificacion_TP1_MODBus.docx](Marco_Teorico_y_Planificacion_TP1_MODBus.docx) | Planificación previa del grupo |
 | [docs/MAX481.PDF](docs/MAX481.PDF) | Datasheet del transceptor |
+| [evidencia/INCONVENIENTES.md](evidencia/INCONVENIENTES.md) | **Registro de problemas de banco y su resolución**, con diagnóstico, hipótesis descartadas y verificación |
 | `evidencia/` | Capturas de Modbus Poll, tramas y fotos del banco *(a completar)* |
 | `informe/` | Informe técnico — **se redacta al final del desarrollo** |
 
@@ -93,7 +96,7 @@ bus funcione con el hardware real) se ataca primero.
 | 1 | Bring-up eléctrico ([guía](PARTE-1.md#7-paso-a-paso-de-resolución)) | Divisor medido entre 2,6 y 3,4 V · `prueba_perifericos.py` en verde | ⬜ Pendiente |
 | 2 | Esclavo 1 validado desde PC ([PARTE-1.md](PARTE-1.md)) | Las 16 pruebas del checklist de [PARTE-1.md §10](PARTE-1.md#10-checklist-de-validación) + evidencia capturada | ⬜ Pendiente |
 | 3 | Maestro monoesclavo ([PARTE-2.md](PARTE-2.md)) | Las 14 pruebas de [PARTE-2.md §12](PARTE-2.md#12-checklist-de-validación) · sondeo estable 5 min con tasa de error medida | 🟡 Funcionando: 4 caminos de datos OK, 750 ciclos con 0 fallos. Falta checklist y evidencia |
-| 4 | Multiesclavo (Parte 3) | Conmutación en vivo · el no seleccionado retiene estado | ⬜ Pendiente |
+| 4 | Multiesclavo ([PARTE-3.md](PARTE-3.md)) | Las 15 pruebas de [PARTE-3.md §12](PARTE-3.md#12-checklist-de-validación) · conmutación en vivo · el no seleccionado retiene estado | ⬜ Pendiente |
 | 5 | Captura y análisis de tramas | Una trama real por cada función (02, 04, 05, 06) desglosada | ⬜ Pendiente |
 | 6 | Informe técnico | PDF con el formato de la cátedra | ⬜ Pendiente |
 | 7 | Defensa oral | Guion cronometrado de 12 min + video de respaldo | ⬜ Pendiente |
