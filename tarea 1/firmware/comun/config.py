@@ -235,3 +235,80 @@ ANTIRREBOTE_MS = 20
 #: el LED PWM del maestro titilaria. 8 muestras es potencia de 2, por lo que el
 #: promedio se calcula con un desplazamiento en vez de una division.
 MUESTRAS_ADC = 8
+
+
+# =============================================================================
+# 5. ROBUSTEZ DEL SONDEO (Parte 3)
+# =============================================================================
+# Esta seccion aparece al incorporar el tercer nodo. Con dos nodos el bus toleraba
+# una politica de fallo binaria; con tres, una perdida esporadica de trama deja de
+# ser un evento raro y pasa a ser parte del regimen normal de operacion, por lo
+# que la reaccion del maestro ante un fallo aislado debe ser proporcional.
+
+#: Reintentos de una misma transaccion antes de darla por perdida.
+#:
+#: MODBus no numera las tramas ni las confirma, de modo que el reintento es el
+#: unico mecanismo de recuperacion que define la especificacion, y es el que usa
+#: cualquier maestro industrial. Las cuatro transacciones del ciclo son
+#: idempotentes -dos lecturas y dos escrituras de valor absoluto, no incrementos-,
+#: por lo que repetir una es seguro por construccion: escribir dos veces el mismo
+#: valor deja el esclavo en el mismo estado que escribirlo una vez.
+#:
+#: Costo en el peor caso: 1 reintento x 300 ms de timeout = 300 ms adicionales
+#: sobre un periodo de 200 ms. El ciclo se estira, pero el maestro nunca se
+#: bloquea indefinidamente y el sistema degrada de forma gradual.
+REINTENTOS_TRANSACCION = 1
+
+#: Tiempo sostenido sin ninguna transaccion exitosa antes de declarar ausente al
+#: esclavo y apagar los LED replicadores locales, en milisegundos.
+#:
+#: Sustituye al criterio anterior, que contaba ciclos consecutivos con fallo. El
+#: cambio corrige un defecto concreto: contando ciclos, tres fallos aislados
+#: separados por ciclos buenos podian igualmente disparar la degradacion, y el
+#: resultado visible era un parpadeo de los LED del maestro. Con un criterio
+#: temporal, la degradacion exige AUSENCIA SOSTENIDA de comunicacion, que es lo
+#: que realmente significa "el esclavo no esta".
+#:
+#: 2000 ms equivalen a diez periodos de sondeo: suficiente para que el operador
+#: distinga una perdida momentanea de una desconexion real.
+MS_PARA_DECLARAR_AUSENTE = 2000
+
+#: Muestras consecutivas coincidentes exigidas para aceptar un cambio del switch
+#: selector del maestro.
+#:
+#: El selector se muestrea una sola vez por ciclo, por lo que un unico pulso
+#: espurio en ese instante desvia las cuatro transacciones del ciclo al esclavo
+#: equivocado. El pull-up interno del ESP32 ronda los 45 kOhm, valor alto: un
+#: cable dupont tendido en paralelo al bus acopla lo suficiente como para
+#: producir ese pulso. Ver diagnostico.EntradaConfirmada.
+CONFIRMACIONES_SELECTOR = 3
+
+#: Variacion minima del valor PWM para reescribirlo en el esclavo.
+#:
+#: El ADC del ESP32 conserva un ruido de algunas unidades aun promediando 8
+#: muestras. Tras el escalado a 0-255 ese ruido se traduce en oscilaciones de una
+#: o dos unidades, que producen un titileo perceptible en el LED del esclavo y,
+#: sobre todo, consumen una transaccion del bus para no cambiar nada. La zona
+#: muerta suprime ambos efectos. Se aplica a la ESCRITURA, no a la lectura: el
+#: Input Register sigue publicando el valor real del conversor.
+ZONA_MUERTA_PWM = 2
+
+
+# =============================================================================
+# 6. DIAGNOSTICO Y TRAZA
+# =============================================================================
+# Ver firmware/comun/diagnostico.py para el detalle de cada nivel.
+#
+#   0 SILENCIO   1 ERROR   2 AVISO   3 INFO   4 DETALLE   5 TRAMA
+#
+# ADVERTENCIA SOBRE EL EFECTO SONDA: cada print() por la consola USB de Thonny
+# cuesta entre 1 y 3 ms. En nivel 5 el esclavo puede tardar mas que el timeout
+# del maestro en volver a atender el bus, generando timeouts que NO existen con
+# la traza apagada. Por eso el nivel 5 se usa en capturas cortas y de a un nodo
+# por vez, nunca en los tres a la vez ni durante una medicion de tasa de error.
+
+#: Nivel de traza activo en este nodo.
+NIVEL_LOG = 3
+
+#: Periodo del resumen estadistico periodico del maestro, en milisegundos.
+PERIODO_RESUMEN_MS = 5000

@@ -46,7 +46,104 @@ from machine import Pin
 from umodbus.serial import ModbusRTU
 
 import config
+import diagnostico
+from diagnostico import DetectorDeCambio, Registrador, describir_trama
 from perifericos import EntradaDigital, EntradaAnalogica, SalidaDigital, SalidaPWM
+
+
+# =============================================================================
+# DIAGNOSTICO DEL NODO
+# =============================================================================
+# El registrador se construye a nivel de modulo, antes que cualquier objeto,
+# porque la subclase del servidor MODBus necesita usarlo dentro de metodos que la
+# libreria invoca sin pasarle referencias.
+#
+# El prefijo se completa con el Unit ID en el arranque, una vez leido el jumper:
+# con tres consolas de Thonny abiertas en paralelo, poder distinguir de un
+# vistazo cual es el Esclavo 1 y cual el Esclavo 2 es la diferencia entre una
+# traza util y tres ventanas identicas.
+LOG = Registrador("ESCLAVO ?")
+
+
+class ServidorRTUInstrumentado(ModbusRTU):
+    """
+    Servidor MODBus RTU que deja traza de todo lo que entra por el bus.
+
+    Responsabilidad dentro del sistema
+    ----------------------------------
+    Observar el bus desde el punto de vista del esclavo, sin alterar el
+    comportamiento del protocolo. Es la contraparte de la instrumentacion del
+    maestro y resuelve una pregunta que desde el maestro no puede responderse:
+    cuando una transaccion falla, hay que distinguir si el esclavo NO RECIBIO la
+    peticion (problema de capa fisica en el sentido maestro -> esclavo) o si la
+    recibio y su respuesta se perdio (problema en el sentido inverso). Solo el
+    esclavo tiene ese dato.
+
+    Se instrumenta ademas el descarte de tramas dirigidas a otro Unit ID. Con
+    dos esclavos en el bus, cada nodo ve el doble de trafico del que le
+    corresponde, y confirmar que el filtrado por direccion funciona descarta de
+    plano toda una familia de hipotesis sobre salidas que cambian solas.
+
+    Atributos principales
+    ---------------------
+    tramas_recibidas : int
+        Tramas leidas del bus, propias y ajenas.
+    tramas_propias : int
+        Tramas cuyo primer byte coincide con el Unit ID de este nodo.
+
+    Relaciones con otras clases
+    ---------------------------
+    Extiende umodbus.serial.ModbusRTU sin modificar su logica de protocolo:
+    unicamente observa el resultado de _uart_read_frame().
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Inicializa los contadores y delega en la clase base."""
+        super().__init__(*args, **kwargs)
+        self.tramas_recibidas = 0
+        self.tramas_propias = 0
+
+    def _uart_read_frame(self, timeout=None):
+        """
+        Lee una trama del bus y la registra antes de entregarla al protocolo.
+
+        La traza se emite en nivel TRAMA y la clasificacion en nivel DETALLE,
+        de modo que el costo de imprimir solo se paga cuando se lo pidio
+        explicitamente. En niveles bajos, este metodo cuesta dos comparaciones
+        de enteros.
+
+        Parametros
+        ----------
+        timeout : int, opcional
+            Tiempo maximo de espera en microsegundos, gestionado por la libreria.
+            No se modifica: el esclavo es pasivo y no impone tiempos al bus.
+
+        Retorna
+        -------
+        bytearray
+            La trama recibida, tal como la devuelve la clase base.
+
+        Excepciones
+        -----------
+        Las que propague la implementacion de la clase base.
+        """
+        trama = super()._uart_read_frame(timeout)
+
+        if trama:
+            self.tramas_recibidas += 1
+            propia = trama[0] == self.addr
+            if propia:
+                self.tramas_propias += 1
+
+            if LOG.habilitado(diagnostico.TRAMA):
+                LOG.trama("RX" if propia else "RX (ajena)", trama)
+            if LOG.habilitado(diagnostico.DETALLE):
+                LOG.detalle("{} {}".format(
+                    "PETICION" if propia else "descartada por direccion",
+                    describir_trama(trama),
+                ))
+
+        return trama
 
 
 # =============================================================================
@@ -176,7 +273,7 @@ def configurar_servidor_modbus(unit_id):
     inicial). Los valores iniciales definen el estado seguro del dispositivo
     antes de recibir la primera orden del maestro: ambas salidas en reposo.
     """
-    cliente = ModbusRTU(
+    cliente = ServidorRTUInstrumentado(
         addr=unit_id,
         baudrate=config.BAUDRATE,
         data_bits=config.BITS_DATOS,
@@ -276,6 +373,16 @@ def publicar_entradas(cliente, perifericos):
 # BLOQUE E5 del diagrama de flujo — Aplicacion de las salidas fisicas
 # =============================================================================
 
+#: Detectores de transicion de las dos salidas. Son de modulo y no locales
+#: porque deben conservar el valor anterior entre llamadas, y aplicar_salidas()
+#: se invoca en cada vuelta del lazo.
+#:
+#: El detector del PWM no lleva zona muerta: aqui interesa registrar CUALQUIER
+#: cambio del registro, incluso de una unidad, porque un titileo del LED por
+#: oscilacion minima del valor es precisamente uno de los sintomas a distinguir.
+CAMBIO_COIL = DetectorDeCambio()
+CAMBIO_HREG = DetectorDeCambio()
+
 def aplicar_salidas(cliente, perifericos):
     """
     Lleva a los actuadores el contenido actual de las areas escribibles.
@@ -308,16 +415,32 @@ def aplicar_salidas(cliente, perifericos):
     Ninguna.
     """
     # Coil 00001 -> LED 1 digital.
-    perifericos["led_digital"].escribir(
-        cliente.get_coil(address=config.DIR_COIL_LED_DIGITAL)
-    )
+    coil = cliente.get_coil(address=config.DIR_COIL_LED_DIGITAL)
+    perifericos["led_digital"].escribir(coil)
 
     # Holding Register 40001 -> LED 2 PWM. La capa de perifericos acota el valor
     # al rango 0-255: si un maestro mal configurado escribe 5000, el esclavo
     # satura y sigue operando en vez de lanzar una excepcion y reiniciarse.
-    perifericos["led_pwm"].escribir(
-        cliente.get_hreg(address=config.DIR_HOLDING_REGISTER_PWM)
-    )
+    hreg = cliente.get_hreg(address=config.DIR_HOLDING_REGISTER_PWM)
+    perifericos["led_pwm"].escribir(hreg)
+
+    # Registro POR CAMBIO, no por iteracion.
+    #
+    # Este lazo gira cientos de veces por segundo: imprimir el estado en cada
+    # vuelta produce un torrente ilegible y, peor, retrasa tanto el nodo que
+    # genera los timeouts que se pretende diagnosticar. Imprimir solo las
+    # TRANSICIONES produce exactamente la traza de un parpadeo, con su instante
+    # y su intervalo, que es el dato que permite atribuirlo: si aqui no aparece
+    # ninguna transicion mientras el LED titila, el problema no esta en los
+    # registros de este esclavo.
+    if CAMBIO_COIL.cambio(bool(coil)):
+        LOG.info("Coil 00001 -> {}  (LED digital, transicion nro {})".format(
+            1 if coil else 0, CAMBIO_COIL.transiciones - 1,
+        ))
+    if CAMBIO_HREG.cambio(hreg):
+        LOG.info("HR 40001 -> {}  (LED PWM, transicion nro {})".format(
+            hreg, CAMBIO_HREG.transiciones - 1,
+        ))
 
 
 # =============================================================================
@@ -362,6 +485,9 @@ def main():
     perifericos = configurar_perifericos()
     cliente = configurar_servidor_modbus(unit_id)
 
+    # Identificacion del nodo en la traza, una vez conocido el Unit ID.
+    LOG.fijar_prefijo("ESCLAVO {}".format(unit_id))
+
     print("=" * 58)
     print("ESCLAVO MODBus RTU  |  Unit ID = {}".format(unit_id))
     print("Bus: {} baudios, {}{}{}".format(
@@ -374,7 +500,11 @@ def main():
         config.UART_ID, config.PIN_UART_TX, config.PIN_UART_RX, config.PIN_DE_RE,
     ))
     print("Registros: DI 10001 | IR 30001 | Coil 00001 | HR 40001")
+    print("Nivel de traza: {} (0 silencio ... 5 trama)".format(config.NIVEL_LOG))
     print("=" * 58)
+
+    instante_resumen = time.ticks_ms()
+    errores = 0
 
     while True:
         try:
@@ -385,7 +515,28 @@ def main():
             # Se informa pero no se aborta. Causas esperables: trama truncada por
             # ruido en el bus, o una funcion MODBus no implementada solicitada
             # por una herramienta de diagnostico.
-            print("[ESCLAVO {}] Error atendiendo el bus: {}".format(unit_id, error))
+            errores += 1
+            LOG.error("Error atendiendo el bus: {}".format(error))
+
+        # Latido periodico.
+        #
+        # Su valor no esta en los numeros sino en su AUSENCIA: si el maestro
+        # reporta timeouts contra este esclavo y aca el latido sigue saliendo con
+        # tramas_propias creciendo, el esclavo recibe y contesta, y el problema
+        # esta en el camino de vuelta. Si el latido sale pero tramas_propias no
+        # crece, el esclavo no esta recibiendo. Y si el latido deja de salir, el
+        # nodo se colgo o se reinicio. Tres diagnosticos distintos a partir de
+        # una sola linea periodica.
+        if time.ticks_diff(time.ticks_ms(), instante_resumen) >= config.PERIODO_RESUMEN_MS:
+            instante_resumen = time.ticks_ms()
+            LOG.info("latido: tramas={} propias={} ajenas={} errores={} | DI={} IR={}".format(
+                cliente.tramas_recibidas,
+                cliente.tramas_propias,
+                cliente.tramas_recibidas - cliente.tramas_propias,
+                errores,
+                1 if perifericos["switch"].leer() else 0,
+                perifericos["potenciometro"].leer(),
+            ))
 
 
 if __name__ == "__main__":

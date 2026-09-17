@@ -52,6 +52,15 @@ from machine import Pin
 from umodbus.serial import Serial as ModbusRTUMaster
 
 import config
+import diagnostico
+from diagnostico import (
+    DetectorDeCambio,
+    EntradaConfirmada,
+    EstadisticaEsclavo,
+    Registrador,
+    clasificar_error,
+    describir_trama,
+)
 from perifericos import (
     EntradaDigital,
     EntradaAnalogica,
@@ -87,16 +96,19 @@ NOMBRES_ESTADO = {
     ESTADO_ESPERA: "ESPERA",
 }
 
-#: Cada cuantos ciclos se emite la linea de estadisticas por consola.
-#: 25 ciclos x 200 ms = un reporte cada 5 segundos: suficiente para seguir el
-#: sistema en vivo sin inundar el Shell de Thonny ni robarle tiempo al lazo.
-CICLOS_ENTRE_REPORTES = 25
+# Nota de evolucion: hasta la Parte 2 el reporte se emitia cada N ciclos y la
+# degradacion se decidia contando ciclos consecutivos con fallo. Ambos criterios
+# se reemplazaron por criterios TEMPORALES (config.PERIODO_RESUMEN_MS y
+# config.MS_PARA_DECLARAR_AUSENTE) al incorporar el tercer nodo, porque con
+# reintentos la duracion del ciclo dejo de ser constante y, sobre todo, porque
+# contar fallos aislados hacia parpadear los LED replicadores. El detalle esta
+# en _registrar_fallo().
 
-#: Cantidad de ciclos consecutivos con fallo tras los cuales se considera que el
-#: esclavo esta ausente y se apagan los replicadores locales. Se eligio 3 y no 1
-#: para no reaccionar a una unica trama perdida por ruido, que en un bus RS-485
-#: es un evento normal y no una falla del dispositivo.
-CICLOS_PARA_DECLARAR_AUSENTE = 3
+#: Registrador del nodo. Se construye a nivel de modulo, antes que cualquier
+#: objeto, para que la subclase del transceptor pueda volcar tramas sin recibir
+#: una referencia por constructor (la libreria instancia la clase base y no
+#: admite argumentos extra).
+LOG = Registrador("MAESTRO")
 
 
 class MaestroRTUConTimeout(ModbusRTUMaster):
@@ -255,9 +267,24 @@ class MaestroRTUConTimeout(ModbusRTUMaster):
         # resuelto" en el docstring de la clase. Ningun byte legitimo del
         # esclavo puede llegar dentro de esta ventana.
         time.sleep_us(self._VENTANA_DESCARTE_GLITCH_US)
-        self._uart.read()
+        descartado = self._uart.read()
 
-        return super()._uart_read_frame(timeout)
+        # Lo descartado no es basura sin valor: si aqui aparecen bytes de forma
+        # sistematica, el bus esta entregando algo fuera de la ventana de
+        # respuesta (eco de la propia transmision, un nodo que habla sin que se
+        # lo interrogue, o ruido de linea). Se registra en nivel TRAMA porque es
+        # exactamente el dato que distingue esas tres causas.
+        if descartado and LOG.habilitado(diagnostico.TRAMA):
+            LOG.trama("RX descartado en la ventana de guarda", descartado)
+
+        trama = super()._uart_read_frame(timeout)
+
+        if LOG.habilitado(diagnostico.TRAMA):
+            LOG.trama("RX", trama)
+            if trama:
+                LOG.detalle("RX  {}".format(describir_trama(trama)))
+
+        return trama
 
 
 class MaestroModbus:
@@ -325,6 +352,48 @@ class MaestroModbus:
 
         self._fallos_consecutivos = 0
         self._instante_fin_espera = time.ticks_ms()
+
+        # --- Diagnostico y robustez (Parte 3) -------------------------------
+        #: Registrador compartido con la subclase del transceptor.
+        self._log = LOG
+
+        #: Estadistica desglosada por Unit ID. Es lo que permite separar un
+        #: problema del bus (fallan los dos esclavos por igual) de un problema
+        #: de un nodo (falla uno solo).
+        self._estadistica = {
+            config.ID_ESCLAVO_1: EstadisticaEsclavo(),
+            config.ID_ESCLAVO_2: EstadisticaEsclavo(),
+        }
+
+        #: Instante de la ultima transaccion exitosa contra CADA esclavo. La
+        #: degradacion se decide sobre este valor y no sobre un contador de
+        #: ciclos: lo que define a un esclavo ausente es el tiempo que lleva sin
+        #: contestar, no cuantos intentos aislados fallaron.
+        self._ultimo_exito_ms = {
+            config.ID_ESCLAVO_1: time.ticks_ms(),
+            config.ID_ESCLAVO_2: time.ticks_ms(),
+        }
+
+        #: Bandera de esclavo declarado ausente, para emitir el aviso una sola
+        #: vez al entrar y otra al salir, en lugar de una linea por ciclo.
+        self._ausente = False
+
+        #: Ultimo valor PWM efectivamente escrito en cada esclavo, para aplicar
+        #: la zona muerta y no consumir una transaccion en reescribir lo mismo.
+        self._pwm_escrito = {
+            config.ID_ESCLAVO_1: None,
+            config.ID_ESCLAVO_2: None,
+        }
+
+        #: Detectores de cambio. Convierten un valor muestreado continuamente en
+        #: una secuencia de eventos con instante, que es la unica forma de dejar
+        #: registrado un parpadeo.
+        self._cambio_seleccion = DetectorDeCambio()
+        self._cambio_di = DetectorDeCambio()
+        self._cambio_ir = DetectorDeCambio(umbral=config.ZONA_MUERTA_PWM)
+
+        #: Instante del ultimo resumen periodico emitido.
+        self._instante_resumen = time.ticks_ms()
 
         # --- Instrumentacion (Parte 2) --------------------------------------
         # El TP pide registrar el comportamiento temporal del sondeo, y "el LED
@@ -399,9 +468,20 @@ class MaestroModbus:
         """
         self._id_activo = (
             config.ID_ESCLAVO_1
-            if self._perifericos["selector"].value()
+            if self._perifericos["selector"].leer()
             else config.ID_ESCLAVO_2
         )
+
+        # Un cambio de destino es un evento, no un estado: se registra al ocurrir.
+        # Si en la consola aparecen cambios que el operador no provoco, el
+        # problema esta en el selector y no en el bus, y el contador de rechazos
+        # de la entrada confirmada lo cuantifica.
+        if self._cambio_seleccion.cambio(self._id_activo):
+            self._log.aviso("Seleccion -> Esclavo {} (cambios={} rechazos={})".format(
+                self._id_activo,
+                self._cambio_seleccion.transiciones - 1,
+                self._perifericos["selector"].rechazos,
+            ))
 
         # Marca de inicio del ciclo, para medir su duracion util (instrumentacion).
         self._instante_inicio_ciclo = time.ticks_ms()
@@ -441,6 +521,81 @@ class MaestroModbus:
         return ESTADO_LEER_DI_REMOTO
 
     # -------------------------------------------------------------------------
+    # Ejecutor comun de transacciones: reintento, medicion y traza
+    # -------------------------------------------------------------------------
+    def _transaccion(self, etiqueta, operacion):
+        """
+        Ejecuta una transaccion MODBus con reintento, medicion y registro.
+
+        Concentrar aqui el reintento, el cronometraje y la traza evita repetir
+        cuatro veces el mismo bloque try/except y, sobre todo, garantiza que las
+        cuatro transacciones se midan y se registren con el mismo criterio: si
+        cada estado lo hiciera a su manera, los numeros no serian comparables
+        entre si y la estadistica perderia sentido.
+
+        Sobre el reintento: MODBus no confirma ni numera las tramas, de modo que
+        reintentar es el unico mecanismo de recuperacion que define la
+        especificacion. Es seguro aqui porque las cuatro operaciones son
+        idempotentes: dos lecturas, y dos escrituras de valor absoluto. Repetir
+        una escritura deja al esclavo en el mismo estado que ejecutarla una vez.
+
+        Parametros
+        ----------
+        etiqueta : str
+            Nombre de la funcion MODBus para los mensajes, por ejemplo
+            "0x02 Read Discrete Inputs".
+        operacion : callable
+            Funcion sin argumentos que ejecuta la transaccion y devuelve su
+            resultado. Se pasa como funcion y no como datos para que el reintento
+            vuelva a emitir la peticion completa.
+
+        Retorna
+        -------
+        tuple(bool, objeto)
+            (True, resultado) si tuvo exito; (False, None) si se agotaron los
+            reintentos.
+
+        Excepciones
+        -----------
+        Ninguna se propaga: se atrapan, se clasifican y se contabilizan.
+        """
+        ultimo_error = None
+
+        for intento in range(config.REINTENTOS_TRANSACCION + 1):
+            comienzo = time.ticks_ms()
+            try:
+                resultado = operacion()
+            except Exception as error:
+                ultimo_error = error
+                clase = clasificar_error(error)
+                self._estadistica[self._id_activo].registrar(clase)
+                self._log.detalle("{} ID={} intento {}/{} FALLO {} ({} ms)".format(
+                    etiqueta, self._id_activo, intento + 1,
+                    config.REINTENTOS_TRANSACCION + 1, clase,
+                    time.ticks_diff(time.ticks_ms(), comienzo),
+                ))
+                continue
+
+            self._estadistica[self._id_activo].registrar(None)
+            self._ultimo_exito_ms[self._id_activo] = time.ticks_ms()
+            self._log.detalle("{} ID={} OK {} ({} ms)".format(
+                etiqueta, self._id_activo, resultado,
+                time.ticks_diff(time.ticks_ms(), comienzo),
+            ))
+            if intento:
+                # Que el reintento haya salvado la transaccion es informacion de
+                # primer orden: significa que la perdida es esporadica y no que
+                # el nodo este caido.
+                self._log.aviso("{} ID={} recuperada en el reintento {}".format(
+                    etiqueta, self._id_activo, intento,
+                ))
+            self._restaurar_si_estaba_ausente()
+            return True, resultado
+
+        self._registrar_fallo(etiqueta, ultimo_error)
+        return False, None
+
+    # -------------------------------------------------------------------------
     # BLOQUE M4 — Lectura del Discrete Input remoto (funcion 0x02)
     # -------------------------------------------------------------------------
     def _accion_leer_di_remoto(self):
@@ -473,22 +628,29 @@ class MaestroModbus:
         -----------
         Ninguna se propaga: se atrapan y se contabilizan en registrar_fallo().
         """
-        try:
-            respuesta = self._bus.read_discrete_inputs(
+        exito, respuesta = self._transaccion(
+            "0x02 Read Discrete Inputs",
+            lambda: self._bus.read_discrete_inputs(
                 slave_addr=self._id_activo,
                 starting_addr=config.DIR_DISCRETE_INPUT_SWITCH,
                 input_qty=1,
-            )
-            self._di_remoto = bool(respuesta[0])
-
-            # Replicacion pedida por la Parte 2: la entrada digital del esclavo
-            # se refleja en el LED digital local del maestro.
-            self._perifericos["led_replicador_digital"].escribir(self._di_remoto)
-            return ESTADO_LEER_IR_REMOTO
-
-        except Exception as error:
-            self._registrar_fallo("0x02 Read Discrete Inputs", error)
+            ),
+        )
+        if not exito:
             return ESTADO_ESPERA
+
+        self._di_remoto = bool(respuesta[0])
+
+        # Replicacion pedida por la Parte 2: la entrada digital del esclavo
+        # se refleja en el LED digital local del maestro.
+        self._perifericos["led_replicador_digital"].escribir(self._di_remoto)
+
+        if self._cambio_di.cambio((self._id_activo, self._di_remoto)):
+            self._log.info("DI Esclavo {} -> {} (LED digital local)".format(
+                self._id_activo, 1 if self._di_remoto else 0,
+            ))
+
+        return ESTADO_LEER_IR_REMOTO
 
     # -------------------------------------------------------------------------
     # BLOQUE M5 — Lectura del Input Register remoto (funcion 0x04)
@@ -530,24 +692,32 @@ class MaestroModbus:
         -----------
         Ninguna se propaga.
         """
-        try:
-            respuesta = self._bus.read_input_registers(
+        exito, respuesta = self._transaccion(
+            "0x04 Read Input Registers",
+            lambda: self._bus.read_input_registers(
                 slave_addr=self._id_activo,
                 starting_addr=config.DIR_INPUT_REGISTER_POTE,
                 register_qty=1,
                 signed=False,
-            )
-            self._ir_remoto = respuesta[0]
-
-            # Replicacion pedida por la Parte 2: el ADC remoto (0-4095) gobierna
-            # la intensidad del LED PWM local (0-255). El escalado se hace aca,
-            # en el consumidor del dato, no en el esclavo.
-            self._perifericos["led_replicador_pwm"].escribir(adc_a_pwm(self._ir_remoto))
-            return ESTADO_ESCRIBIR_COIL_REMOTO
-
-        except Exception as error:
-            self._registrar_fallo("0x04 Read Input Registers", error)
+            ),
+        )
+        if not exito:
             return ESTADO_ESPERA
+
+        self._ir_remoto = respuesta[0]
+
+        # Replicacion pedida por la Parte 2: el ADC remoto (0-4095) gobierna
+        # la intensidad del LED PWM local (0-255). El escalado se hace aca,
+        # en el consumidor del dato, no en el esclavo.
+        pwm_local = adc_a_pwm(self._ir_remoto)
+        self._perifericos["led_replicador_pwm"].escribir(pwm_local)
+
+        if self._cambio_ir.cambio(pwm_local):
+            self._log.info("IR Esclavo {} -> {} = PWM {} (LED PWM local)".format(
+                self._id_activo, self._ir_remoto, pwm_local,
+            ))
+
+        return ESTADO_ESCRIBIR_COIL_REMOTO
 
     # -------------------------------------------------------------------------
     # BLOQUE M6 — Escritura del Coil remoto (funcion 0x05)
@@ -585,17 +755,16 @@ class MaestroModbus:
         -----------
         Ninguna se propaga.
         """
-        try:
-            self._bus.write_single_coil(
+        estado_local = self._perifericos["switch_local"].leer()
+        exito, _ = self._transaccion(
+            "0x05 Write Single Coil",
+            lambda: self._bus.write_single_coil(
                 slave_addr=self._id_activo,
                 output_address=config.DIR_COIL_LED_DIGITAL,
-                output_value=self._perifericos["switch_local"].leer(),
-            )
-            return ESTADO_ESCRIBIR_HREG_REMOTO
-
-        except Exception as error:
-            self._registrar_fallo("0x05 Write Single Coil", error)
-            return ESTADO_ESPERA
+                output_value=estado_local,
+            ),
+        )
+        return ESTADO_ESCRIBIR_HREG_REMOTO if exito else ESTADO_ESPERA
 
     # -------------------------------------------------------------------------
     # BLOQUE M7 — Escritura del Holding Register remoto (funcion 0x06)
@@ -636,19 +805,34 @@ class MaestroModbus:
         -----------
         Ninguna se propaga.
         """
-        try:
-            valor_local = adc_a_pwm(self._perifericos["potenciometro_local"].leer())
-            self._bus.write_single_register(
-                slave_addr=self._id_activo,
-                register_address=config.DIR_HOLDING_REGISTER_PWM,
-                register_value=valor_local,
-                signed=False,
+        valor_local = adc_a_pwm(self._perifericos["potenciometro_local"].leer())
+
+        # Zona muerta: si el valor no se movio mas alla del ruido del conversor,
+        # no se emite la transaccion. Evita dos cosas a la vez: el titileo del
+        # LED del esclavo por oscilaciones de una unidad, y el gasto de una
+        # transaccion del bus para reescribir lo que ya estaba escrito.
+        anterior = self._pwm_escrito[self._id_activo]
+        if anterior is not None and abs(valor_local - anterior) <= config.ZONA_MUERTA_PWM:
+            self._log.detalle("0x06 omitida ID={} (PWM {} dentro de la zona muerta)".format(
+                self._id_activo, valor_local,
+            ))
+            exito = True
+        else:
+            exito, _ = self._transaccion(
+                "0x06 Write Single Register",
+                lambda: self._bus.write_single_register(
+                    slave_addr=self._id_activo,
+                    register_address=config.DIR_HOLDING_REGISTER_PWM,
+                    register_value=valor_local,
+                    signed=False,
+                ),
             )
+            if exito:
+                self._pwm_escrito[self._id_activo] = valor_local
+
+        if exito:
             # Ciclo completo sin errores: el esclavo esta sano.
             self._fallos_consecutivos = 0
-
-        except Exception as error:
-            self._registrar_fallo("0x06 Write Single Register", error)
 
         # --- Cierre del ciclo: instrumentacion ------------------------------
         # Se mide ACA y no en ESPERA porque lo que interesa es el tiempo que las
@@ -661,7 +845,12 @@ class MaestroModbus:
         if self._ciclo_actual_fallido:
             self._ciclos_con_fallo += 1
 
-        if self._ciclos_totales % CICLOS_ENTRE_REPORTES == 0:
+        # El resumen se emite por TIEMPO y no cada N ciclos. Con reintentos, la
+        # duracion del ciclo es variable, de modo que un criterio por ciclos
+        # produciria un resumen a intervalos irregulares, justamente cuando el
+        # sistema esta degradado y el intervalo importa para leer la traza.
+        if time.ticks_diff(time.ticks_ms(), self._instante_resumen) >= config.PERIODO_RESUMEN_MS:
+            self._instante_resumen = time.ticks_ms()
             self._informar_estadisticas()
 
         return ESTADO_ESPERA
@@ -696,6 +885,16 @@ class MaestroModbus:
         Ninguna.
         """
         porcentaje = (self._ciclos_con_fallo * 1000 // self._ciclos_totales) / 10
+
+        # Desglose por esclavo. Es la linea que decide hacia donde mirar: si los
+        # dos esclavos muestran una tasa de error parecida, el sospechoso es el
+        # medio compartido (terminacion, polarizacion, masas); si falla uno solo,
+        # el sospechoso es ese nodo (su transceptor, su cableado, su jumper).
+        for unit_id in sorted(self._estadistica):
+            self._log.info("  Esclavo {}: {}".format(
+                unit_id, self._estadistica[unit_id].resumen(),
+            ))
+
         print(
             "[MAESTRO] ciclos={} fallos={} ({}%) t_ciclo={}ms | "
             "ID={} DI={} IR={} -> PWM={}".format(
@@ -765,12 +964,17 @@ class MaestroModbus:
         senaliza ambos casos como excepcion de Python, por lo que se registra el
         texto del error para poder distinguirlos en el diagnostico.
 
-        Politica de degradacion: tras CICLOS_PARA_DECLARAR_AUSENTE ciclos
-        consecutivos con fallo, se apagan los LED replicadores locales. El
-        criterio de ingenieria es que una indicacion congelada es peor que
-        ninguna indicacion: un operador que ve el LED replicador encendido
-        supone que esa es la lectura actual del esclavo, cuando en realidad es
-        un valor viejo de hace varios segundos.
+        Politica de degradacion: tras config.MS_PARA_DECLARAR_AUSENTE
+        milisegundos sin NINGUNA transaccion exitosa contra el esclavo en curso,
+        se apagan los LED replicadores locales. El criterio de ingenieria es que
+        una indicacion congelada es peor que ninguna indicacion: un operador que
+        ve el LED replicador encendido supone que esa es la lectura actual del
+        esclavo, cuando en realidad es un valor viejo de hace varios segundos.
+
+        El criterio es TEMPORAL y no por fallos contados. Contando fallos, tres
+        perdidas aisladas separadas por ciclos correctos disparaban igualmente la
+        degradacion, y el efecto visible era un parpadeo de los LED del maestro
+        que no correspondia a ningun cambio real en el esclavo.
 
         Notese que esto NO afecta a las salidas del esclavo, que conservan su
         ultimo valor recibido: eso es exactamente lo que pide la Parte 3.
@@ -797,13 +1001,74 @@ class MaestroModbus:
         # ciclos de sondeo salio completa", no cuantas tramas se perdieron.
         self._ciclo_actual_fallido = True
 
-        print("[MAESTRO] Fallo {} con Esclavo {} ({} consecutivos): {}".format(
-            funcion, self._id_activo, self._fallos_consecutivos, error,
+        self._log.error("Fallo {} con Esclavo {} [{}] ({} consecutivos): {}".format(
+            funcion, self._id_activo, clasificar_error(error),
+            self._fallos_consecutivos, error,
         ))
 
-        if self._fallos_consecutivos >= CICLOS_PARA_DECLARAR_AUSENTE:
+        # Degradacion por AUSENCIA SOSTENIDA, no por fallos contados.
+        #
+        # El criterio anterior apagaba los LED replicadores tras tres ciclos
+        # consecutivos con algun fallo. Con tres nodos en el bus, las perdidas
+        # esporadicas dejan de ser raras, y ese criterio hacia que los LED del
+        # maestro se apagaran y se volvieran a encender cada pocos cientos de
+        # milisegundos: el parpadeo observado en banco no era el esclavo
+        # cambiando de estado, era la politica de degradacion reaccionando a
+        # perdidas aisladas. Exigir un intervalo sin NINGUNA transaccion exitosa
+        # mantiene intacta la intencion original -no mostrar un dato viejo como
+        # si fuera actual- y elimina la reaccion desproporcionada.
+        sin_respuesta_ms = time.ticks_diff(
+            time.ticks_ms(), self._ultimo_exito_ms[self._id_activo]
+        )
+        if sin_respuesta_ms >= config.MS_PARA_DECLARAR_AUSENTE and not self._ausente:
+            self._ausente = True
             self._perifericos["led_replicador_digital"].escribir(False)
             self._perifericos["led_replicador_pwm"].apagar()
+            self._log.aviso(
+                "Esclavo {} AUSENTE ({} ms sin responder): replicadores apagados".format(
+                    self._id_activo, sin_respuesta_ms,
+                )
+            )
+
+    def _restaurar_si_estaba_ausente(self):
+        """
+        Sale del estado degradado tras recuperar la comunicacion.
+
+        Se emite una sola linea al volver, y no una por cada transaccion
+        exitosa: el evento es la transicion, no la permanencia. Sin esta
+        funcion, el estado de ausencia quedaria pegado y el maestro nunca
+        volveria a informar que el esclavo regreso.
+
+        Parametros
+        ----------
+        Ninguno.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        if self._ausente:
+            self._ausente = False
+
+            # Se olvida el ultimo PWM escrito para forzar una reescritura en el
+            # ciclo siguiente. Sin esto, la zona muerta introduciria un fallo
+            # sutil: si el esclavo se reinicio durante la ausencia, sus salidas
+            # arrancan en el estado seguro (PWM 0) y el maestro, al comparar
+            # contra el valor que creia escrito, decidiria que no hace falta
+            # reescribir. El LED del esclavo quedaria apagado hasta que alguien
+            # moviera el potenciometro del maestro.
+            #
+            # Es el caso general de toda optimizacion basada en "ya lo escribi":
+            # solo es valida mientras se pueda sostener que el otro extremo no
+            # perdio el estado. Una reconexion rompe exactamente esa premisa.
+            self._pwm_escrito[self._id_activo] = None
+
+            self._log.aviso("Esclavo {} PRESENTE otra vez: replicadores activos, "
+                            "se fuerza reescritura del PWM".format(self._id_activo))
 
     # -------------------------------------------------------------------------
     # Motor de la maquina de estados
@@ -878,7 +1143,12 @@ def configurar_perifericos():
         "potenciometro_local": EntradaAnalogica(config.PIN_POTENCIOMETRO),
         "led_replicador_digital": SalidaDigital(config.PIN_LED_DIGITAL, estado_inicial=False),
         "led_replicador_pwm": SalidaPWM(config.PIN_LED_PWM),
-        "selector": Pin(config.PIN_SELECTOR, Pin.IN, Pin.PULL_UP),
+        # El selector se envuelve en EntradaConfirmada: se muestrea una sola vez
+        # por ciclo, de modo que un unico pulso espurio en ese instante desviaria
+        # las cuatro transacciones del ciclo al esclavo equivocado. Exigir varias
+        # muestras coincidentes convierte ese pulso en un evento descartado, y el
+        # contador de rechazos deja registrado cuanto ruido recibe la entrada.
+        "selector": EntradaConfirmada(Pin(config.PIN_SELECTOR, Pin.IN, Pin.PULL_UP)),
         "indicador_1": SalidaDigital(config.PIN_LED_INDICADOR_1, estado_inicial=False),
         "indicador_2": SalidaDigital(config.PIN_LED_INDICADOR_2, estado_inicial=False),
     }
