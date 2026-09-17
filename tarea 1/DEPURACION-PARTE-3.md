@@ -83,13 +83,29 @@ Para cada placa:
 
 > Los dos esclavos llevan **el mismo** `main.py`. La dirección la determina el jumper de GPIO13 en el arranque: abierto = Unit ID 1, puenteado a GND = Unit ID 2.
 
-**Antes de subir nada**, el banco de pruebas del módulo de diagnóstico corre en la PC y no necesita hardware:
+### 3.1. Los cinco archivos van juntos
+
+`diagnostico.py` y `config.py` se estrenaron en la misma versión: **subir uno y olvidar el otro deja la placa con constantes que no existen.**
+
+| Síntoma en el Shell de Thonny | Qué significa |
+|---|---|
+| `AttributeError: 'module' object has no attribute 'NIVEL_LOG'` | Falta el `config.py` actualizado en esa placa |
+| `AVISO: config.py en esta placa es de una versión anterior. Faltan: ...` | Lo mismo, ya detectado por el firmware |
+
+El firmware verifica la configuración al arrancar y, si falta algo, **sigue funcionando con valores por defecto seguros e informa cuáles faltan**, en lugar de abortar. Es el criterio habitual para configuración externa: un nodo que arranca degradado y lo declara es más útil que un nodo que no arranca.
+
+Aun así, **las correcciones del §2 no quedan realmente aplicadas hasta subir el `config.py` nuevo**: sin él se usan los valores por defecto del código, no los del proyecto.
+
+### 3.2. Pruebas en la PC, antes de tocar las placas
+
+Ninguna de las dos necesita hardware:
 
 ```
-python "tarea 1/herramientas/prueba_diagnostico.py"
+python "tarea 1/herramientas/prueba_diagnostico.py"           → FALLAS: 0
+python "tarea 1/herramientas/prueba_config_desactualizado.py" → arranca y avisa
 ```
 
-Debe terminar con `FALLAS: 0`.
+La primera verifica la lógica del módulo (21 comprobaciones). La segunda reproduce el fallo de despliegue descrito arriba y confirma que degrada bien.
 
 ---
 

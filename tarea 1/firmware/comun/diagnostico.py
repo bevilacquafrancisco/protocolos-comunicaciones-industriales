@@ -66,6 +66,101 @@ INFO = 3
 DETALLE = 4
 TRAMA = 5
 
+
+# =============================================================================
+# 1.b  LECTURA TOLERANTE DE LA CONFIGURACION
+# =============================================================================
+# Este modulo se estreno junto con una tanda de constantes nuevas en config.py.
+# Subir uno de los dos archivos al ESP32 y olvidar el otro es un error de
+# despliegue frecuente cuando hay tres placas, y su sintoma por defecto es un
+# AttributeError en medio de un traceback que no dice que hacer.
+#
+# El criterio adoptado es el de cualquier sistema que lee configuracion externa:
+# ante un parametro ausente se aplica un valor por defecto seguro y se INFORMA
+# con claridad, en lugar de abortar. Un nodo que arranca con la traza en su
+# nivel por defecto es infinitamente mas util que un nodo que no arranca.
+#
+# Se informa una sola vez por parametro para no repetir el aviso en cada lectura.
+
+_FALTANTES = []
+
+
+def opcion(nombre, por_defecto):
+    """
+    Lee una constante de config.py, con valor por defecto si no existe.
+
+    Parametros
+    ----------
+    nombre : str
+        Nombre de la constante en config.py, por ejemplo "NIVEL_LOG".
+    por_defecto : objeto
+        Valor a usar si la constante no esta definida.
+
+    Retorna
+    -------
+    objeto
+        El valor de config, o por_defecto si falta.
+
+    Excepciones
+    -----------
+    Ninguna.
+
+    Ejemplo de uso
+    --------------
+    >>> opcion("NIVEL_LOG", INFO)
+    3
+    """
+    try:
+        return getattr(config, nombre)
+    except AttributeError:
+        if nombre not in _FALTANTES:
+            _FALTANTES.append(nombre)
+            print("[DIAGNOSTICO] config.{} no esta definido; se usa {}. "
+                  "Falta subir el config.py actualizado a esta placa.".format(
+                      nombre, por_defecto))
+        return por_defecto
+
+
+def verificar_config():
+    """
+    Comprueba que config.py traiga las constantes que exige esta version.
+
+    Se invoca desde el arranque de cada nodo. Convierte un fallo de despliegue en
+    un mensaje accionable emitido en el instante correcto -antes de que el nodo
+    empiece a operar- en lugar de una excepcion a mitad de la ejecucion.
+
+    Parametros
+    ----------
+    Ninguno.
+
+    Retorna
+    -------
+    list
+        Nombres de las constantes ausentes. Lista vacia si esta todo en orden.
+
+    Excepciones
+    -----------
+    Ninguna.
+    """
+    requeridas = (
+        "NIVEL_LOG",
+        "PERIODO_RESUMEN_MS",
+        "REINTENTOS_TRANSACCION",
+        "MS_PARA_DECLARAR_AUSENTE",
+        "CONFIRMACIONES_SELECTOR",
+        "ZONA_MUERTA_PWM",
+    )
+    ausentes = [n for n in requeridas if not hasattr(config, n)]
+    if ausentes:
+        print("=" * 66)
+        print("AVISO: config.py en esta placa es de una version anterior.")
+        print("Faltan: {}".format(", ".join(ausentes)))
+        print("Subir firmware/comun/config.py a la raiz del ESP32 y reiniciar")
+        print("con Ctrl+D. Mientras tanto se usan valores por defecto.")
+        print("=" * 66)
+    return ausentes
+
+
 #: Etiqueta de una sola letra por nivel. Se usa una letra y no la palabra
 #: completa para que la columna no desplace el resto de la linea: con tres
 #: consolas en paralelo, la alineacion vertical es lo que hace legible la traza.
@@ -127,7 +222,7 @@ class Registrador:
         Ninguna.
         """
         self._prefijo = prefijo
-        self._nivel = config.NIVEL_LOG if nivel is None else nivel
+        self._nivel = opcion("NIVEL_LOG", INFO) if nivel is None else nivel
         self._origen_ms = time.ticks_ms()
 
     # -- Consulta y control ---------------------------------------------------
@@ -662,7 +757,8 @@ class EntradaConfirmada:
         """
         self._pin = pin
         self._confirmaciones = (
-            config.CONFIRMACIONES_SELECTOR if confirmaciones is None else confirmaciones
+            opcion("CONFIRMACIONES_SELECTOR", 3)
+            if confirmaciones is None else confirmaciones
         )
         self._estable = pin.value()
         self._candidato = self._estable

@@ -390,10 +390,20 @@ class MaestroModbus:
         #: registrado un parpadeo.
         self._cambio_seleccion = DetectorDeCambio()
         self._cambio_di = DetectorDeCambio()
-        self._cambio_ir = DetectorDeCambio(umbral=config.ZONA_MUERTA_PWM)
+        self._cambio_ir = DetectorDeCambio(umbral=diagnostico.opcion("ZONA_MUERTA_PWM", 2))
 
         #: Instante del ultimo resumen periodico emitido.
         self._instante_resumen = time.ticks_ms()
+
+        # Parametros de robustez leidos UNA vez, al construir, y no en cada uso.
+        # Dos motivos: se evita repetir el acceso a config en el lazo, y se
+        # centraliza aqui la tolerancia a un config.py desactualizado en la placa
+        # -un fallo de despliegue habitual con tres nodos-, de modo que el nodo
+        # arranca con valores por defecto seguros e informa, en lugar de abortar.
+        self._reintentos = diagnostico.opcion("REINTENTOS_TRANSACCION", 1)
+        self._ms_ausente = diagnostico.opcion("MS_PARA_DECLARAR_AUSENTE", 2000)
+        self._zona_muerta_pwm = diagnostico.opcion("ZONA_MUERTA_PWM", 2)
+        self._periodo_resumen = diagnostico.opcion("PERIODO_RESUMEN_MS", 5000)
 
         # --- Instrumentacion (Parte 2) --------------------------------------
         # El TP pide registrar el comportamiento temporal del sondeo, y "el LED
@@ -561,7 +571,7 @@ class MaestroModbus:
         """
         ultimo_error = None
 
-        for intento in range(config.REINTENTOS_TRANSACCION + 1):
+        for intento in range(self._reintentos + 1):
             comienzo = time.ticks_ms()
             try:
                 resultado = operacion()
@@ -571,7 +581,7 @@ class MaestroModbus:
                 self._estadistica[self._id_activo].registrar(clase)
                 self._log.detalle("{} ID={} intento {}/{} FALLO {} ({} ms)".format(
                     etiqueta, self._id_activo, intento + 1,
-                    config.REINTENTOS_TRANSACCION + 1, clase,
+                    self._reintentos + 1, clase,
                     time.ticks_diff(time.ticks_ms(), comienzo),
                 ))
                 continue
@@ -812,7 +822,7 @@ class MaestroModbus:
         # LED del esclavo por oscilaciones de una unidad, y el gasto de una
         # transaccion del bus para reescribir lo que ya estaba escrito.
         anterior = self._pwm_escrito[self._id_activo]
-        if anterior is not None and abs(valor_local - anterior) <= config.ZONA_MUERTA_PWM:
+        if anterior is not None and abs(valor_local - anterior) <= self._zona_muerta_pwm:
             self._log.detalle("0x06 omitida ID={} (PWM {} dentro de la zona muerta)".format(
                 self._id_activo, valor_local,
             ))
@@ -849,7 +859,7 @@ class MaestroModbus:
         # duracion del ciclo es variable, de modo que un criterio por ciclos
         # produciria un resumen a intervalos irregulares, justamente cuando el
         # sistema esta degradado y el intervalo importa para leer la traza.
-        if time.ticks_diff(time.ticks_ms(), self._instante_resumen) >= config.PERIODO_RESUMEN_MS:
+        if time.ticks_diff(time.ticks_ms(), self._instante_resumen) >= self._periodo_resumen:
             self._instante_resumen = time.ticks_ms()
             self._informar_estadisticas()
 
@@ -1020,7 +1030,7 @@ class MaestroModbus:
         sin_respuesta_ms = time.ticks_diff(
             time.ticks_ms(), self._ultimo_exito_ms[self._id_activo]
         )
-        if sin_respuesta_ms >= config.MS_PARA_DECLARAR_AUSENTE and not self._ausente:
+        if sin_respuesta_ms >= self._ms_ausente and not self._ausente:
             self._ausente = True
             self._perifericos["led_replicador_digital"].escribir(False)
             self._perifericos["led_replicador_pwm"].apagar()
@@ -1207,6 +1217,11 @@ def main():
     -----------
     Ninguna se propaga hacia afuera.
     """
+    # Primero de todo: confirmar que esta placa tiene el config.py de esta
+    # version. Es un chequeo de despliegue, no de logica, y por eso va antes de
+    # construir nada.
+    diagnostico.verificar_config()
+
     perifericos = configurar_perifericos()
     bus = configurar_maestro_modbus()
     maestro = MaestroModbus(bus, perifericos)
@@ -1222,8 +1237,12 @@ def main():
     print("UART{}  TX=GPIO{}  RX=GPIO{}  DE/RE=GPIO{}".format(
         config.UART_ID, config.PIN_UART_TX, config.PIN_UART_RX, config.PIN_DE_RE,
     ))
-    print("Periodo de sondeo: {} ms  |  Timeout: {} ms".format(
+    print("Periodo de sondeo: {} ms  |  Timeout: {} ms  |  Reintentos: {}".format(
         config.PERIODO_SONDEO_MS, config.TIMEOUT_RESPUESTA_MS,
+        diagnostico.opcion("REINTENTOS_TRANSACCION", 1),
+    ))
+    print("Nivel de traza: {} (0 silencio ... 5 trama)".format(
+        diagnostico.opcion("NIVEL_LOG", diagnostico.INFO),
     ))
     print("Selector GPIO{}: abierto = Esclavo 1, a GND = Esclavo 2".format(
         config.PIN_SELECTOR,

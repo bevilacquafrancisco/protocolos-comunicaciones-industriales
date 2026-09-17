@@ -2,7 +2,7 @@
 perifericos.py
 Autores: Bevilacqua Francisco, Peralta Agustina
 Fecha de creacion: 2026-09-01
-Version: 1.0
+Version: 1.0 
 
 Descripcion general
 -------------------

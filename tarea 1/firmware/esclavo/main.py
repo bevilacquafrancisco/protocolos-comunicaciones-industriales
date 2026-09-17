@@ -481,6 +481,8 @@ def main():
     control, un dispositivo de campo que se detiene ante una trama malformada es
     peor que uno que la descarta y sigue operando.
     """
+    diagnostico.verificar_config()
+
     unit_id = leer_unit_id()
     perifericos = configurar_perifericos()
     cliente = configurar_servidor_modbus(unit_id)
@@ -500,10 +502,13 @@ def main():
         config.UART_ID, config.PIN_UART_TX, config.PIN_UART_RX, config.PIN_DE_RE,
     ))
     print("Registros: DI 10001 | IR 30001 | Coil 00001 | HR 40001")
-    print("Nivel de traza: {} (0 silencio ... 5 trama)".format(config.NIVEL_LOG))
+    print("Nivel de traza: {} (0 silencio ... 5 trama)".format(
+        diagnostico.opcion("NIVEL_LOG", diagnostico.INFO),
+    ))
     print("=" * 58)
 
     instante_resumen = time.ticks_ms()
+    periodo_resumen = diagnostico.opcion("PERIODO_RESUMEN_MS", 5000)
     errores = 0
 
     while True:
@@ -527,7 +532,7 @@ def main():
         # crece, el esclavo no esta recibiendo. Y si el latido deja de salir, el
         # nodo se colgo o se reinicio. Tres diagnosticos distintos a partir de
         # una sola linea periodica.
-        if time.ticks_diff(time.ticks_ms(), instante_resumen) >= config.PERIODO_RESUMEN_MS:
+        if time.ticks_diff(time.ticks_ms(), instante_resumen) >= periodo_resumen:
             instante_resumen = time.ticks_ms()
             LOG.info("latido: tramas={} propias={} ajenas={} errores={} | DI={} IR={}".format(
                 cliente.tramas_recibidas,
