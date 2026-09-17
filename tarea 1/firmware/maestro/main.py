@@ -110,6 +110,9 @@ NOMBRES_ESTADO = {
 #: admite argumentos extra).
 LOG = Registrador("MAESTRO")
 
+#: Instancia del maestro, publicada por main() para inspeccion desde el REPL.
+MAESTRO = None
+
 
 class MaestroRTUConTimeout(ModbusRTUMaster):
     """
@@ -374,6 +377,16 @@ class MaestroModbus:
             config.ID_ESCLAVO_2: time.ticks_ms(),
         }
 
+        #: Instante del ultimo INTENTO de sondeo contra cada esclavo, exitoso o
+        #: no. Es distinto del anterior y hace falta para poder decir hace cuanto
+        #: que un esclavo no se sondea: sin este dato, un nodo simplemente no
+        #: seleccionado y un nodo caido producen exactamente la misma linea de
+        #: log, que es la ambiguedad que este reporte viene a eliminar.
+        self._ultimo_sondeo_ms = {
+            config.ID_ESCLAVO_1: time.ticks_ms(),
+            config.ID_ESCLAVO_2: time.ticks_ms(),
+        }
+
         #: Bandera de esclavo declarado ausente, para emitir el aviso una sola
         #: vez al entrar y otra al salir, en lugar de una linea por ciclo.
         self._ausente = False
@@ -570,6 +583,7 @@ class MaestroModbus:
         Ninguna se propaga: se atrapan, se clasifican y se contabilizan.
         """
         ultimo_error = None
+        self._ultimo_sondeo_ms[self._id_activo] = time.ticks_ms()
 
         for intento in range(self._reintentos + 1):
             comienzo = time.ticks_ms()
@@ -894,23 +908,15 @@ class MaestroModbus:
         -----------
         Ninguna.
         """
-        porcentaje = (self._ciclos_con_fallo * 1000 // self._ciclos_totales) / 10
-
-        # Desglose por esclavo. Es la linea que decide hacia donde mirar: si los
-        # dos esclavos muestran una tasa de error parecida, el sospechoso es el
-        # medio compartido (terminacion, polarizacion, masas); si falla uno solo,
-        # el sospechoso es ese nodo (su transceptor, su cableado, su jumper).
-        for unit_id in sorted(self._estadistica):
-            self._log.info("  Esclavo {}: {}".format(
-                unit_id, self._estadistica[unit_id].resumen(),
-            ))
-
-        print(
-            "[MAESTRO] ciclos={} fallos={} ({}%) t_ciclo={}ms | "
-            "ID={} DI={} IR={} -> PWM={}".format(
+        # --- Linea 1: el ciclo de sondeo ------------------------------------
+        # Conserva los mismos nombres de campo que la version anterior
+        # (ciclos, fallos, t_ciclo, ID, DI, IR, PWM) para que las capturas ya
+        # incluidas en el informe sigan siendo legibles con la misma leyenda.
+        self._log.info(
+            "ciclos={} fallos={} ({}) t_ciclo={}ms | ID={} DI={} IR={} -> PWM={}".format(
                 self._ciclos_totales,
                 self._ciclos_con_fallo,
-                porcentaje,
+                diagnostico.porcentaje(self._ciclos_con_fallo, self._ciclos_totales),
                 self._duracion_ciclo_ms,
                 self._id_activo,
                 1 if self._di_remoto else 0,
@@ -918,6 +924,73 @@ class MaestroModbus:
                 adc_a_pwm(self._ir_remoto),
             )
         )
+
+        # --- Lineas 2 y 3: una por esclavo ----------------------------------
+        # Cada linea separa DOS informaciones que antes se confundian en una:
+        #
+        #   ventana  lo ocurrido desde el reporte anterior -> el estado ACTUAL
+        #   total    lo acumulado desde el arranque        -> el HISTORIAL
+        #
+        # La confusion no era cosmetica. Con un solo esclavo seleccionado, el
+        # otro conserva sus totales congelados, y una linea que repite
+        # "err=239 (11.6%)" cada cinco segundos se lee como un nodo que esta
+        # fallando ahora, cuando en realidad no se lo esta sondeando. Marcar el
+        # esclavo activo e indicar hace cuanto que el otro no se sondea elimina
+        # esa lectura equivocada.
+        #
+        # El criterio de diagnostico se mantiene: si AMBOS esclavos muestran una
+        # tasa parecida y distinta de cero EN VENTANA, el sospechoso es el medio
+        # compartido; si falla uno solo, el sospechoso es ese nodo.
+        ahora = time.ticks_ms()
+        for unit_id in sorted(self._estadistica):
+            estadistica = self._estadistica[unit_id]
+
+            if unit_id == self._id_activo:
+                situacion = "ACTIVO"
+            else:
+                inactivo_s = time.ticks_diff(ahora, self._ultimo_sondeo_ms[unit_id]) // 1000
+                situacion = "pausa {}s".format(inactivo_s)
+
+            self._log.continuacion(diagnostico.INFO, "{} E{} {:<13} {:>18}  acum: {}".format(
+                "->" if unit_id == self._id_activo else "  ",
+                unit_id,
+                situacion,
+                estadistica.resumen_ventana(),
+                estadistica.resumen(),
+            ))
+            estadistica.cerrar_ventana()
+
+    def reiniciar_estadisticas(self):
+        """
+        Pone a cero los contadores de ambos esclavos y los del ciclo.
+
+        Se invoca desde el Shell de Thonny antes de comenzar una medicion que se
+        vaya a documentar. Permite separar la etapa de puesta a punto -donde los
+        errores son esperables y no dicen nada del sistema terminado- de la
+        corrida que se reporta, sin reiniciar la placa: un reinicio obligaria a
+        reconstruir el estado del bus y a repetir la puesta en marcha.
+
+        Parametros
+        ----------
+        Ninguno.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+
+        Ejemplo de uso
+        --------------
+        >>> MAESTRO.reiniciar_estadisticas()
+        """
+        for estadistica in self._estadistica.values():
+            estadistica.reiniciar()
+        self._ciclos_totales = 0
+        self._ciclos_con_fallo = 0
+        self._log.aviso("Estadisticas reiniciadas: comienza una medicion nueva")
 
     # -------------------------------------------------------------------------
     # BLOQUE M8 — Espera hasta completar el periodo de sondeo
@@ -1222,9 +1295,20 @@ def main():
     # construir nada.
     diagnostico.verificar_config()
 
+    global MAESTRO
+
     perifericos = configurar_perifericos()
     bus = configurar_maestro_modbus()
     maestro = MaestroModbus(bus, perifericos)
+
+    # Se publica la instancia a nivel de modulo para poder inspeccionarla y
+    # operarla desde el Shell de Thonny tras interrumpir con Ctrl+C, sin
+    # reiniciar la placa ni perder el estado del bus. Es el equivalente
+    # embebido de una consola de administracion:
+    #
+    #   >>> MAESTRO.reiniciar_estadisticas()   antes de una medicion
+    #   >>> LOG.fijar_nivel(diagnostico.TRAMA) para capturar tramas
+    MAESTRO = maestro
 
     print("=" * 58)
     print("MAESTRO MODBus RTU")

@@ -151,6 +151,50 @@ Regla práctica:
 
 El tiempo es **relativo al arranque de cada placa**, así que los tres relojes no coinciden entre sí. Para correlacionar, reiniciar los tres con Ctrl+D lo más junto posible, o usar como referencia común un evento visible en las tres consolas (el cambio de selector aparece en el maestro y se refleja en el tráfico de ambos esclavos).
 
+### 4.4. El reporte periódico del maestro
+
+Cada 5 s el maestro emite tres líneas: una del ciclo y una por esclavo.
+
+```
+[   400.544] I [MAESTRO] ciclos=1470 fallos=0 (0.0%) t_ciclo=126ms | ID=1 DI=0 IR=0 -> PWM=0
+   -> E1 ACTIVO          78tx 0err (0.0%)  acum: 2954tx 7err (0.2%) 7to r=7
+      E2 pausa 210s            sin sondeo  acum: 2046tx 239err (11.6%) 238to/1tr r=239
+```
+
+Cada línea de esclavo separa **dos informaciones que antes se confundían**:
+
+| Columna | Qué responde |
+|---|---|
+| `->` | Cuál es el esclavo **seleccionado ahora** |
+| `ACTIVO` / `pausa 210s` | Si se lo está sondeando, o hace cuánto que no |
+| **ventana** (columna del medio) | Qué pasó **en los últimos 5 s**. Es el estado ACTUAL |
+| `acum:` | Qué pasó **desde el arranque**. Es el HISTORIAL |
+
+> **Por qué importa la distinción.** Con un solo esclavo seleccionado, el otro conserva sus totales congelados. Una línea que repite `err=239 (11.6%)` cada cinco segundos se lee como un nodo que está fallando *ahora*, cuando en realidad **no se lo está sondeando**. La ventana lo dice sin ambigüedad: `sin sondeo` no es lo mismo que `0err`.
+
+Abreviaturas del desglose, que sólo aparecen si hubo algún error:
+
+| Símbolo | Significado |
+|---|---|
+| `238to` | 238 **t**ime**o**uts — el esclavo no contestó |
+| `4ex` | 4 **ex**cepciones MODBus — contestó rechazando la petición |
+| `1tr` | 1 error de **tr**ama — CRC inválido o longitud inesperada |
+| `r=239` | Peor racha de fallos consecutivos |
+
+Un nodo sano produce una línea corta: `78tx 0err (0.0%)`, sin desglose.
+
+### 4.5. Comandos desde el Shell de Thonny
+
+Tras interrumpir con Ctrl+C, el maestro queda accesible como `MAESTRO`:
+
+```python
+>>> MAESTRO.reiniciar_estadisticas()      # antes de una medición para el informe
+>>> LOG.fijar_nivel(diagnostico.TRAMA)    # capturar tramas en vivo
+>>> LOG.fijar_nivel(diagnostico.INFO)     # volver al nivel normal
+```
+
+`reiniciar_estadisticas()` separa la puesta a punto —donde los errores son esperables y no dicen nada del sistema terminado— de la corrida que se va a documentar, **sin reiniciar la placa**: un reinicio obligaría a rehacer la puesta en marcha del bus.
+
 ### 4.4. Procedimiento con tres consolas
 
 Thonny maneja una sola conexión serie por ventana. Para ver los tres nodos a la vez:
@@ -164,22 +208,24 @@ Thonny maneja una sola conexión serie por ventana. Para ver los tres nodos a la
 
 ## 5. Árbol de decisión
 
-Con `NIVEL_LOG = 3` en los tres nodos, dejar correr un minuto y leer el resumen periódico del maestro:
+Con `NIVEL_LOG = 3` en los tres nodos, **sondear cada esclavo durante un rato** —conmutando el selector— y leer el reporte periódico del maestro:
 
 ```
-[MAESTRO]   Esclavo 1: tx=1200 err=0 (0.0%) timeout=0 excep=0 trama=0 racha=0
-[MAESTRO]   Esclavo 2: tx=1198 err=214 (17.8%) timeout=214 excep=0 trama=0 racha=6
+   -> E1 ACTIVO          78tx 0err (0.0%)  acum: 2954tx 7err (0.2%) 7to r=7
+      E2 pausa 210s            sin sondeo  acum: 2046tx 239err (11.6%) 238to/1tr r=239
 ```
+
+> Comparar siempre la columna **ventana** entre ambos esclavos, no los acumulados: un esclavo que estuvo en pausa tiene el acumulado congelado y no dice nada del estado presente. Para comparar en igualdad de condiciones hay que darle tiempo de sondeo a cada uno.
 
 | Lo que muestra la traza | Causa probable | Qué hacer |
 |---|---|---|
-| **Ambos** esclavos con tasa de error parecida y distinta de cero | El medio compartido: terminación, polarización o masas | Sección 6 |
+| **Ambos** esclavos con tasa parecida y distinta de cero **en ventana** | El medio compartido: terminación, polarización o masas | Sección 6 |
 | **Un solo** esclavo con error; el otro en 0,0 % | Ese nodo: su transceptor, su cableado, su alimentación | Cambiar ese MAX485 por el del otro esclavo. Si el error se muda con el módulo, es el módulo; si se queda, es el cableado |
-| Muchos `timeout=` y `trama=0` | El esclavo no recibe o no alcanza a contestar | Mirar el latido de ese esclavo (abajo) |
-| `trama=` distinto de cero | Ruido o **colisión**: dos nodos transmitiendo a la vez | Verificar que ningún esclavo tenga el mismo Unit ID. Nivel 5 en un esclavo y observar `RX descartado en la ventana de guarda` |
-| `excep=` distinto de cero | El esclavo responde rechazando: está vivo y el problema es la petición | El mapa de direcciones no coincide entre maestro y esclavo |
-| `racha=` alta con tasa **baja** | Falla en ráfagas: interferencia externa | Alejar el bus de fuentes conmutadas; trenzar A y B |
-| `racha=` baja con tasa **alta** | Pérdida uniforme: problema estructural del bus | Sección 6 |
+| Muchos `to` y ningún `tr` | El esclavo no recibe o no alcanza a contestar | Mirar el latido de ese esclavo (abajo) |
+| Aparece `tr` en el desglose | Ruido o **colisión**: dos nodos transmitiendo a la vez | Verificar que ningún esclavo tenga el mismo Unit ID. Nivel 5 en un esclavo y observar `RX descartado en la ventana de guarda` |
+| Aparece `ex` en el desglose | El esclavo responde rechazando: está vivo y el problema es la petición | El mapa de direcciones no coincide entre maestro y esclavo |
+| `r=` alta con tasa **baja** | Falla en ráfagas: interferencia externa | Alejar el bus de fuentes conmutadas; trenzar A y B |
+| `r=` baja con tasa **alta** | Pérdida uniforme: problema estructural del bus | Sección 6 |
 | `Seleccion -> Esclavo N` aparece sin que nadie toque el switch | Ruido en el selector. `rechazos=` cuantifica cuánto | Pull-up externo de 10 kΩ en GPIO13; alejar ese cable del bus; subir `CONFIRMACIONES_SELECTOR` |
 | `Coil 00001 ->` / `HR 40001 ->` con transiciones que nadie provocó, en la consola del esclavo | El registro **sí** está cambiando: el origen está en el maestro | Comparar con la traza del maestro en el mismo instante |
 | El LED titila pero en el esclavo **no** aparece ninguna transición | El registro no cambia: el problema es eléctrico, no de protocolo | Revisar el LED, su resistencia y la masa de ese nodo |
@@ -265,7 +311,7 @@ El Esclavo 2 es el nodo agregado más recientemente. Confirmar que lleva la resi
 
 | Evidencia | Cómo obtenerla |
 |---|---|
-| Resumen por esclavo, antes y después de la corrección | Copiar del Shell las líneas `Esclavo N: tx=... err=...` |
+| Resumen por esclavo, antes y después de la corrección | `MAESTRO.reiniciar_estadisticas()`, dejar correr, copiar las líneas `E1` / `E2` |
 | Tiempo de ciclo con reintentos activos | Línea `t_ciclo=` del maestro |
 | Captura de tramas de una transacción completa | `NIVEL_LOG = 5` en el maestro, 5 segundos, copiar el bloque hexadecimal |
 | Evidencia de que el filtrado por dirección funciona | Latido del esclavo mostrando `ajenas` ≈ `propias` |

@@ -92,7 +92,12 @@ e2 = d.EntradaConfirmada(PinFalso([1] + [0]*12), confirmaciones=3)
 e2.leer(); e2.leer()
 check(e2.leer() == 0, "cambio sostenido aceptado")
 
-print("\n6. EstadisticaEsclavo()")
+print("\n6. porcentaje()")
+check(d.porcentaje(239, 2046) == "11.6%", "un decimal, con aritmetica entera")
+check(d.porcentaje(0, 100) == "0.0%", "cero observado es 0.0%")
+check(d.porcentaje(0, 0) == "-", "sin observaciones no es cero, es indefinido")
+
+print("\n7. EstadisticaEsclavo() — acumulado")
 est = d.EstadisticaEsclavo()
 for c in [None, None, "TIMEOUT", "TIMEOUT", None, "EXCEPCION"]:
     est.registrar(c)
@@ -100,14 +105,52 @@ check(est.intentos == 6 and est.exitos == 3, "intentos y exitos")
 check(est.timeouts == 2 and est.excepciones == 1, "desglose por clase")
 check(est.peor_racha == 2, "peor racha de fallos consecutivos")
 check("50.0%" in est.resumen(), "tasa de error en el resumen: " + est.resumen())
+check("2to" in est.resumen() and "1ex" in est.resumen(), "clases no nulas en el resumen")
+check("tr" not in est.resumen(), "las clases en cero no se imprimen")
 
-print("\n7. Registrador()")
+sano = d.EstadisticaEsclavo()
+for _ in range(10):
+    sano.registrar(None)
+check(sano.resumen() == "10tx 0err (0.0%)", "un nodo sano da una linea corta y limpia")
+
+print("\n8. EstadisticaEsclavo() — ventana movil")
+# Escenario real del banco: un esclavo que fallo mucho al principio y desde
+# entonces funciona bien. El acumulado debe seguir alarmante y la ventana limpia.
+v = d.EstadisticaEsclavo()
+for _ in range(100):
+    v.registrar("TIMEOUT")
+for _ in range(900):
+    v.registrar(None)
+v.cerrar_ventana()
+for _ in range(50):
+    v.registrar(None)
+check("9.5%" in v.resumen(), "el acumulado conserva el historial: " + v.resumen())
+check(v.resumen_ventana() == "50tx 0err (0.0%)",
+      "la ventana describe el presente: " + v.resumen_ventana())
+
+# Un esclavo no seleccionado no debe confundirse con uno sano.
+pausado = d.EstadisticaEsclavo()
+for _ in range(20):
+    pausado.registrar(None)
+pausado.cerrar_ventana()
+check(pausado.resumen_ventana() == "sin sondeo",
+      "sin sondeo se distingue de cero errores")
+check(pausado.intentos == 20, "cerrar_ventana no toca el acumulado")
+
+v.reiniciar()
+check(v.intentos == 0 and v.v_intentos == 0 and v.peor_racha == 0,
+      "reiniciar() pone a cero acumulado y ventana")
+
+print("\n9. Registrador()")
+
 log = d.Registrador("PRUEBA", nivel=d.INFO)
 check(log.habilitado(d.INFO) and not log.habilitado(d.DETALLE), "filtrado por nivel")
 log.info("esta linea debe verse")
 log.detalle("esta NO debe verse")
 log.fijar_nivel(d.TRAMA)
 log.trama("RX", b'\x01\x04\x00\x00\x00\x01\x31\xCA')
+log.info("linea principal del reporte")
+log.continuacion(d.INFO, "-> linea subordinada, sangrada y sin encabezado")
 
 print("\n" + "="*60)
 print("FALLAS: {}".format(fallos))

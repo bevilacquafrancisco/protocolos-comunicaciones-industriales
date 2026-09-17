@@ -350,6 +350,43 @@ class Registrador:
             t // 1000, t % 1000, _ETIQUETA.get(nivel, "?"), self._prefijo, mensaje,
         ))
 
+    def continuacion(self, nivel, mensaje, sangria=3):
+        """
+        Emite una linea subordinada a la anterior, alineada y sin encabezado.
+
+        Un reporte de varias lineas que repite marca de tiempo, nivel y nombre
+        del nodo en cada una gasta 25 columnas por linea en informacion que ya
+        se leyo. Con tres ventanas de Thonny dispuestas en paralelo -que es la
+        forma de trabajo recomendada para correlacionar los tres nodos- cada
+        ventana ronda las 90 columnas, y esas 25 son la diferencia entre una
+        tabla legible y un texto que se envuelve y pierde toda alineacion.
+
+        La sangria es deliberadamente corta y no alineada bajo el encabezado:
+        alinear habria consumido las mismas 25 columnas que se quieren ahorrar.
+        Tres espacios bastan para que se lea como subordinada a la linea
+        anterior.
+
+        Parametros
+        ----------
+        nivel : int
+            Nivel de la linea, para respetar el mismo filtrado que _emitir().
+        mensaje : str
+            Texto ya construido.
+        sangria : int, opcional
+            Espacios de indentacion.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        if nivel > self._nivel:
+            return
+        print(" " * sangria + mensaje)
+
     def error(self, mensaje):
         """Emite una linea de nivel ERROR. Ver _emitir()."""
         self._emitir(ERROR, mensaje)
@@ -454,6 +491,43 @@ def hexa(datos):
     '01 04'
     """
     return " ".join("{:02X}".format(b) for b in datos)
+
+
+def porcentaje(parte, total):
+    """
+    Formatea una proporcion como porcentaje con un decimal.
+
+    Se calcula con aritmetica entera y un desplazamiento decimal en lugar de
+    punto flotante: en MicroPython el flotante es mas caro y aqui no aporta
+    precision util.
+
+    Parametros
+    ----------
+    parte : int
+        Numerador.
+    total : int
+        Denominador. Si es cero se devuelve un guion, porque una proporcion sin
+        observaciones no vale cero: es indefinida, y mostrarla como 0.0% seria
+        afirmar algo que no se midio.
+
+    Retorna
+    -------
+    str
+        Por ejemplo "11.6%", o "-" si no hubo observaciones.
+
+    Excepciones
+    -----------
+    Ninguna.
+
+    Ejemplo de uso
+    --------------
+    >>> porcentaje(239, 2046)
+    '11.6%'
+    """
+    if not total:
+        return "-"
+    por_mil = parte * 1000 // total
+    return "{}.{}%".format(por_mil // 10, por_mil % 10)
 
 
 def describir_trama(datos):
@@ -842,7 +916,8 @@ class EstadisticaEsclavo:
     """
 
     def __init__(self):
-        """Inicializa todos los contadores en cero."""
+        """Inicializa todos los contadores, acumulados y de ventana, en cero."""
+        # --- Acumulado desde el arranque ------------------------------------
         self.intentos = 0
         self.exitos = 0
         self.timeouts = 0
@@ -851,9 +926,20 @@ class EstadisticaEsclavo:
         self.peor_racha = 0
         self._racha = 0
 
+        # --- Ventana: lo ocurrido desde el reporte anterior ------------------
+        # El acumulado responde "como se comporto este nodo en toda la corrida";
+        # la ventana responde "como se esta comportando AHORA". Son preguntas
+        # distintas, y confundirlas induce a error: un nodo que fallo mucho hace
+        # cinco minutos y desde entonces funciona bien muestra un acumulado
+        # alarmante junto a una ventana impecable, y es la ventana la que
+        # describe el estado presente del sistema.
+        self.v_intentos = 0
+        self.v_exitos = 0
+        self.v_peor_racha = 0
+
     def registrar(self, clase=None):
         """
-        Contabiliza una transaccion.
+        Contabiliza una transaccion, en el acumulado y en la ventana.
 
         Parametros
         ----------
@@ -870,14 +956,19 @@ class EstadisticaEsclavo:
         Ninguna.
         """
         self.intentos += 1
+        self.v_intentos += 1
+
         if clase is None:
             self.exitos += 1
+            self.v_exitos += 1
             self._racha = 0
             return
 
         self._racha += 1
         if self._racha > self.peor_racha:
             self.peor_racha = self._racha
+        if self._racha > self.v_peor_racha:
+            self.v_peor_racha = self._racha
 
         if clase == "TIMEOUT":
             self.timeouts += 1
@@ -888,7 +979,12 @@ class EstadisticaEsclavo:
 
     def resumen(self):
         """
-        Devuelve una linea con el estado acumulado.
+        Devuelve una linea con el estado ACUMULADO desde el arranque.
+
+        El desglose por clase se abrevia como t/e/c (timeout, excepcion, error
+        de trama) para que la linea entre completa en el ancho del Shell de
+        Thonny: una linea que se corta o se envuelve deja de ser comparable con
+        la de al lado, que es justamente para lo que se la imprime.
 
         Parametros
         ----------
@@ -904,11 +1000,101 @@ class EstadisticaEsclavo:
         """
         if not self.intentos:
             return "sin transacciones"
+
         fallos = self.intentos - self.exitos
-        # Se calcula con enteros y un desplazamiento decimal para no arrastrar
-        # punto flotante, que en MicroPython es mas caro y aqui no aporta nada.
-        por_mil = fallos * 1000 // self.intentos
-        return "tx={} err={} ({}.{}%) timeout={} excep={} trama={} racha={}".format(
-            self.intentos, fallos, por_mil // 10, por_mil % 10,
-            self.timeouts, self.excepciones, self.errores_trama, self.peor_racha,
+        linea = "{}tx {}err ({})".format(
+            self.intentos, fallos, porcentaje(fallos, self.intentos),
         )
+
+        # El desglose y la peor racha solo se imprimen si hubo algun fallo, y
+        # dentro del desglose solo las clases distintas de cero. Un nodo sano
+        # produce una linea corta y limpia, y el ojo detecta de inmediato cual
+        # de los dos esclavos trae informacion adicional. Una linea que siempre
+        # muestra "t/e/c=0/0/0 racha=0" gasta ancho en decir que no hay nada que
+        # mirar, y en una consola angosta ese ancho se paga con envolvimiento de
+        # linea y perdida de alineacion.
+        if fallos:
+            clases = []
+            if self.timeouts:
+                clases.append("{}to".format(self.timeouts))
+            if self.excepciones:
+                clases.append("{}ex".format(self.excepciones))
+            if self.errores_trama:
+                clases.append("{}tr".format(self.errores_trama))
+            linea += " " + "/".join(clases) + " r={}".format(self.peor_racha)
+        return linea
+
+    def resumen_ventana(self):
+        """
+        Devuelve una linea con lo ocurrido desde el reporte anterior.
+
+        Distingue explicitamente el caso "no se sondeo este nodo" del caso "se
+        sondeo y no fallo". Sin esa distincion, un esclavo no seleccionado
+        aparece con cero errores y se confunde con un esclavo sano, que es
+        exactamente la ambiguedad que esta ventana viene a resolver.
+
+        Parametros
+        ----------
+        Ninguno.
+
+        Retorna
+        -------
+        str
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        if not self.v_intentos:
+            return "sin sondeo"
+        fallos = self.v_intentos - self.v_exitos
+        return "{}tx {}err ({})".format(
+            self.v_intentos, fallos, porcentaje(fallos, self.v_intentos),
+        )
+
+    def cerrar_ventana(self):
+        """
+        Reinicia los contadores de ventana tras emitir el reporte.
+
+        Se invoca desde el maestro inmediatamente despues de imprimir, de modo
+        que cada linea de ventana describa exactamente el intervalo transcurrido
+        entre dos reportes y no un acumulado parcial.
+
+        Parametros
+        ----------
+        Ninguno.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        self.v_intentos = 0
+        self.v_exitos = 0
+        self.v_peor_racha = 0
+
+    def reiniciar(self):
+        """
+        Pone a cero todos los contadores, acumulados y de ventana.
+
+        Pensado para invocarse desde el REPL de Thonny al comenzar una medicion:
+        permite separar la etapa de puesta a punto -donde los errores son
+        esperables- de la corrida que se va a documentar en el informe, sin
+        reiniciar el nodo y sin perder el estado del bus.
+
+        Parametros
+        ----------
+        Ninguno.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        self.__init__()
