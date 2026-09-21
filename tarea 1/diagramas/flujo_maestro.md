@@ -1,5 +1,7 @@
 # Diagrama de flujo — Maestro MODBus RTU
 
+**Autores:** Bevilacqua Francisco, Peralta Agustina
+
 Cumple el requerimiento adicional 1 de la consigna ("máquina de estados, ciclo de
 polling, conmutación de esclavo") y el requerimiento 2 ("trazabilidad de código":
 cada bloque nombra la función de [firmware/maestro/main.py](../firmware/maestro/main.py)

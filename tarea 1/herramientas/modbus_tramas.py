@@ -1,6 +1,6 @@
 """
 modbus_tramas.py
-Autor: Francisco Bevilacqua
+Autores: Bevilacqua Francisco, Peralta Agustina
 Fecha de creacion: 2026-09-01
 Version: 1.0
 

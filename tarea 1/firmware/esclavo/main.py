@@ -1,6 +1,6 @@
 """
 main.py  (ESCLAVO MODBus RTU)
-Autor: Francisco Bevilacqua
+Autores: Bevilacqua Francisco, Peralta Agustina
 Fecha de creacion: 2026-09-01
 Version: 1.0
 
@@ -46,7 +46,90 @@ from machine import Pin
 from umodbus.serial import ModbusRTU
 
 import config
+import diagnostico
+
+# -----------------------------------------------------------------------------
+# Verificacion de despliegue
+# -----------------------------------------------------------------------------
+# Se comprueba ANTES de importar nombres concretos de diagnostico.py, porque un
+# "from diagnostico import X" contra una version vieja del modulo falla con un
+# ImportError que no indica que archivo hay que actualizar ni en que placa.
+#
+# Se usa getattr con valor por defecto y no diagnostico.VERSION directo: una
+# version suficientemente vieja del modulo no tiene siquiera esa constante, y el
+# acceso directo produciria un AttributeError, es decir, el mismo problema que se
+# intenta evitar, corrido un renglon.
+_VERSION_DIAGNOSTICO_REQUERIDA = 4
+if getattr(diagnostico, "VERSION", 0) < _VERSION_DIAGNOSTICO_REQUERIDA:
+    print("=" * 66)
+    print("ERROR DE DESPLIEGUE")
+    print("diagnostico.py en esta placa es de una version anterior.")
+    print("  version en la placa : {}".format(getattr(diagnostico, "VERSION", 0)))
+    print("  version requerida   : {}".format(_VERSION_DIAGNOSTICO_REQUERIDA))
+    print("")
+    print("Subir firmware/comun/diagnostico.py a la raiz del ESP32 y")
+    print("reiniciar con Ctrl+D. Recordar cerrar y reabrir el archivo en")
+    print("Thonny antes de subirlo: el editor trabaja sobre su propio buffer.")
+    print("=" * 66)
+    raise SystemExit("diagnostico.py desactualizado en esta placa")
+
+from diagnostico import (
+    CapturaTramas,
+    DetectorDeCambio,
+    InstrumentacionBus,
+    Registrador,
+)
 from perifericos import EntradaDigital, EntradaAnalogica, SalidaDigital, SalidaPWM
+
+
+# =============================================================================
+# DIAGNOSTICO DEL NODO
+# =============================================================================
+# El registrador se construye a nivel de modulo, antes que cualquier objeto,
+# porque la subclase del servidor MODBus necesita usarlo dentro de metodos que la
+# libreria invoca sin pasarle referencias.
+#
+# El prefijo se completa con el Unit ID en el arranque, una vez leido el jumper:
+# con tres consolas de Thonny abiertas en paralelo, poder distinguir de un
+# vistazo cual es el Esclavo 1 y cual el Esclavo 2 es la diferencia entre una
+# traza util y tres ventanas identicas.
+LOG = Registrador("ESCLAVO ?")
+
+#: Captura circular de las ultimas tramas vistas por este nodo. Un esclavo ve
+#: TODO el trafico del bus, incluidas las tramas dirigidas al otro esclavo, de
+#: modo que su captura es la mas completa de los tres nodos: sirve para verificar
+#: que el filtrado por direccion funciona y para observar transacciones en las
+#: que este nodo ni siquiera participa.
+CAPTURA = CapturaTramas(diagnostico.opcion("CAPTURA_TRAMAS", 24))
+
+#: Volcado de la captura, publicado por main() para invocarlo desde el REPL:
+#:
+#:   >>> VOLCAR()
+VOLCAR = None
+
+
+#: Instrumentacion del bus de este nodo.
+#:
+#: Se aplica por ENVOLTURA y no por herencia. El motivo es concreto y costo un
+#: fallo en banco: la libreria expone dos clases con jerarquias distintas.
+#:
+#:   Serial      es la interfaz serie: tiene el UART y los metodos que leen y
+#:               escriben tramas. El MAESTRO la extiende directamente, y por eso
+#:               alli si funciona sobrescribir _uart_read_frame().
+#:   ModbusRTU   es el servidor esclavo. NO extiende a Serial: la CONTIENE en un
+#:               atributo interno. Es composicion, no herencia.
+#:
+#: Extender ModbusRTU y sobrescribir sus metodos de lectura de trama no
+#: instrumenta nada: esos metodos viven en el objeto contenido y nunca llegan a
+#: invocarse. El sintoma es silencioso -contadores en cero para siempre, sin
+#: ningun error- hasta que ademas se accede a un atributo que no existe, y recien
+#: ahi aparece el AttributeError sobre _uart.
+#:
+#: InstrumentacionBus localiza la interfaz real en lugar de suponerla, de modo
+#: que funciona igual en los tres nodos.
+INSTRUMENTACION = InstrumentacionBus(
+    CAPTURA, LOG, unit_id=None, tx_es_peticion=False,
+)
 
 
 # =============================================================================
@@ -276,6 +359,16 @@ def publicar_entradas(cliente, perifericos):
 # BLOQUE E5 del diagrama de flujo — Aplicacion de las salidas fisicas
 # =============================================================================
 
+#: Detectores de transicion de las dos salidas. Son de modulo y no locales
+#: porque deben conservar el valor anterior entre llamadas, y aplicar_salidas()
+#: se invoca en cada vuelta del lazo.
+#:
+#: El detector del PWM no lleva zona muerta: aqui interesa registrar CUALQUIER
+#: cambio del registro, incluso de una unidad, porque un titileo del LED por
+#: oscilacion minima del valor es precisamente uno de los sintomas a distinguir.
+CAMBIO_COIL = DetectorDeCambio()
+CAMBIO_HREG = DetectorDeCambio()
+
 def aplicar_salidas(cliente, perifericos):
     """
     Lleva a los actuadores el contenido actual de las areas escribibles.
@@ -308,16 +401,32 @@ def aplicar_salidas(cliente, perifericos):
     Ninguna.
     """
     # Coil 00001 -> LED 1 digital.
-    perifericos["led_digital"].escribir(
-        cliente.get_coil(address=config.DIR_COIL_LED_DIGITAL)
-    )
+    coil = cliente.get_coil(address=config.DIR_COIL_LED_DIGITAL)
+    perifericos["led_digital"].escribir(coil)
 
     # Holding Register 40001 -> LED 2 PWM. La capa de perifericos acota el valor
     # al rango 0-255: si un maestro mal configurado escribe 5000, el esclavo
     # satura y sigue operando en vez de lanzar una excepcion y reiniciarse.
-    perifericos["led_pwm"].escribir(
-        cliente.get_hreg(address=config.DIR_HOLDING_REGISTER_PWM)
-    )
+    hreg = cliente.get_hreg(address=config.DIR_HOLDING_REGISTER_PWM)
+    perifericos["led_pwm"].escribir(hreg)
+
+    # Registro POR CAMBIO, no por iteracion.
+    #
+    # Este lazo gira cientos de veces por segundo: imprimir el estado en cada
+    # vuelta produce un torrente ilegible y, peor, retrasa tanto el nodo que
+    # genera los timeouts que se pretende diagnosticar. Imprimir solo las
+    # TRANSICIONES produce exactamente la traza de un parpadeo, con su instante
+    # y su intervalo, que es el dato que permite atribuirlo: si aqui no aparece
+    # ninguna transicion mientras el LED titila, el problema no esta en los
+    # registros de este esclavo.
+    if CAMBIO_COIL.cambio(bool(coil)):
+        LOG.info("Coil 00001 -> {}  (LED digital, transicion nro {})".format(
+            1 if coil else 0, CAMBIO_COIL.transiciones - 1,
+        ))
+    if CAMBIO_HREG.cambio(hreg):
+        LOG.info("HR 40001 -> {}  (LED PWM, transicion nro {})".format(
+            hreg, CAMBIO_HREG.transiciones - 1,
+        ))
 
 
 # =============================================================================
@@ -358,9 +467,28 @@ def main():
     control, un dispositivo de campo que se detiene ante una trama malformada es
     peor que uno que la descarta y sigue operando.
     """
+    global VOLCAR
+
+    diagnostico.verificar_config()
+
     unit_id = leer_unit_id()
     perifericos = configurar_perifericos()
     cliente = configurar_servidor_modbus(unit_id)
+
+    # Identificacion del nodo en la traza, una vez conocido el Unit ID.
+    LOG.fijar_prefijo("ESCLAVO {}".format(unit_id))
+
+    # La instrumentacion se aplica DESPUES de construir el cliente, porque es el
+    # constructor de la libreria el que crea el UART, y con el Unit ID ya leido,
+    # que es lo que permite separar el trafico propio del ajeno.
+    INSTRUMENTACION._unit_id = unit_id
+    INSTRUMENTACION.aplicar(cliente)
+
+    # Se publica el volcado como funcion de modulo para poder invocarlo desde el
+    # Shell de Thonny tras interrumpir con Ctrl+C, del mismo modo que en el
+    # maestro. Un esclavo no tiene maquina de estados que exponer, pero si tiene
+    # la captura, que es lo que interesa mirar.
+    VOLCAR = lambda: CAPTURA.volcar(LOG, "CAPTURA DEL ESCLAVO {}".format(unit_id))
 
     print("=" * 58)
     print("ESCLAVO MODBus RTU  |  Unit ID = {}".format(unit_id))
@@ -374,7 +502,31 @@ def main():
         config.UART_ID, config.PIN_UART_TX, config.PIN_UART_RX, config.PIN_DE_RE,
     ))
     print("Registros: DI 10001 | IR 30001 | Coil 00001 | HR 40001")
+    print("Nivel de traza: {} (0 silencio ... 5 trama)".format(
+        diagnostico.opcion("NIVEL_LOG", diagnostico.INFO),
+    ))
     print("=" * 58)
+
+    instante_resumen = time.ticks_ms()
+    periodo_resumen = diagnostico.opcion("PERIODO_RESUMEN_MS", 5000)
+    umbral_retencion = diagnostico.opcion("MS_PARA_DECLARAR_RETENCION", 1500)
+    errores = 0
+
+    # --- Evidencia del tercer requisito de la Parte 3 -----------------------
+    # "Verificar que el esclavo que no esta seleccionado mantenga el ultimo
+    #  estado recibido en sus salidas hasta recibir una nueva orden."
+    #
+    # El comportamiento se cumple por construccion: los registros conservan su
+    # valor mientras nadie los escriba, y aplicar_salidas() los refleja en el
+    # hardware en cada vuelta. Pero la consigna no pide implementarlo, pide
+    # VERIFICARLO, y una propiedad que no se puede observar no esta verificada.
+    #
+    # Se emiten dos eventos con marca de tiempo -entrada y salida del estado de
+    # retencion- mas el estado de las salidas en cada latido. La evidencia queda
+    # entonces sobre la consola y no sobre la palabra del autor: las salidas
+    # conservan su valor mientras el contador de ordenes no avanza.
+    reteniendo = False
+    salidas_al_retener = (None, None)
 
     while True:
         try:
@@ -385,7 +537,64 @@ def main():
             # Se informa pero no se aborta. Causas esperables: trama truncada por
             # ruido en el bus, o una funcion MODBus no implementada solicitada
             # por una herramienta de diagnostico.
-            print("[ESCLAVO {}] Error atendiendo el bus: {}".format(unit_id, error))
+            errores += 1
+            LOG.error("Error atendiendo el bus: {}".format(error))
+
+        # Latido periodico.
+        #
+        # Su valor no esta en los numeros sino en su AUSENCIA: si el maestro
+        # reporta timeouts contra este esclavo y aca el latido sigue saliendo con
+        # tramas_propias creciendo, el esclavo recibe y contesta, y el problema
+        # esta en el camino de vuelta. Si el latido sale pero tramas_propias no
+        # crece, el esclavo no esta recibiendo. Y si el latido deja de salir, el
+        # nodo se colgo o se reinicio. Tres diagnosticos distintos a partir de
+        # una sola linea periodica.
+        # --- Transicion de y hacia el estado de retencion -------------------
+        sin_ordenes = INSTRUMENTACION.ms_sin_ordenes()
+        salidas = (
+            1 if cliente.get_coil(address=config.DIR_COIL_LED_DIGITAL) else 0,
+            cliente.get_hreg(address=config.DIR_HOLDING_REGISTER_PWM),
+        )
+
+        if not reteniendo and sin_ordenes >= umbral_retencion:
+            reteniendo = True
+            salidas_al_retener = salidas
+            LOG.aviso(
+                "RETENCION: sin ordenes hace {} ms. Salidas mantenidas en "
+                "LED={} PWM={}".format(sin_ordenes, salidas[0], salidas[1])
+            )
+        elif reteniendo and sin_ordenes < umbral_retencion:
+            reteniendo = False
+            # Se compara contra el valor que tenian al ENTRAR en retencion. Si
+            # coinciden, el requisito quedo demostrado sobre ese intervalo
+            # concreto; si difieren, algo modifico las salidas sin que mediara
+            # una orden, y eso seria un defecto que hay que ver.
+            intactas = salidas == salidas_al_retener
+            LOG.aviso(
+                "FIN DE RETENCION: llego una orden. Salidas durante la pausa: "
+                "{} (LED={} PWM={})".format(
+                    "SIN CAMBIOS" if intactas else "MODIFICADAS, revisar",
+                    salidas_al_retener[0], salidas_al_retener[1],
+                )
+            )
+
+        if time.ticks_diff(time.ticks_ms(), instante_resumen) >= periodo_resumen:
+            instante_resumen = time.ticks_ms()
+            LOG.info("latido: tramas={} propias={} ajenas={} errores={} | DI={} IR={}".format(
+                INSTRUMENTACION.tramas_recibidas,
+                INSTRUMENTACION.tramas_propias,
+                INSTRUMENTACION.tramas_recibidas - INSTRUMENTACION.tramas_propias,
+                errores,
+                1 if perifericos["switch"].leer() else 0,
+                perifericos["potenciometro"].leer(),
+            ))
+            LOG.continuacion(diagnostico.INFO, "salidas: LED={} PWM={} | {} ordenes, "
+                             "ultima hace {} ms{}".format(
+                                 salidas[0], salidas[1],
+                                 INSTRUMENTACION.ordenes_escritura,
+                                 sin_ordenes,
+                                 "  <- RETENIENDO" if reteniendo else "",
+                             ))
 
 
 if __name__ == "__main__":
