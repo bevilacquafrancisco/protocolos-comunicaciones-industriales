@@ -312,3 +312,50 @@ NIVEL_LOG = 3
 
 #: Periodo del resumen estadistico periodico del maestro, en milisegundos.
 PERIODO_RESUMEN_MS = 5000
+
+
+# =============================================================================
+# 7. CAPTURA DE TRAMAS
+# =============================================================================
+# Ver firmware/comun/diagnostico.py, clase CapturaTramas.
+
+#: Cantidad de tramas conservadas en memoria por cada nodo. Con 24 se cubren
+#: tres ciclos de sondeo completos (4 transacciones x 2 tramas por ciclo), que
+#: es el contexto necesario para entender un fallo aislado. Cero desactiva la
+#: captura por completo.
+#:
+#: Costo: cada trama ocupa unos 8 a 12 bytes mas la sobrecarga de una tupla.
+#: Registrarla cuesta microsegundos, frente a los 1 a 3 ms de imprimirla, y por
+#: eso la captura puede quedar activa de forma permanente sin alterar el timing
+#: del bus. Esa es exactamente su razon de ser.
+CAPTURA_TRAMAS = 24
+
+#: Volcar automaticamente la captura cuando una transaccion falla.
+#:
+#: Es la funcion mas util del mecanismo: en el instante de un fallo se imprime
+#: lo que estaba pasando en el bus justo antes, que es la informacion que
+#: explica el fallo y la que resulta imposible de obtener a mano, porque para
+#: cuando el operador reacciona ya se perdio.
+VOLCAR_TRAMAS_AL_FALLAR = True
+
+#: Intervalo minimo entre dos volcados automaticos, en milisegundos.
+#:
+#: Sin este limite, una rafaga de fallos dispararia un volcado por cada uno,
+#: inundaria la consola y -al costar cada volcado unos 50 ms de impresion-
+#: agravaria el propio fallo que se intenta diagnosticar. El limite convierte
+#: la traza en una muestra representativa en lugar de un torrente.
+MS_ENTRE_VOLCADOS = 8000
+
+
+#: Tiempo sin recibir ordenes de escritura tras el cual un esclavo declara que
+#: esta RETENIENDO su estado, en milisegundos.
+#:
+#: No cambia ningun comportamiento: la retencion ocurre siempre, porque los
+#: registros MODBus conservan su valor mientras nadie los escriba. Lo que hace
+#: este umbral es decidir cuando emitir el evento que la deja registrada en la
+#: consola, que es lo que la consigna pide VERIFICAR.
+#:
+#: 1500 ms equivalen a mas de siete periodos de sondeo: un valor que no se
+#: alcanza por una perdida de tramas aislada, solo porque el maestro dejo
+#: efectivamente de dirigirse a este nodo.
+MS_PARA_DECLARAR_RETENCION = 1500

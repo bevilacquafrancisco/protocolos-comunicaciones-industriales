@@ -56,6 +56,32 @@ import config
 
 
 # =============================================================================
+# 0. VERSION DEL MODULO
+# =============================================================================
+#: Version de la interfaz que expone este modulo. Se incrementa cada vez que se
+#: agregan nombres de los que dependen los firmwares de los nodos.
+#:
+#: Existe porque el despliegue de este proyecto es manual y sobre TRES placas:
+#: se copian cinco archivos a cada una desde Thonny, y olvidar uno es un error
+#: frecuente y facil de cometer. Su sintoma por defecto es un ImportError o un
+#: AttributeError en medio de un traceback que no dice cual es el archivo que
+#: falta ni en que placa.
+#:
+#: Cada firmware declara la version minima que necesita y la comprueba ANTES de
+#: importar nombres concretos, usando getattr con valor por defecto para que la
+#: comprobacion funcione incluso contra una version tan vieja que ni siquiera
+#: tenga esta constante. El resultado es un mensaje que dice exactamente que
+#: archivo subir, en lugar de un error que hay que interpretar.
+#:
+#: Historial:
+#:   1  Registrador, DetectorDeCambio, EntradaConfirmada, EstadisticaEsclavo
+#:   2  ventana movil en EstadisticaEsclavo, porcentaje(), continuacion()
+#:   3  CapturaTramas, UARTObservado, InstrumentacionBus, localizar_interfaz()
+#:   4  InstrumentacionBus registra las ordenes de escritura recibidas
+VERSION = 4
+
+
+# =============================================================================
 # 1. NIVELES
 # =============================================================================
 
@@ -530,19 +556,73 @@ def porcentaje(parte, total):
     return "{}.{}%".format(por_mil // 10, por_mil % 10)
 
 
-def describir_trama(datos):
+#: Nombre de cada codigo de funcion MODBus. Se listan los ocho de uso corriente
+#: sobre linea serie; los seis primeros son los que emplea este trabajo.
+NOMBRE_FUNCION = {
+    0x01: "Read Coils",
+    0x02: "Read Discrete Inputs",
+    0x03: "Read Holding Registers",
+    0x04: "Read Input Registers",
+    0x05: "Write Single Coil",
+    0x06: "Write Single Register",
+    0x0F: "Write Multiple Coils",
+    0x10: "Write Multiple Registers",
+}
+
+
+def nombre_funcion(codigo):
+    """
+    Traduce un codigo de funcion MODBus a su nombre segun la especificacion.
+
+    Parametros
+    ----------
+    codigo : int
+        Codigo de funcion, con o sin el bit de excepcion.
+
+    Retorna
+    -------
+    str
+
+    Excepciones
+    -----------
+    Ninguna.
+
+    Ejemplo de uso
+    --------------
+    >>> nombre_funcion(0x04)
+    'Read Input Registers'
+    """
+    return NOMBRE_FUNCION.get(codigo & 0x7F, "funcion 0x{:02X}".format(codigo & 0x7F))
+
+
+def describir_trama(datos, es_peticion=None):
     """
     Interpreta los campos de una trama MODBus RTU y devuelve una descripcion.
 
     Es el complemento del volcado hexadecimal: el volcado permite verificar byte
-    a byte, y esta descripcion permite leer de un vistazo a quien iba dirigida y
-    que pedia. Detecta ademas las respuestas de excepcion, que son las que
-    interesa distinguir de un timeout.
+    a byte, y esta descripcion permite leer de un vistazo a quien iba dirigida,
+    que funcion solicitaba y con que valor. Detecta ademas las respuestas de
+    excepcion, que son las que interesa distinguir de un timeout.
+
+    Sobre el parametro es_peticion
+    ------------------------------
+    En MODBus RTU, peticion y respuesta **comparten la estructura de cabecera**:
+    ambas empiezan con direccion y codigo de funcion. Para una lectura, la
+    peticion lleva direccion inicial y cantidad, mientras que la respuesta lleva
+    un conteo de bytes y los datos. Sin saber el sentido, distinguirlas exige
+    adivinar por la longitud, y esa heuristica falla en los casos de borde.
+
+    Como cada nodo SI conoce el sentido -el maestro pregunta y recibe, el esclavo
+    recibe y contesta-, se pasa el dato en lugar de deducirlo. Es la diferencia
+    entre una descripcion correcta y una plausible.
 
     Parametros
     ----------
     datos : bytes | bytearray | None
         Trama completa, incluido el CRC.
+    es_peticion : bool | None, opcional
+        True si la trama es una peticion maestro -> esclavo, False si es una
+        respuesta, None para deducirlo por longitud (menos fiable).
 
     Retorna
     -------
@@ -556,8 +636,8 @@ def describir_trama(datos):
 
     Ejemplo de uso
     --------------
-    >>> describir_trama(b'\\x01\\x04\\x00\\x00\\x00\\x01\\x31\\xCA')
-    'ID=1 FC=0x04 dir=0x0000 cant=1'
+    >>> describir_trama(b'\x01\x04\x00\x00\x00\x01\x31\xCA', True)
+    'E1 FC=0x04 Read Input Registers  dir=0x0000 n=1'
     """
     if not datos:
         return "sin trama"
@@ -566,39 +646,57 @@ def describir_trama(datos):
 
     unit = datos[0]
     funcion = datos[1]
+    quien = "E{}".format(unit) if unit else "BROADCAST"
 
     # Bit 7 del codigo de funcion encendido: el esclavo respondio con excepcion.
-    # Esta rama va primero porque una excepcion tiene un formato propio y no debe
+    # Esta rama va primero porque una excepcion tiene formato propio y no debe
     # interpretarse con el esquema de la funcion original.
     if funcion & 0x80:
         codigo = datos[2] if len(datos) > 2 else 0
-        return "ID={} EXCEPCION a FC=0x{:02X} codigo={} ({})".format(
-            unit, funcion & 0x7F, codigo, _EXCEPCIONES.get(codigo, "desconocida"),
+        return "{} EXCEPCION a FC=0x{:02X} {}  codigo={} ({})".format(
+            quien, funcion & 0x7F, nombre_funcion(funcion), codigo,
+            _EXCEPCIONES.get(codigo, "desconocida"),
         )
 
-    if funcion in (0x01, 0x02, 0x03, 0x04) and len(datos) >= 8:
-        direccion = (datos[2] << 8) | datos[3]
-        cantidad = (datos[4] << 8) | datos[5]
-        return "ID={} FC=0x{:02X} dir=0x{:04X} cant={}".format(
-            unit, funcion, direccion, cantidad,
-        )
+    etiqueta = "{} FC=0x{:02X} {}".format(quien, funcion, nombre_funcion(funcion))
 
-    if funcion in (0x01, 0x02, 0x03, 0x04):
-        # Respuesta: [ID][FC][conteo][datos...][CRC]
-        conteo = datos[2]
-        cuerpo = datos[3:3 + conteo]
-        return "ID={} FC=0x{:02X} respuesta {}B: {}".format(
-            unit, funcion, conteo, hexa(cuerpo),
-        )
-
+    # Las funciones de escritura simple tienen eco identico: peticion y respuesta
+    # son la misma trama, de modo que el sentido no altera la interpretacion.
     if funcion in (0x05, 0x06) and len(datos) >= 8:
         direccion = (datos[2] << 8) | datos[3]
         valor = (datos[4] << 8) | datos[5]
-        return "ID={} FC=0x{:02X} dir=0x{:04X} valor=0x{:04X} ({})".format(
-            unit, funcion, direccion, valor, valor,
-        )
+        if funcion == 0x05:
+            legible = "ON" if valor == 0xFF00 else ("OFF" if valor == 0x0000 else "invalido")
+            return "{}  dir=0x{:04X} valor=0x{:04X} ({})".format(
+                etiqueta, direccion, valor, legible,
+            )
+        return "{}  dir=0x{:04X} valor={}".format(etiqueta, direccion, valor)
 
-    return "ID={} FC=0x{:02X} {}B: {}".format(unit, funcion, len(datos), hexa(datos))
+    if funcion in (0x01, 0x02, 0x03, 0x04):
+        if es_peticion is None:
+            # Sin conocer el sentido: una peticion de lectura mide siempre 8
+            # bytes exactos. Es una heuristica, y se la usa solo como respaldo.
+            es_peticion = len(datos) == 8
+
+        if es_peticion and len(datos) >= 8:
+            direccion = (datos[2] << 8) | datos[3]
+            cantidad = (datos[4] << 8) | datos[5]
+            return "{}  dir=0x{:04X} n={}".format(etiqueta, direccion, cantidad)
+
+        # Respuesta: [ID][FC][conteo][datos...][CRC]
+        conteo = datos[2]
+        cuerpo = datos[3:3 + conteo]
+        if funcion in (0x03, 0x04) and conteo >= 2:
+            valores = [(cuerpo[i] << 8) | cuerpo[i + 1]
+                       for i in range(0, conteo - 1, 2)]
+            texto = ", ".join(str(v) for v in valores)
+        elif funcion in (0x01, 0x02) and conteo >= 1:
+            texto = "bits=0b{:08b}".format(cuerpo[0])
+        else:
+            texto = hexa(cuerpo)
+        return "{}  -> {}".format(etiqueta, texto)
+
+    return "{}  {}B: {}".format(etiqueta, len(datos), hexa(datos))
 
 
 #: Codigos de excepcion MODBus relevantes para este sistema. Se listan solo los
@@ -1098,3 +1196,618 @@ class EstadisticaEsclavo:
         Ninguna.
         """
         self.__init__()
+
+
+# =============================================================================
+# 7. CAPTURA DE TRAMAS
+# =============================================================================
+
+#: Columnas que ocupa el prefijo de una linea de volcado:
+#: 7 del salto + 1 + 6 del sentido + 1 + 3 del tamano + 3 del separador " | ".
+#: Se define como constante y no como literal para que la segunda linea siga
+#: alineada si el formato de la primera cambia.
+_SANGRIA_DESCRIPCION = 21
+
+
+class CapturaTramas:
+    """
+    Almacena en memoria las ultimas tramas vistas por este nodo.
+
+    Responsabilidad dentro del sistema
+    ----------------------------------
+    Permitir observar el trafico del bus SIN alterarlo. Es la diferencia entre
+    un analizador y una sonda que perturba lo que mide.
+
+    Por que no imprimir directamente
+    --------------------------------
+    Imprimir cada trama en el momento en que ocurre cuesta entre 1 y 3 ms por
+    linea sobre la consola USB. Una transaccion genera dos tramas, el ciclo de
+    sondeo tiene cuatro transacciones, y el esclavo debe contestar dentro de los
+    300 ms de timeout del maestro: la traza inmediata consume el presupuesto
+    temporal del propio protocolo y produce timeouts que no existen sin ella.
+    Es el efecto sonda en su forma mas clara.
+
+    Registrar en un buffer circular cuesta, en cambio, una copia de ocho bytes y
+    un append: microsegundos. El costo de imprimir se paga una sola vez, cuando
+    se pide el volcado, y en ese momento ya no importa perturbar el bus porque
+    el dato que interesa ya esta guardado.
+
+    Estrategia de buffer circular
+    -----------------------------
+    Se conservan las N ultimas tramas y se descartan las viejas. Para diagnostico
+    es exactamente lo que se necesita: cuando algo falla, lo que explica el fallo
+    es lo que ocurrio inmediatamente antes, no lo que paso hace cinco minutos.
+    Ademas acota el uso de memoria, que en un ESP32 con MicroPython no es un
+    detalle menor.
+
+    Atributos principales
+    ---------------------
+    capacidad : int
+        Cantidad maxima de tramas conservadas.
+    total : int
+        Tramas registradas desde el inicio, incluidas las ya descartadas. Sirve
+        para saber cuanto trafico paso aunque el buffer solo muestre el final.
+
+    Relaciones con otras clases
+    ---------------------------
+    La alimentan UARTObservado (transmision) y los metodos _uart_read_frame de
+    maestro y esclavo (recepcion). La consume Registrador al volcar.
+    """
+
+    def __init__(self, capacidad=24):
+        """
+        Parametros
+        ----------
+        capacidad : int, opcional
+            Tramas a conservar. Con 24 se cubren tres ciclos de sondeo
+            completos, suficiente para ver el contexto de un fallo.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        self.capacidad = capacidad
+        self.total = 0
+        self._tramas = []
+
+    def registrar(self, sentido, datos, es_peticion=None):
+        """
+        Guarda una trama con su instante, sentido y sentido logico.
+
+        Parametros
+        ----------
+        sentido : str
+            "TX" o "RX", desde el punto de vista de este nodo.
+        datos : bytes | bytearray
+            Contenido de la trama. Se copia, porque la libreria reutiliza sus
+            buffers y guardar la referencia daria lecturas corrompidas al volcar.
+        es_peticion : bool | None, opcional
+            True si es una peticion maestro -> esclavo, False si es respuesta.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        if not self.capacidad or not datos:
+            return
+
+        self.total += 1
+        self._tramas.append((time.ticks_ms(), sentido, bytes(datos), es_peticion))
+        if len(self._tramas) > self.capacidad:
+            self._tramas.pop(0)
+
+    def limpiar(self):
+        """
+        Vacia el buffer sin tocar el contador total.
+
+        Parametros
+        ----------
+        Ninguno.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        self._tramas = []
+
+    def volcar(self, log, titulo="CAPTURA DE TRAMAS", limpiar=True):
+        """
+        Imprime el contenido del buffer en forma legible.
+
+        Cada trama ocupa dos lineas: el volcado hexadecimal, que permite
+        verificar byte a byte y contar campos, y la interpretacion, que permite
+        leer de un vistazo que ocurrio. Se imprimen las dos porque cumplen
+        funciones distintas: el hexadecimal es la evidencia, la interpretacion
+        es la lectura, y para un informe hacen falta ambas.
+
+        Se muestra ademas el intervalo respecto de la trama anterior. Ese numero
+        es el que revela el comportamiento temporal: el tiempo de respuesta del
+        esclavo, el silencio entre tramas y, cuando falta una respuesta, el hueco
+        que dejo.
+
+        Parametros
+        ----------
+        log : Registrador
+            Registrador por el que se emite el volcado.
+        titulo : str, opcional
+            Encabezado del bloque.
+        limpiar : bool, opcional
+            Si vaciar el buffer despues de volcar. Por defecto si, para que dos
+            volcados sucesivos no repitan las mismas tramas.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        if not self._tramas:
+            log.info("{}: sin tramas capturadas".format(titulo))
+            return
+
+        log.info("--- {} ({} de {} vistas) ---".format(
+            titulo, len(self._tramas), self.total,
+        ))
+
+        # Anchos fijos para que las columnas queden alineadas entre tramas y la
+        # segunda linea caiga justo bajo el hexadecimal de la primera. Una tabla
+        # desalineada obliga a leer cada linea por separado, que es justo lo que
+        # un volcado debe evitar.
+        anterior = None
+        for instante, sentido, datos, es_peticion in self._tramas:
+            if anterior is None:
+                salto = " " * 7
+            else:
+                salto = "{:+5d}ms".format(time.ticks_diff(instante, anterior))
+            anterior = instante
+
+            log.continuacion(INFO, "{} {:<6} {:2d}B | {}".format(
+                salto, sentido, len(datos), hexa(datos),
+            ))
+            log.continuacion(INFO, "{}{}".format(
+                " " * _SANGRIA_DESCRIPCION, describir_trama(datos, es_peticion),
+            ))
+
+        if limpiar:
+            self.limpiar()
+
+
+class UARTObservado:
+    """
+    Envoltorio de un UART que registra en una captura todo lo que transmite.
+
+    Responsabilidad dentro del sistema
+    ----------------------------------
+    Observar el lado de la TRANSMISION, que de otro modo queda ciego.
+
+    Por que hace falta
+    ------------------
+    La instrumentacion de recepcion se implementa extendiendo _uart_read_frame(),
+    porque la libreria expone ese punto. Para la transmision no existe un punto
+    equivalente estable: el nombre y la firma del metodo que escribe varian entre
+    versiones de la libreria, y depender de ellos haria que la instrumentacion se
+    rompiera con cualquier actualizacion.
+
+    Interponerse en el objeto UART, en cambio, funciona con cualquier version,
+    porque el UART es una interfaz de MicroPython y no de la libreria. Es el
+    patron Proxy aplicado al punto de acoplamiento mas estable disponible.
+
+    Todo lo que no sea write() se delega al UART real mediante __getattr__, de
+    modo que la libreria no percibe diferencia alguna.
+
+    Atributos principales
+    ---------------------
+    _uart : machine.UART
+        Objeto real, al que se delega todo.
+    _captura : CapturaTramas
+        Destino de las tramas transmitidas.
+
+    Relaciones con otras clases
+    ---------------------------
+    Sustituye al atributo _uart de las subclases del transceptor, tras la
+    construccion de la clase base.
+    """
+
+    def __init__(self, uart, captura, es_peticion=None):
+        """
+        Parametros
+        ----------
+        uart : machine.UART
+            UART real ya inicializado por la libreria.
+        captura : CapturaTramas
+            Buffer donde registrar lo transmitido.
+        es_peticion : bool | None, opcional
+            Sentido logico de lo que transmite este nodo: True en el maestro,
+            que emite peticiones; False en el esclavo, que emite respuestas.
+            Se fija por nodo y no por trama porque un maestro nunca responde y
+            un esclavo nunca pregunta: es una propiedad del rol.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        self._uart = uart
+        self._captura = captura
+        self._es_peticion = es_peticion
+
+    def write(self, datos):
+        """
+        Registra la trama y la entrega al UART real.
+
+        Parametros
+        ----------
+        datos : bytes | bytearray
+            Trama completa a transmitir.
+
+        Retorna
+        -------
+        int
+            Lo que devuelva el UART real: bytes escritos.
+
+        Excepciones
+        -----------
+        Las que propague el UART real.
+        """
+        self._captura.registrar("TX", datos, self._es_peticion)
+        return self._uart.write(datos)
+
+    def __getattr__(self, nombre):
+        """
+        Delega en el UART real cualquier atributo no definido aqui.
+
+        Se invoca solo cuando la busqueda normal falla, de modo que write() y los
+        atributos propios no pasan por aca. read(), any() y flush() si.
+
+        Parametros
+        ----------
+        nombre : str
+            Atributo solicitado.
+
+        Retorna
+        -------
+        objeto
+            El atributo del UART real.
+
+        Excepciones
+        -----------
+        AttributeError
+            Si el UART real tampoco lo define.
+        """
+        return getattr(self._uart, nombre)
+
+
+# =============================================================================
+# 8. INSTRUMENTACION DE LA INTERFAZ SERIE
+# =============================================================================
+
+def localizar_interfaz(objeto):
+    """
+    Encuentra, dentro de un objeto de la libreria, el que realmente tiene el UART.
+
+    Por que hace falta
+    ------------------
+    La libreria expone dos clases con roles distintos y jerarquia distinta:
+
+      Serial      es la interfaz serie: tiene el UART y los metodos que leen y
+                  escriben tramas. La usa el MAESTRO, que la extiende
+                  directamente.
+      ModbusRTU   es el servidor esclavo. NO extiende a Serial: la CONTIENE, en
+                  un atributo interno. Es composicion, no herencia.
+
+    La consecuencia practica es que extender ModbusRTU y sobrescribir sus metodos
+    de lectura de trama no instrumenta nada: esos metodos viven en el objeto
+    contenido, no en el que se extendio, y nunca llegan a invocarse. El sintoma es
+    silencioso y enganoso -contadores que quedan en cero para siempre, sin ningun
+    error- salvo que ademas se acceda a un atributo inexistente, que es lo que
+    produce el AttributeError sobre _uart.
+
+    Esta funcion resuelve el problema buscando el objeto correcto en lugar de
+    suponerlo, y tolerando que el nombre del atributo cambie entre versiones de
+    la libreria.
+
+    Parametros
+    ----------
+    objeto : objeto
+        Instancia de la libreria: Serial, ModbusRTU o una subclase de cualquiera.
+
+    Retorna
+    -------
+    tuple(objeto, str)
+        La interfaz que posee el UART y una descripcion de donde se la encontro,
+        o (None, motivo) si no se la pudo ubicar.
+
+    Excepciones
+    -----------
+    Ninguna.
+    """
+    if hasattr(objeto, "_uart"):
+        return objeto, "el objeto mismo"
+
+    # Nombres con los que las distintas versiones guardan la interfaz contenida.
+    for nombre in ("_itf", "itf", "_serial", "serial"):
+        contenido = getattr(objeto, nombre, None)
+        if contenido is not None and hasattr(contenido, "_uart"):
+            return contenido, "atributo {}".format(nombre)
+
+    return None, "no se encontro ningun atributo con _uart"
+
+
+def explorar(objeto):
+    """
+    Imprime los atributos de un objeto, para inspeccionarlo desde el REPL.
+
+    Utilidad de ultimo recurso: si localizar_interfaz() falla porque una version
+    de la libreria guarda el UART con otro nombre, esto permite averiguar cual es
+    sin leer el codigo fuente de la libreria en la placa.
+
+    Parametros
+    ----------
+    objeto : objeto
+        Instancia a inspeccionar.
+
+    Retorna
+    -------
+    None
+
+    Excepciones
+    -----------
+    Ninguna.
+
+    Ejemplo de uso
+    --------------
+    >>> import diagnostico
+    >>> diagnostico.explorar(cliente)
+    """
+    print("Tipo:", type(objeto))
+    try:
+        atributos = sorted(dir(objeto))
+    except Exception:
+        atributos = []
+    print("Atributos:")
+    for nombre in atributos:
+        if nombre.startswith("__"):
+            continue
+        try:
+            valor = getattr(objeto, nombre)
+        except Exception:
+            valor = "<no accesible>"
+        if callable(valor):
+            print("   {}()".format(nombre))
+        else:
+            print("   {} = {}".format(nombre, valor))
+
+
+class InstrumentacionBus:
+    """
+    Observa el trafico de un nodo sin modificar la logica del protocolo.
+
+    Responsabilidad dentro del sistema
+    ----------------------------------
+    Conectar la captura de tramas a la interfaz serie real de un nodo,
+    cualquiera sea la clase de la libreria que ese nodo utilice.
+
+    Como funciona
+    -------------
+    Se aplica DESPUES de construir el objeto de la libreria, y actua por
+    envoltura y no por herencia:
+
+      - Reemplaza el UART por un UARTObservado, que registra la transmision.
+      - Envuelve el metodo de lectura de trama, que registra la recepcion.
+
+    Envolver en tiempo de ejecucion, en lugar de extender la clase, tiene una
+    ventaja concreta en este caso: funciona igual sea cual sea la clase concreta
+    y sin importar si el nodo hereda de la interfaz serie o la contiene. Es la
+    diferencia entre una instrumentacion que anda en los tres nodos y una que
+    anda solo en el maestro.
+
+    Si no logra ubicar la interfaz, lo informa con claridad y el nodo sigue
+    funcionando sin captura: la observabilidad es deseable, pero no al precio de
+    impedir que el dispositivo opere.
+
+    Atributos principales
+    ---------------------
+    tramas_recibidas, tramas_propias : int
+        Contadores de recepcion. La diferencia entre ambos es el trafico dirigido
+        a otros nodos, cuya presencia confirma que el filtrado por direccion
+        funciona.
+    activa : bool
+        Si la instrumentacion llego a aplicarse.
+
+    Relaciones con otras clases
+    ---------------------------
+    Usa CapturaTramas y UARTObservado. La aplican maestro/main.py y
+    esclavo/main.py tras construir su objeto de la libreria.
+    """
+
+    def __init__(self, captura, log, unit_id=None, tx_es_peticion=None):
+        """
+        Parametros
+        ----------
+        captura : CapturaTramas
+            Buffer donde registrar las tramas.
+        log : Registrador
+            Registrador del nodo, para informar el resultado.
+        unit_id : int | None, opcional
+            Direccion propia, para distinguir el trafico propio del ajeno. None
+            en el maestro, que no tiene direccion.
+        tx_es_peticion : bool | None, opcional
+            True en el maestro (transmite peticiones), False en el esclavo
+            (transmite respuestas).
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        self._captura = captura
+        self._log = log
+        self._unit_id = unit_id
+        self._tx_es_peticion = tx_es_peticion
+        self.tramas_recibidas = 0
+        self.tramas_propias = 0
+        self.activa = False
+
+        #: Cantidad de ordenes de ESCRITURA dirigidas a este nodo, y el instante
+        #: de la ultima. Se cuentan aparte de las lecturas porque son las unicas
+        #: que pueden modificar las salidas.
+        #:
+        #: Sirven para evidenciar el tercer requisito de la Parte 3: que el
+        #: esclavo no seleccionado mantenga su ultimo estado hasta recibir una
+        #: nueva orden. Ese requisito se cumple por construccion -los registros
+        #: MODBus conservan su valor mientras nadie los escriba- pero la consigna
+        #: pide VERIFICARLO, y una propiedad que no se puede observar no esta
+        #: verificada. Con estos contadores, la evidencia es directa: las salidas
+        #: permanecen constantes mientras este contador no avanza.
+        self.ordenes_escritura = 0
+        self.ultima_orden_ms = time.ticks_ms()
+
+    def aplicar(self, objeto):
+        """
+        Instrumenta el objeto de la libreria e informa el resultado.
+
+        Parametros
+        ----------
+        objeto : objeto
+            Instancia de Serial, ModbusRTU o subclase.
+
+        Retorna
+        -------
+        bool
+            True si se instrumento la transmision y la recepcion.
+
+        Excepciones
+        -----------
+        Ninguna: cualquier fallo se informa y se devuelve False.
+        """
+        interfaz, donde = localizar_interfaz(objeto)
+        if interfaz is None:
+            self._log.error(
+                "No se pudo instrumentar el bus ({}). El nodo funciona, pero sin "
+                "captura de tramas. Ejecutar diagnostico.explorar(objeto) para "
+                "averiguar donde guarda el UART esta version de la libreria."
+                .format(donde)
+            )
+            return False
+
+        try:
+            interfaz._uart = UARTObservado(
+                interfaz._uart, self._captura, self._tx_es_peticion,
+            )
+        except Exception as error:
+            self._log.error("No se pudo envolver el UART: {}".format(error))
+            return False
+
+        if not hasattr(interfaz, "_uart_read_frame"):
+            self._log.aviso(
+                "Transmision instrumentada ({}), pero la interfaz no expone "
+                "_uart_read_frame: no se registrara la recepcion.".format(donde)
+            )
+            self.activa = True
+            return False
+
+        original = interfaz._uart_read_frame
+
+        def leer_trama(timeout=None):
+            """Lee la trama con el metodo original y la registra."""
+            trama = original(timeout)
+            self._registrar_recepcion(trama)
+            return trama
+
+        interfaz._uart_read_frame = leer_trama
+        self.activa = True
+        self._log.info("Bus instrumentado ({}): TX y RX bajo observacion".format(donde))
+        return True
+
+    def ms_sin_ordenes(self):
+        """
+        Milisegundos transcurridos desde la ultima orden de escritura recibida.
+
+        Parametros
+        ----------
+        Ninguno.
+
+        Retorna
+        -------
+        int
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        return time.ticks_diff(time.ticks_ms(), self.ultima_orden_ms)
+
+    def _registrar_recepcion(self, trama):
+        """
+        Contabiliza y captura una trama recibida.
+
+        Parametros
+        ----------
+        trama : bytes | bytearray | None
+            Trama devuelta por la libreria.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+        """
+        if not trama:
+            return
+
+        self.tramas_recibidas += 1
+
+        if self._unit_id is None:
+            # Maestro: no tiene direccion propia, y todo lo que recibe es una
+            # respuesta a una peticion que el mismo emitio.
+            self._captura.registrar("RX", trama, es_peticion=False)
+            return
+
+        propia = trama[0] == self._unit_id
+        if propia:
+            self.tramas_propias += 1
+
+            # Funciones de escritura: 0x05 y 0x06 simples, 0x0F y 0x10 multiples.
+            # Solo estas pueden alterar una salida; las de lectura no tocan el
+            # estado del dispositivo, de modo que contarlas aqui desdibujaria la
+            # evidencia de retencion.
+            if len(trama) > 1 and trama[1] in (0x05, 0x06, 0x0F, 0x10):
+                self.ordenes_escritura += 1
+                self.ultima_orden_ms = time.ticks_ms()
+
+        # Sentido logico de lo recibido por un esclavo, que no es uniforme:
+        #
+        #   propia -> siempre una peticion del maestro. Nadie mas inicia
+        #             transacciones en el bus.
+        #   ajena  -> puede ser una peticion al otro esclavo, o la RESPUESTA de
+        #             ese otro esclavo. En un bus multipunto todos los nodos oyen
+        #             todo, de modo que el sentido es genuinamente desconocido y
+        #             se deja que lo deduzca la heuristica de longitud. Forzarlo
+        #             describiria mal las respuestas ajenas, y un volcado que
+        #             miente es peor que no tener volcado.
+        self._captura.registrar(
+            "RX" if propia else "RX(aj)", trama,
+            es_peticion=True if propia else None,
+        )

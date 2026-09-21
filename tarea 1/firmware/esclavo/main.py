@@ -47,7 +47,38 @@ from umodbus.serial import ModbusRTU
 
 import config
 import diagnostico
-from diagnostico import DetectorDeCambio, Registrador, describir_trama
+
+# -----------------------------------------------------------------------------
+# Verificacion de despliegue
+# -----------------------------------------------------------------------------
+# Se comprueba ANTES de importar nombres concretos de diagnostico.py, porque un
+# "from diagnostico import X" contra una version vieja del modulo falla con un
+# ImportError que no indica que archivo hay que actualizar ni en que placa.
+#
+# Se usa getattr con valor por defecto y no diagnostico.VERSION directo: una
+# version suficientemente vieja del modulo no tiene siquiera esa constante, y el
+# acceso directo produciria un AttributeError, es decir, el mismo problema que se
+# intenta evitar, corrido un renglon.
+_VERSION_DIAGNOSTICO_REQUERIDA = 4
+if getattr(diagnostico, "VERSION", 0) < _VERSION_DIAGNOSTICO_REQUERIDA:
+    print("=" * 66)
+    print("ERROR DE DESPLIEGUE")
+    print("diagnostico.py en esta placa es de una version anterior.")
+    print("  version en la placa : {}".format(getattr(diagnostico, "VERSION", 0)))
+    print("  version requerida   : {}".format(_VERSION_DIAGNOSTICO_REQUERIDA))
+    print("")
+    print("Subir firmware/comun/diagnostico.py a la raiz del ESP32 y")
+    print("reiniciar con Ctrl+D. Recordar cerrar y reabrir el archivo en")
+    print("Thonny antes de subirlo: el editor trabaja sobre su propio buffer.")
+    print("=" * 66)
+    raise SystemExit("diagnostico.py desactualizado en esta placa")
+
+from diagnostico import (
+    CapturaTramas,
+    DetectorDeCambio,
+    InstrumentacionBus,
+    Registrador,
+)
 from perifericos import EntradaDigital, EntradaAnalogica, SalidaDigital, SalidaPWM
 
 
@@ -64,86 +95,41 @@ from perifericos import EntradaDigital, EntradaAnalogica, SalidaDigital, SalidaP
 # traza util y tres ventanas identicas.
 LOG = Registrador("ESCLAVO ?")
 
+#: Captura circular de las ultimas tramas vistas por este nodo. Un esclavo ve
+#: TODO el trafico del bus, incluidas las tramas dirigidas al otro esclavo, de
+#: modo que su captura es la mas completa de los tres nodos: sirve para verificar
+#: que el filtrado por direccion funciona y para observar transacciones en las
+#: que este nodo ni siquiera participa.
+CAPTURA = CapturaTramas(diagnostico.opcion("CAPTURA_TRAMAS", 24))
 
-class ServidorRTUInstrumentado(ModbusRTU):
-    """
-    Servidor MODBus RTU que deja traza de todo lo que entra por el bus.
+#: Volcado de la captura, publicado por main() para invocarlo desde el REPL:
+#:
+#:   >>> VOLCAR()
+VOLCAR = None
 
-    Responsabilidad dentro del sistema
-    ----------------------------------
-    Observar el bus desde el punto de vista del esclavo, sin alterar el
-    comportamiento del protocolo. Es la contraparte de la instrumentacion del
-    maestro y resuelve una pregunta que desde el maestro no puede responderse:
-    cuando una transaccion falla, hay que distinguir si el esclavo NO RECIBIO la
-    peticion (problema de capa fisica en el sentido maestro -> esclavo) o si la
-    recibio y su respuesta se perdio (problema en el sentido inverso). Solo el
-    esclavo tiene ese dato.
 
-    Se instrumenta ademas el descarte de tramas dirigidas a otro Unit ID. Con
-    dos esclavos en el bus, cada nodo ve el doble de trafico del que le
-    corresponde, y confirmar que el filtrado por direccion funciona descarta de
-    plano toda una familia de hipotesis sobre salidas que cambian solas.
-
-    Atributos principales
-    ---------------------
-    tramas_recibidas : int
-        Tramas leidas del bus, propias y ajenas.
-    tramas_propias : int
-        Tramas cuyo primer byte coincide con el Unit ID de este nodo.
-
-    Relaciones con otras clases
-    ---------------------------
-    Extiende umodbus.serial.ModbusRTU sin modificar su logica de protocolo:
-    unicamente observa el resultado de _uart_read_frame().
-    """
-
-    def __init__(self, *args, **kwargs):
-        """Inicializa los contadores y delega en la clase base."""
-        super().__init__(*args, **kwargs)
-        self.tramas_recibidas = 0
-        self.tramas_propias = 0
-
-    def _uart_read_frame(self, timeout=None):
-        """
-        Lee una trama del bus y la registra antes de entregarla al protocolo.
-
-        La traza se emite en nivel TRAMA y la clasificacion en nivel DETALLE,
-        de modo que el costo de imprimir solo se paga cuando se lo pidio
-        explicitamente. En niveles bajos, este metodo cuesta dos comparaciones
-        de enteros.
-
-        Parametros
-        ----------
-        timeout : int, opcional
-            Tiempo maximo de espera en microsegundos, gestionado por la libreria.
-            No se modifica: el esclavo es pasivo y no impone tiempos al bus.
-
-        Retorna
-        -------
-        bytearray
-            La trama recibida, tal como la devuelve la clase base.
-
-        Excepciones
-        -----------
-        Las que propague la implementacion de la clase base.
-        """
-        trama = super()._uart_read_frame(timeout)
-
-        if trama:
-            self.tramas_recibidas += 1
-            propia = trama[0] == self.addr
-            if propia:
-                self.tramas_propias += 1
-
-            if LOG.habilitado(diagnostico.TRAMA):
-                LOG.trama("RX" if propia else "RX (ajena)", trama)
-            if LOG.habilitado(diagnostico.DETALLE):
-                LOG.detalle("{} {}".format(
-                    "PETICION" if propia else "descartada por direccion",
-                    describir_trama(trama),
-                ))
-
-        return trama
+#: Instrumentacion del bus de este nodo.
+#:
+#: Se aplica por ENVOLTURA y no por herencia. El motivo es concreto y costo un
+#: fallo en banco: la libreria expone dos clases con jerarquias distintas.
+#:
+#:   Serial      es la interfaz serie: tiene el UART y los metodos que leen y
+#:               escriben tramas. El MAESTRO la extiende directamente, y por eso
+#:               alli si funciona sobrescribir _uart_read_frame().
+#:   ModbusRTU   es el servidor esclavo. NO extiende a Serial: la CONTIENE en un
+#:               atributo interno. Es composicion, no herencia.
+#:
+#: Extender ModbusRTU y sobrescribir sus metodos de lectura de trama no
+#: instrumenta nada: esos metodos viven en el objeto contenido y nunca llegan a
+#: invocarse. El sintoma es silencioso -contadores en cero para siempre, sin
+#: ningun error- hasta que ademas se accede a un atributo que no existe, y recien
+#: ahi aparece el AttributeError sobre _uart.
+#:
+#: InstrumentacionBus localiza la interfaz real en lugar de suponerla, de modo
+#: que funciona igual en los tres nodos.
+INSTRUMENTACION = InstrumentacionBus(
+    CAPTURA, LOG, unit_id=None, tx_es_peticion=False,
+)
 
 
 # =============================================================================
@@ -273,7 +259,7 @@ def configurar_servidor_modbus(unit_id):
     inicial). Los valores iniciales definen el estado seguro del dispositivo
     antes de recibir la primera orden del maestro: ambas salidas en reposo.
     """
-    cliente = ServidorRTUInstrumentado(
+    cliente = ModbusRTU(
         addr=unit_id,
         baudrate=config.BAUDRATE,
         data_bits=config.BITS_DATOS,
@@ -481,6 +467,8 @@ def main():
     control, un dispositivo de campo que se detiene ante una trama malformada es
     peor que uno que la descarta y sigue operando.
     """
+    global VOLCAR
+
     diagnostico.verificar_config()
 
     unit_id = leer_unit_id()
@@ -489,6 +477,18 @@ def main():
 
     # Identificacion del nodo en la traza, una vez conocido el Unit ID.
     LOG.fijar_prefijo("ESCLAVO {}".format(unit_id))
+
+    # La instrumentacion se aplica DESPUES de construir el cliente, porque es el
+    # constructor de la libreria el que crea el UART, y con el Unit ID ya leido,
+    # que es lo que permite separar el trafico propio del ajeno.
+    INSTRUMENTACION._unit_id = unit_id
+    INSTRUMENTACION.aplicar(cliente)
+
+    # Se publica el volcado como funcion de modulo para poder invocarlo desde el
+    # Shell de Thonny tras interrumpir con Ctrl+C, del mismo modo que en el
+    # maestro. Un esclavo no tiene maquina de estados que exponer, pero si tiene
+    # la captura, que es lo que interesa mirar.
+    VOLCAR = lambda: CAPTURA.volcar(LOG, "CAPTURA DEL ESCLAVO {}".format(unit_id))
 
     print("=" * 58)
     print("ESCLAVO MODBus RTU  |  Unit ID = {}".format(unit_id))
@@ -509,7 +509,24 @@ def main():
 
     instante_resumen = time.ticks_ms()
     periodo_resumen = diagnostico.opcion("PERIODO_RESUMEN_MS", 5000)
+    umbral_retencion = diagnostico.opcion("MS_PARA_DECLARAR_RETENCION", 1500)
     errores = 0
+
+    # --- Evidencia del tercer requisito de la Parte 3 -----------------------
+    # "Verificar que el esclavo que no esta seleccionado mantenga el ultimo
+    #  estado recibido en sus salidas hasta recibir una nueva orden."
+    #
+    # El comportamiento se cumple por construccion: los registros conservan su
+    # valor mientras nadie los escriba, y aplicar_salidas() los refleja en el
+    # hardware en cada vuelta. Pero la consigna no pide implementarlo, pide
+    # VERIFICARLO, y una propiedad que no se puede observar no esta verificada.
+    #
+    # Se emiten dos eventos con marca de tiempo -entrada y salida del estado de
+    # retencion- mas el estado de las salidas en cada latido. La evidencia queda
+    # entonces sobre la consola y no sobre la palabra del autor: las salidas
+    # conservan su valor mientras el contador de ordenes no avanza.
+    reteniendo = False
+    salidas_al_retener = (None, None)
 
     while True:
         try:
@@ -532,16 +549,52 @@ def main():
         # crece, el esclavo no esta recibiendo. Y si el latido deja de salir, el
         # nodo se colgo o se reinicio. Tres diagnosticos distintos a partir de
         # una sola linea periodica.
+        # --- Transicion de y hacia el estado de retencion -------------------
+        sin_ordenes = INSTRUMENTACION.ms_sin_ordenes()
+        salidas = (
+            1 if cliente.get_coil(address=config.DIR_COIL_LED_DIGITAL) else 0,
+            cliente.get_hreg(address=config.DIR_HOLDING_REGISTER_PWM),
+        )
+
+        if not reteniendo and sin_ordenes >= umbral_retencion:
+            reteniendo = True
+            salidas_al_retener = salidas
+            LOG.aviso(
+                "RETENCION: sin ordenes hace {} ms. Salidas mantenidas en "
+                "LED={} PWM={}".format(sin_ordenes, salidas[0], salidas[1])
+            )
+        elif reteniendo and sin_ordenes < umbral_retencion:
+            reteniendo = False
+            # Se compara contra el valor que tenian al ENTRAR en retencion. Si
+            # coinciden, el requisito quedo demostrado sobre ese intervalo
+            # concreto; si difieren, algo modifico las salidas sin que mediara
+            # una orden, y eso seria un defecto que hay que ver.
+            intactas = salidas == salidas_al_retener
+            LOG.aviso(
+                "FIN DE RETENCION: llego una orden. Salidas durante la pausa: "
+                "{} (LED={} PWM={})".format(
+                    "SIN CAMBIOS" if intactas else "MODIFICADAS, revisar",
+                    salidas_al_retener[0], salidas_al_retener[1],
+                )
+            )
+
         if time.ticks_diff(time.ticks_ms(), instante_resumen) >= periodo_resumen:
             instante_resumen = time.ticks_ms()
             LOG.info("latido: tramas={} propias={} ajenas={} errores={} | DI={} IR={}".format(
-                cliente.tramas_recibidas,
-                cliente.tramas_propias,
-                cliente.tramas_recibidas - cliente.tramas_propias,
+                INSTRUMENTACION.tramas_recibidas,
+                INSTRUMENTACION.tramas_propias,
+                INSTRUMENTACION.tramas_recibidas - INSTRUMENTACION.tramas_propias,
                 errores,
                 1 if perifericos["switch"].leer() else 0,
                 perifericos["potenciometro"].leer(),
             ))
+            LOG.continuacion(diagnostico.INFO, "salidas: LED={} PWM={} | {} ordenes, "
+                             "ultima hace {} ms{}".format(
+                                 salidas[0], salidas[1],
+                                 INSTRUMENTACION.ordenes_escritura,
+                                 sin_ordenes,
+                                 "  <- RETENIENDO" if reteniendo else "",
+                             ))
 
 
 if __name__ == "__main__":

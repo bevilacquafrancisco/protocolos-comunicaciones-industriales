@@ -11,8 +11,29 @@ comportamiento del protocolo se describe en
 [protocolo-comunicacion.md](protocolo-comunicacion.md) y el contrato de datos en
 [mapa-registros.md](mapa-registros.md).
 
-Hardware disponible: 3 × ESP32 DevKit · 3 × módulo MAX485 (TTL↔RS-485) ·
-1 × conversor USB↔RS-485. Datasheet del transceptor en [MAX481.PDF](MAX481.PDF).
+Hardware del sistema: 3 × ESP32 DevKit · 3 × módulo transceptor TTL↔RS-485 ·
+1 × conversor USB↔RS-485 para la validación desde PC. Datasheet del transceptor
+en [MAX481.PDF](MAX481.PDF).
+
+**Estado: construido y medido.** Este documento describe la capa física tal como
+quedó implementada, no una propuesta. Las decisiones que se validaron con
+instrumento o con la tasa de error del sistema se indican como tales; las que se
+sostienen solo sobre el cálculo también, para que la distinción quede clara.
+
+### Resumen de lo verificado en la capa física
+
+| Decisión | Fundamento | Cómo se verificó |
+|---|---|---|
+| Conexión directa en el sentido ESP32 → transceptor | Umbral de entrada alta del transceptor (2,0 V) inferior a los 3,3 V del ESP32 | Operación correcta del bus en las tres partes |
+| Divisor resistivo en el sentido transceptor → ESP32 | Máximo absoluto del GPIO | Medición del nodo del divisor con multímetro antes de conectar |
+| **Pull-up en la salida del receptor** | El receptor queda en alta impedancia mientras el nodo transmite | Prueba de lectura directa del puerto serie: sin el pull-up devolvía bytes nulos espurios; con él, ninguno |
+| Operar **sin** terminación ni polarización | Longitud del bus muy por debajo de la longitud crítica calculada (1,5 m) | 750 ciclos de sondeo con 0,0 % de error |
+
+> La tercera fila corresponde a un **error de diseño propio detectado y corregido
+> durante la puesta en marcha**, no a una limitación del hardware. El diagnóstico
+> completo está en [INCONVENIENTES.md](../evidencia/INCONVENIENTES.md); se
+> documenta porque el proceso de encontrarlo tiene más valor técnico que el
+> circuito final.
 
 ---
 
@@ -41,7 +62,7 @@ ubicar componentes en una planta:
 Nivel 4-5   Empresa / Sitio        ERP, planificación              ─┐  IT
 ──────────────  DMZ industrial  ────────────────────────────────────
 Nivel 3     Operaciones            MES, historian                  ─┐
-Nivel 2     Supervisión            SCADA / HMI    ←── PC + Modbus Poll (Parte 1)
+Nivel 2     Supervisión            SCADA / HMI    ←── PC + herramienta MODBus (Parte 1)
 Nivel 1     Control                PLC / PAC      ←── MAESTRO ESP32
 Nivel 0     Campo                  sensores y actuadores ←── ESCLAVOS 1 y 2
                                                                    ─┘  OT
@@ -53,7 +74,7 @@ La equivalencia es directa y conviene tenerla lista para la defensa oral:
 |---|---|---|
 | Esclavos 1 y 2 | Módulos de E/S remotas de nivel 0 | Encapsulan sensores (switch, potenciómetro) y actuadores (LEDs) detrás de un mapa de registros. No deciden nada: publican y obedecen. |
 | Maestro ESP32 | Controlador de nivel 1 (PLC/PAC) | Es el único que contiene lógica y el único que inicia transacciones. Si se cae lo de arriba, sigue operando. |
-| PC con Modbus Poll | Herramienta de supervisión de nivel 2 | Sondea y comanda, pero solo durante la puesta en marcha. Un SCADA supervisa; no es responsable del control. |
+| PC con herramienta MODBus | Herramienta de supervisión de nivel 2 | Sondea y comanda, pero solo durante la puesta en marcha. Un SCADA supervisa; no es responsable del control. |
 
 Esto responde además la **pregunta de análisis de la Parte 1** de la consigna: en
 esa instancia la PC es el maestro (inicia cada transacción) y el ESP32 es el
@@ -66,7 +87,7 @@ definición del modelo maestro-esclavo por sondeo.
 ```mermaid
 flowchart TB
     subgraph PC["PC — solo durante la Parte 1"]
-        MP["Modbus Poll"] --- USB["Conversor<br/>USB ↔ RS-485"]
+        MP["Herramienta<br/>MODBus de PC"] --- USB["Conversor<br/>USB ↔ RS-485"]
     end
 
     subgraph MAESTRO["MAESTRO (ESP32)"]
@@ -639,21 +660,56 @@ Con 4 LEDs a 3,9 mA, el maestro consume 15,6 mA en sus salidas: sin problemas.
 
 ## 9. Lista de materiales
 
-| Componente | Cantidad | Uso |
-|---|---|---|
-| ESP32 DevKit | 3 | Maestro, Esclavo 1, Esclavo 2 |
-| Módulo MAX485 (TTL↔RS-485) | 3 | Transceptor de cada nodo |
-| Conversor USB↔RS-485 | 1 | Validación desde PC (Parte 1) |
-| Resistencia 2,2 kΩ | 3 | Divisor RO→RX (una por nodo) |
-| Resistencia 3,3 kΩ | 3 | Divisor RO→RX (una por nodo) |
-| **Resistencia 680 Ω** | **3** | **Pull-up de RO (una por nodo) — obligatorio, ver §4.3.1** |
-| Resistencia 330 Ω | 8 | LEDs (2 por esclavo + 4 en el maestro) |
-| Resistencia 120 Ω | 2 | Terminación del bus (solo extremos) |
-| Resistencia 680 Ω | 2 | Polarización de reposo (un solo punto) |
-| LED 5 mm | 8 | 2 por esclavo, 4 en el maestro |
-| Potenciómetro 10 kΩ | 3 | Entrada analógica de cada nodo |
-| Pulsador / llave | 6 | 1 switch + 1 jumper o selector por nodo |
-| Par trenzado | ~2 m | Líneas A/B del bus |
+Cantidades para el sistema completo de tres nodos. Los valores indicados son los
+empleados; la columna de tolerancia indica **qué margen admite cada componente**,
+de modo que el sistema pueda reproducirse con lo que haya disponible sin recalcular
+nada.
+
+### 9.1 Componentes activos
+
+| Componente | Cant. | Uso | Sustituciones admisibles |
+|---|---|---|---|
+| Placa ESP32 con MicroPython | 3 | Maestro, Esclavo 1, Esclavo 2 | Cualquier variante con UART libre, ADC y suficientes GPIO |
+| Módulo transceptor TTL↔RS-485 | 3 | Interfaz de cada nodo al bus | Cualquiera basado en MAX485 o equivalente con pines DI, RO, DE, RE |
+| Conversor USB↔RS-485 | 1 | Validación desde PC (Parte 1) | Cualquiera reconocido por el sistema operativo |
+
+### 9.2 Componentes pasivos
+
+| Componente | Cant. | Uso | Rango admisible |
+|---|---|---|---|
+| Resistencia R1 del divisor | 3 | Rama superior del divisor de la salida del receptor | 1,5 kΩ a 10 kΩ, **manteniendo la relación R2 ≈ 1,5 × R1** |
+| Resistencia R2 del divisor | 3 | Rama inferior del divisor | Ver §4.3: la tabla da cinco pares válidos |
+| **Resistencia de pull-up** | **3** | **Sostiene la salida del receptor mientras el nodo transmite** | **680 Ω a 1 kΩ. Por encima de 1,5 kΩ deja de cumplir su función — ver §4.3.1** |
+| Resistencia limitadora de LED | 8 | Una por LED | 220 Ω a 1 kΩ; el cálculo está en §8.4 |
+| Resistencia de terminación | 2 | Extremos del bus, **solo si la longitud lo exige** | 120 Ω, valor fijado por la impedancia característica del cable |
+| Resistencia de polarización | 2 | Un único punto del bus, **solo si hay terminación** | 680 Ω. Con 1 kΩ o más la tensión de reposo cae en la zona muerta — ver §6.2 |
+
+### 9.3 Periféricos y cableado
+
+| Componente | Cant. | Uso | Observaciones |
+|---|---|---|---|
+| LED | 8 | 2 por esclavo (digital y PWM) + 4 en el maestro (2 réplicas + 2 indicadores) | Cualquier color; el rojo y el verde requieren menos corriente para el mismo brillo aparente |
+| Potenciómetro | 3 | Entrada analógica de cada nodo | **1 kΩ a 100 kΩ.** Ver la nota de abajo |
+| Pulsador o llave | 3 | Entrada digital de cada nodo | Normal abierto, a masa |
+| Jumper o llave de direccionamiento | 2 | Unit ID de cada esclavo | Un simple puente a masa alcanza |
+| Llave selectora | 1 | Selección de esclavo en el maestro | Debe ser **de posición estable**, no pulsador momentáneo |
+| Cable para el bus | según montaje | Líneas A y B | Par trenzado preferentemente; ver la nota de abajo |
+| Placa de montaje sin soldadura | según montaje | Soporte de los nodos | Un nodo entra cómodo en media placa estándar |
+
+> **Sobre el valor del potenciómetro.** Cualquier valor entre 1 kΩ y 100 kΩ
+> funciona sin cambiar una línea de código: el conversor mide **tensión**, y un
+> divisor entrega la misma fracción de la alimentación con cualquier resistencia
+> total. Lo único que cambia es la corriente consumida —despreciable en todos los
+> casos— y la impedancia de fuente vista por el conversor. Por encima de unos
+> 100 kΩ esa impedancia empieza a interactuar con el capacitor de muestreo del
+> conversor y conviene agregar un capacitor de desacople a la entrada.
+
+> **Sobre el cable del bus.** RS-485 está especificado para par trenzado, cuyo
+> trenzado es lo que cancela el ruido de modo común. Este montaje se realizó con
+> cable sin trenzar, lo que **resigna parte de esa inmunidad**. Es aceptable a
+> 9600 baudios en un bus de pocos centímetros —y quedó demostrado por la tasa de
+> error nula—, pero no lo sería en una instalación industrial. Se documenta como
+> desviación explícita respecto de la práctica normada, no como equivalencia.
 
 ## 10. Procedimiento de puesta en marcha
 
@@ -668,9 +724,16 @@ en simultáneo.
 | 3 | Alimentar los ESP32 y correr un *blink* | Confirma alimentación, reloj y que MicroPython arranca |
 | 4 | Probar los periféricos locales uno por vez, sin MODBus | Con `firmware/prueba_perifericos.py` (F5 en Thonny): cada periférico responde aislado |
 | 5 | Armar el bus completo y medir la polarización de reposo, con todos los nodos callados | V(A) − V(B) ≈ 200-220 mV, estable |
-| 6 | Modbus Poll ↔ Esclavo 1, con el resto de los nodos apagados | Lectura y escritura correctas en las 4 direcciones |
+| 6 | Herramienta MODBus de PC ↔ Esclavo 1, con el resto de los nodos apagados | Lectura y escritura correctas en las 4 direcciones |
 | 7 | Agregar el maestro (Parte 2) | Sondeo estable, sin timeouts durante 5 minutos continuos |
 | 8 | Agregar el Esclavo 2 (Parte 3) | Conmutación en vivo; el esclavo no seleccionado retiene su estado |
+
+Los ocho pasos se ejecutaron en ese orden y el sistema los superó. El orden no es
+una formalidad: **los tres defectos encontrados durante la puesta en marcha
+presentaron síntomas que no correspondían a su causa**, y haberlos enfrentado con
+una sola variable nueva en juego fue lo que permitió aislarlos. El registro de
+esos tres casos, con la hipótesis falsada en cada uno, está en
+[INCONVENIENTES.md](../evidencia/INCONVENIENTES.md).
 
 ### 10.1 Qué responde cada instrumento
 

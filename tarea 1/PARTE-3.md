@@ -75,8 +75,8 @@ flowchart LR
 | GPIO22/23 del maestro | Sin conectar (opcionales) | **2 LEDs indicadores**, ahora informativos |
 | Firmware del maestro | Sin cambios | **Sin cambios** (la máquina de estados ya soportaba esto) |
 | Firmware de los esclavos | Sin cambios | **Sin cambios**, mismo archivo en ambos |
-| Protoboards | 2 | 3 |
-| Potenciómetros usados | 2 de 2 disponibles | **3** — hace falta conseguir uno más |
+| Nodos montados | 2 | 3 |
+| Potenciómetros | 2 | 3 |
 
 **Lo que NO cambia y por eso no vuelve a ser sospechoso:** el mapa de registros,
 los parámetros serie, la adaptación de niveles (con el pull-up ya corregido en
@@ -100,7 +100,7 @@ Repasando `firmware/maestro/main.py` (documentado en detalle en
 | M4-M7 | Lecturas y escrituras | Usan `self._id_activo` como destino de cada transacción | No — nunca tuvieron el Unit ID fijo "quemado", siempre leyeron la variable |
 
 **Conclusión operativa: la Parte 3 es 100 % hardware.** Cargar el mismo
-`main.py` que ya tenés funcionando en el maestro, cargar el mismo `main.py`
+`main.py` que ya funciona en el maestro, cargar el mismo `main.py`
 del esclavo en la placa nueva, y conectar tres cosas: el jumper de la placa
 nueva, el switch selector, y los dos LEDs indicadores.
 
@@ -111,19 +111,19 @@ nueva, el switch selector, y los dos LEDs indicadores.
 
 ## 4. Prerrequisitos — qué conseguir antes de empezar
 
-| # | Componente | Ya tenés | Falta | Notas |
+| # | Componente | Cant. | Valor de referencia | Notas |
 |---|---|---|---|---|
-| 1 | Protoboard 16×5,5 cm | 2 (Maestro, Esclavo 1) | **1** | Para el Esclavo 2. Documentado como pendiente desde [PARTE-2.md §6.1](PARTE-2.md#61-dos-protoboards-una-por-nodo) |
-| 2 | Potenciómetro | 10 kΩ (Esc. 1) + 2,2 kΩ (Maestro) | **1 más** | Ver §5.1 — el valor exacto no es crítico |
-| 3 | ESP32 DevKit | 2 en uso | **1 más** | Para el Esclavo 2 |
-| 4 | Módulo MAX485 | 2 en uso | **1 más** | Para el Esclavo 2 |
-| 5 | Pulsador | 2 en uso | **1 más** | Switch local del Esclavo 2 |
-| 6 | LED | 4 en uso (2 por nodo) | **4 más** | 2 del Esclavo 2 + 2 indicadores del maestro |
-| 7 | Resistencia 330 Ω | 4 en uso | **4 más** | Limitadoras de esos 4 LEDs |
-| 8 | Resistencia 2,2 kΩ / 3,3 kΩ (divisor) | 4 en uso (2 por nodo) | **1 par más** | Divisor RO→RX del Esclavo 2 |
-| 9 | Resistencia 680 Ω (pull-up) | 2 en uso | **1 más** | Pull-up de RO del Esclavo 2 — **obligatorio**, ver §5.2 |
-| 10 | Switch / llave de 2 posiciones | 0 | **1** | Selector de esclavo — puede ser un jumper simple, igual que el de Unit ID |
-| 11 | Cables dupont | — | ~15 más | Para el nodo nuevo |
+| 1 | Superficie de montaje para un nodo | 1 | — | Media placa de prototipado estándar alcanza. Ver [PARTE-2.md §6.1](PARTE-2.md#61-un-área-de-montaje-por-nodo) |
+| 2 | Placa ESP32 con MicroPython | 1 | — | Igual que las otras dos |
+| 3 | Módulo transceptor TTL↔RS-485 | 1 | — | Igual que los otros dos |
+| 4 | Potenciómetro | 1 | 10 kΩ | **1 kΩ a 100 kΩ** — ver §5.1 |
+| 5 | Pulsador o llave | 1 | — | Normal abierto, a masa |
+| 6 | LED | 2 | — | Salida digital y salida PWM |
+| 7 | Resistencia limitadora de LED | 2 | 330 Ω | 220 Ω a 1 kΩ |
+| 8 | Par de resistencias del divisor | 1 par | 2,2 kΩ / 3,3 kΩ | Divisor RO→RX del Esclavo 2; ver [PARTE-1.md §4.1](PARTE-1.md#41-cómo-elegir-el-par-del-divisor-rorx) |
+| 9 | Resistencia de pull-up | 1 | 680 Ω | **Obligatoria.** 680 Ω a 1 kΩ |
+| 10 | Jumper o puente a masa | 1 | — | Fija el Unit ID 2 del Esclavo 2 |
+| 11 | Llave selectora | 1 | — | **De posición estable, no pulsador momentáneo** — ver §5.4 |
 
 **No hay ningún ítem de software ni de firmware en esta lista.** Es
 deliberado: si algo de esto faltara, la Parte 3 se puede seguir armando por
@@ -172,19 +172,19 @@ físicamente en esta placa también. Ver §7.2 para el detalle de conexión.
 partir de 3-4 nodos. Sin embargo, la Parte 2 ya demostró en banco que ese
 criterio genérico —pensado para una distancia de referencia de 1 a 2 metros—
 no aplica igual a este montaje concreto: con el bus real de ~15-20 cm entre
-dos protoboards, **750 ciclos sin un solo fallo, sin terminación ni
+dos nodos, **750 ciclos sin un solo fallo, sin terminación ni
 polarización**.
 
 Al sumar el tercer nodo, el criterio no cambia, **se vuelve a medir**:
 
 ```
 Longitud crítica (tR = 15 ns del MAX485):  L_c = tR × v / 2 ≈ 1,5 m
-Bus de 3 protoboards en línea, con dos saltos de ~15-20 cm cada uno:  ≈ 30-40 cm
+Bus de 3 nodos en línea, con dos saltos de ~15-20 cm cada uno:      ≈ 30-40 cm
 ```
 
 | Longitud total A-B medida | Decisión |
 |---|---|
-| **< 1 m** (caso esperado con 3 protoboards de 16 cm) | Sin terminación ni polarización — igual que la Parte 2 |
+| **< 1 m** (caso habitual con los tres nodos sobre la mesa) | Sin terminación ni polarización — igual que la Parte 2 |
 | ≥ 1,5 m | Instalar 120 Ω en los dos extremos físicos **junto con** la polarización de 680 Ω/680 Ω (§6 de `arquitectura.md`) |
 
 **Criterio de aceptación, igual que en la Parte 2:** si tras varios minutos de
@@ -339,7 +339,7 @@ rápida de conexión:
    tercero".
 3. **Topología lineal, nunca en estrella.** El Esclavo 1 se conecta al
    Maestro, y el Esclavo 2 se conecta *a la misma línea*, no en un punto
-   aparte formando una Y. Si las protoboards están una al lado de la otra en
+   aparte formando una Y. Si los nodos están uno al lado del otro en
    línea, esto sale naturalmente.
 
 ### 7.4 Jumper de Unit ID — Esclavo 2

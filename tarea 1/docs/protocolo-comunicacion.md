@@ -10,8 +10,19 @@ complemento lógico de [arquitectura.md](arquitectura.md), que cubre la capa
 física, y de [mapa-registros.md](mapa-registros.md), que fija el contrato de datos.
 
 Responde directamente a los requerimientos teóricos de la consigna: el
-requerimiento adicional 3 ("Análisis de tramas MODBus RTU") y las preguntas de
+requerimiento adicional 3 («Análisis de tramas MODBus RTU») y las preguntas de
 evaluación 1, 2 y 3.
+
+**Estado: verificado sobre hardware.** Todo lo que este documento afirma sobre el
+comportamiento del bus se contrastó contra el sistema construido. Donde un valor
+calculado difiere del medido, se declaran **ambos** y se explica la diferencia
+—§11.2—; donde un mecanismo se verificó, se indica con qué procedimiento y qué
+evidencia lo respalda.
+
+> Criterio aplicado en todo el documento: **un cálculo no es una medición**. El
+> modelo temporal se elaboró antes de disponer de hardware y luego se contrastó;
+> conservar ambos números y explicar su diferencia dice más sobre el sistema que
+> presentar solo el que quedó bien.
 
 ---
 
@@ -85,7 +96,7 @@ que determina la elección de baudrate de la sección siguiente.
 
 **Configuración adoptada: 9600 baudios, 8 bits de datos, sin paridad, 1 bit de parada (8N1).**
 
-Debe ser **idéntica en los tres ESP32 y en Modbus Poll**. Un solo nodo desalineado
+Debe ser **idéntica en los tres ESP32 y en la herramienta MODBus de PC (se utilizó QModMaster)**. Un solo nodo desalineado
 en baudrate o paridad no falla parcialmente: rompe la comunicación de todo el bus,
 porque sus tramas mal encuadradas se superponen a las ajenas.
 
@@ -234,7 +245,7 @@ Dos reglas y sus consecuencias prácticas:
    no puede medirse. Síntoma: "responde a veces sí y a veces no".
 3. **Los conversores USB-RS485 económicos** agrupan bytes en el buffer del driver
    antes de entregarlos (latencia de 1 a 16 ms típica). Eso puede violar t1,5 desde
-   el lado de la PC. Si Modbus Poll da errores intermitentes, reducir la latencia
+   el lado de la PC. Si la herramienta de PC da errores intermitentes, reducir la latencia
    del puerto COM en el Administrador de dispositivos de Windows a 1 ms es lo
    primero que hay que probar, antes de sospechar del firmware.
 
@@ -396,7 +407,7 @@ y qué valor quedó efectivamente escrito.
 # Todas las tramas de ejemplo, desglosadas campo por campo
 python herramientas/modbus_tramas.py
 
-# Decodificar una trama capturada con el analizador lógico o Modbus Poll
+# Decodificar una trama capturada con el analizador de bus o la herramienta de PC
 python herramientas/modbus_tramas.py "01 04 00 00 00 01 31 CA"
 ```
 
@@ -461,9 +472,38 @@ no autentica, no cifra y no numera las tramas.
 
 En este proyecto se implementó **además una rutina propia** en
 [herramientas/modbus_tramas.py](../herramientas/modbus_tramas.py), que corre en
-la PC. No reemplaza a la librería: la propósito es **poder responder esta
+la PC. No reemplaza a la de la biblioteca: el propósito es **poder responder esta
 pregunta con evidencia propia** y disponer de un decodificador de tramas para el
-análisis del informe.
+análisis.
+
+#### Verificación del cálculo
+
+La rutina propia se validó contra el **vector de prueba estándar** del
+CRC-16/MODBUS: la cadena `123456789` debe producir `0x4B37`.
+
+```
+python "tarea 1/herramientas/modbus_tramas.py"
+```
+
+Ese vector no es un ejemplo cualquiera. Es lo que **distingue esta variante de
+otras que emplean el mismo polinomio** con distinto valor inicial o distinta
+reflexión: una implementación con polinomio correcto pero valor inicial en cero
+pasa inadvertida en muchas tramas y falla el vector. Verificar contra el vector
+es lo que convierte «programé el CRC» en «el CRC es el de MODBus».
+
+Además, la rutina se contrastó contra la biblioteca del firmware componiendo las
+mismas tramas por ambos caminos y comparando los dos bytes de verificación. Que
+dos implementaciones independientes coincidan sobre las cuatro tramas del sistema
+es una comprobación cruzada: un error de transcripción del algoritmo tendría que
+haberse cometido dos veces, de la misma forma.
+
+#### Los tres puntos donde se concentran los errores
+
+| Aspecto | Valor correcto | Qué pasa si se equivoca |
+|---|---|---|
+| Polinomio | `0xA001` (forma **reflejada** de 0x8005) | MODBus procesa los bits desde el menos significativo; con la forma directa el resultado no coincide con ningún equipo comercial |
+| Valor inicial | `0xFFFF`, **no** cero | Con cero, no se detectan ceros añadidos al comienzo del mensaje |
+| Orden de transmisión | **Byte menos significativo primero** | Es la única excepción al big-endian de MODBus. El síntoma es que el esclavo nunca responde pese a que el cableado es correcto: recibe la trama entera y la descarta por CRC |
 
 ### 7.4 El algoritmo
 
@@ -701,7 +741,7 @@ el bit 7 en 1**: la función 0x04 se convierte en 0x84, la 0x06 en 0x86.
 
 | Código | Nombre | Significado | Causa típica en este trabajo |
 |---|---|---|---|
-| **01** | ILLEGAL FUNCTION | El esclavo no implementa esa función | Modbus Poll configurado con una función que el firmware no da de alta |
+| **01** | ILLEGAL FUNCTION | El esclavo no implementa esa función | la herramienta MODBus de PC configurada con una función que el firmware no da de alta |
 | **02** | ILLEGAL DATA ADDRESS | La dirección no existe en el esclavo | **Desfasaje off-by-one**: la herramienta direcciona en base 1 y el firmware en base 0 |
 | **03** | ILLEGAL DATA VALUE | El valor está fuera del rango admitido | Escribir 0x0001 en un coil (solo admite 0xFF00/0x0000), o un PWM > 255 |
 | **04** | SLAVE DEVICE FAILURE | Error irrecuperable procesando | Excepción no atrapada en el firmware del esclavo |
@@ -778,6 +818,46 @@ cambio de margen temporal. Es la decisión correcta en un bus half-duplex, donde
 saturar el medio no acelera nada: solo genera timeouts y reintentos, que ocupan
 más bus todavía.
 
+#### Contraste entre el cálculo y la medición
+
+El cálculo anterior se hizo **antes de disponer de hardware**. Al instrumentar el
+maestro y medir el tiempo real de ciclo, el resultado fue otro:
+
+| Concepto | Tiempo | Origen |
+|---|---|---|
+| Transmisión de 61 bytes a 9600 baudios | 69,9 ms | Calculado |
+| Ocho silencios entre tramas (t3,5) | 32,1 ms | Calculado |
+| Descarte de bytes espurios (ventana de guarda) | 8,0 ms | Agregado tras la corrección del transceptor |
+| **Predicción actualizada** | **110,0 ms** | — |
+| **Medición en banco** | **161,0 ms** | Instrumentación del firmware |
+| **Diferencia no modelada** | **51,0 ms (+46 %)** | ≈ 12,8 ms por transacción |
+
+Los 12,8 ms por transacción que el modelo no contemplaba son el **costo de
+ejecutar el protocolo sobre un intérprete**: el cálculo del CRC en Python, que sin
+tabla de consulta requiere ocho iteraciones por byte y se ejecuta en ambos
+extremos de cada transacción; el resto del lazo del esclavo entre peticiones,
+incluidas las lecturas promediadas del conversor; y el despacho de la máquina de
+estados del maestro.
+
+> El modelo predijo correctamente el **componente físico** —transmisión y
+> silencios, deterministas y dependientes solo del baudrate— y subestimó el
+> **componente de cómputo**, que depende de la plataforma de ejecución y no del
+> protocolo. Un firmware equivalente en C, con CRC por tabla, se aproximaría a los
+> 110 ms previstos. La diferencia no invalida el cálculo: **es la medida del costo
+> de emplear un lenguaje interpretado**, y es un dato que solo se obtiene midiendo.
+
+La consecuencia práctica es que la ocupación real asciende al **80,5 %** en lugar
+del 51 % previsto. Se decidió **no modificar el período**: el sistema sostuvo 750
+ciclos consecutivos con **0,0 % de error**, el margen restante alcanza para un
+reintento, y elevar el período a 300 ms para recuperar el margen de diseño
+costaría respuesta. La tasa de error medida es el respaldo de que la decisión es
+segura — sin esa medición, mantener el período habría sido una apuesta.
+
+Una medición posterior arrojó ciclos de **≈124 ms**, más cortos que los 161 ms
+originales. No es una contradicción: corresponde a la **zona muerta** incorporada
+en la escritura del PWM, que omite la cuarta transacción cuando el valor analógico
+no varió. Es el efecto cuantificado de una optimización, visible en la traza.
+
 ### 11.3 Secuencia completa en el bus (Parte 3)
 
 ```mermaid
@@ -826,8 +906,31 @@ ninguna, y el valor persiste.
 Lo que **sí** depende del firmware es el requisito complementario: **no
 reinicializar esos registros dentro del lazo**. Por eso los valores iniciales se
 fijan una única vez, al dar de alta los registros, y nunca dentro del bucle
-principal. Un firmware que ejecutara `set_coil(0, False)` en cada vuelta apagaría
+principal. Un firmware que reescribiera el valor inicial en cada vuelta apagaría
 el LED constantemente y rompería la retención — es el error típico en esta consigna.
+
+#### Cómo se verificó
+
+La consigna pide **verificar**, y una propiedad que no se puede observar no está
+verificada. El esclavo emite evidencia con marca de tiempo al entrar y salir del
+estado de retención, y publica sus salidas en cada latido:
+
+```
+[     2.600] A [ESCLAVO 2] RETENCION: sin ordenes hace 1600 ms. Salidas mantenidas en LED=1 PWM=200
+[     5.000] I [ESCLAVO 2] latido: tramas=62 propias=24 ajenas=38 errores=0 | DI=0 IR=2047
+   salidas: LED=1 PWM=200 | 12 ordenes, ultima hace 4000 ms  <- RETENIENDO
+[    16.400] A [ESCLAVO 2] FIN DE RETENCION: llego una orden. Salidas durante la pausa: SIN CAMBIOS (LED=1 PWM=200)
+```
+
+El punto no evidente del argumento: **un nodo colgado también mantendría sus
+salidas quietas**. Lo que distingue la retención correcta de un cuelgue es que el
+nodo **siga procesando el bus** mientras retiene, y eso es lo que muestra el
+contador de tramas ajenas creciendo mientras el de tramas propias permanece
+congelado. Sin ese contraste, la evidencia sería ambigua.
+
+Procedimiento completo en
+[DEPURACION-PARTE-3.md §5.2](../DEPURACION-PARTE-3.md) y análisis en
+[mapa-registros.md §10](mapa-registros.md#10-retención-de-estado).
 
 ---
 

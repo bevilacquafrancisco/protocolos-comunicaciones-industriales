@@ -53,10 +53,38 @@ from umodbus.serial import Serial as ModbusRTUMaster
 
 import config
 import diagnostico
+
+# -----------------------------------------------------------------------------
+# Verificacion de despliegue
+# -----------------------------------------------------------------------------
+# Se comprueba ANTES de importar nombres concretos de diagnostico.py, porque un
+# "from diagnostico import X" contra una version vieja del modulo falla con un
+# ImportError que no indica que archivo hay que actualizar ni en que placa.
+#
+# Se usa getattr con valor por defecto y no diagnostico.VERSION directo: una
+# version suficientemente vieja del modulo no tiene siquiera esa constante, y el
+# acceso directo produciria un AttributeError, es decir, el mismo problema que se
+# intenta evitar, corrido un renglon.
+_VERSION_DIAGNOSTICO_REQUERIDA = 4
+if getattr(diagnostico, "VERSION", 0) < _VERSION_DIAGNOSTICO_REQUERIDA:
+    print("=" * 66)
+    print("ERROR DE DESPLIEGUE")
+    print("diagnostico.py en esta placa es de una version anterior.")
+    print("  version en la placa : {}".format(getattr(diagnostico, "VERSION", 0)))
+    print("  version requerida   : {}".format(_VERSION_DIAGNOSTICO_REQUERIDA))
+    print("")
+    print("Subir firmware/comun/diagnostico.py a la raiz del ESP32 y")
+    print("reiniciar con Ctrl+D. Recordar cerrar y reabrir el archivo en")
+    print("Thonny antes de subirlo: el editor trabaja sobre su propio buffer.")
+    print("=" * 66)
+    raise SystemExit("diagnostico.py desactualizado en esta placa")
+
 from diagnostico import (
+    CapturaTramas,
     DetectorDeCambio,
     EntradaConfirmada,
     EstadisticaEsclavo,
+    InstrumentacionBus,
     Registrador,
     clasificar_error,
     describir_trama,
@@ -112,6 +140,20 @@ LOG = Registrador("MAESTRO")
 
 #: Instancia del maestro, publicada por main() para inspeccion desde el REPL.
 MAESTRO = None
+
+#: Captura circular de las ultimas tramas vistas por este nodo, en ambos
+#: sentidos. Es de modulo porque la alimentan tanto la subclase del transceptor
+#: (recepcion) como el envoltorio del UART (transmision), que son objetos
+#: distintos y ninguno de los dos puede recibirla por constructor.
+CAPTURA = CapturaTramas(diagnostico.opcion("CAPTURA_TRAMAS", 24))
+
+#: Instrumentacion del bus. unit_id=None porque un maestro MODBus no tiene
+#: direccion propia: nunca es destinatario de una trama, solo emisor.
+#: tx_es_peticion=True porque todo lo que transmite un maestro es una peticion,
+#: que es una propiedad del rol y no una suposicion.
+INSTRUMENTACION = InstrumentacionBus(
+    CAPTURA, LOG, unit_id=None, tx_es_peticion=True,
+)
 
 
 class MaestroRTUConTimeout(ModbusRTUMaster):
@@ -234,6 +276,43 @@ class MaestroRTUConTimeout(ModbusRTUMaster):
     #: datasheet: 40-70 ns tipico/maximo, tres ordenes de magnitud menor).
     _VENTANA_DESCARTE_GLITCH_US = 2000
 
+    def __init__(self, *args, **kwargs):
+        """
+        Construye el transceptor y le interpone el observador de transmision.
+
+        El envoltorio se coloca DESPUES de llamar al constructor de la clase
+        base, porque es ese constructor el que crea el UART. Interponerse antes
+        seria imposible: todavia no existe el objeto que se quiere observar.
+
+        Parametros
+        ----------
+        *args, **kwargs
+            Se entregan sin modificar a umodbus.serial.Serial.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Las que propague la clase base.
+        """
+        super().__init__(*args, **kwargs)
+
+        # La instrumentacion se delega en InstrumentacionBus en lugar de tocar
+        # self._uart directamente. Aqui el maestro EXTIENDE la interfaz serie, de
+        # modo que el atributo existe y el acceso directo funcionaria; se usa la
+        # via indirecta de todas formas por dos razones:
+        #
+        #   1. Es la misma que emplea el esclavo, donde el acceso directo NO
+        #      funciona porque alli la interfaz esta contenida y no heredada.
+        #      Un solo mecanismo para los tres nodos es un mecanismo que se
+        #      prueba una vez.
+        #   2. Degrada con un mensaje claro si una version futura de la libreria
+        #      reacomoda sus atributos, en lugar de impedir que el nodo arranque.
+        #      Perder la traza es aceptable; no poder operar, no.
+        INSTRUMENTACION.aplicar(self)
+
     def _uart_read_frame(self, timeout=None):
         """
         Lee una trama del UART aplicando un piso de timeout y descartando el
@@ -280,12 +359,17 @@ class MaestroRTUConTimeout(ModbusRTUMaster):
         if descartado and LOG.habilitado(diagnostico.TRAMA):
             LOG.trama("RX descartado en la ventana de guarda", descartado)
 
+        # La captura de la trama recibida la hace InstrumentacionBus, que
+        # envuelve este mismo metodo desde afuera. Registrarla tambien aca la
+        # duplicaria en el volcado.
         trama = super()._uart_read_frame(timeout)
 
-        if LOG.habilitado(diagnostico.TRAMA):
+        # Traza inmediata, solo en el nivel mas alto. Es util para mirar el bus
+        # en vivo, pero altera el timing: el uso recomendado es la captura, que
+        # no lo altera.
+        if LOG.habilitado(diagnostico.TRAMA) and trama:
             LOG.trama("RX", trama)
-            if trama:
-                LOG.detalle("RX  {}".format(describir_trama(trama)))
+            LOG.detalle("RX  {}".format(describir_trama(trama, es_peticion=False)))
 
         return trama
 
@@ -407,6 +491,18 @@ class MaestroModbus:
 
         #: Instante del ultimo resumen periodico emitido.
         self._instante_resumen = time.ticks_ms()
+
+        #: Instante del ultimo volcado automatico de tramas, para limitarlos.
+        #:
+        #: Se inicializa HACIA ATRAS, un intervalo completo en el pasado, para
+        #: que el primer fallo vuelque su contexto de inmediato. Inicializarlo en
+        #: el instante actual dejaba ciego justamente el arranque, que es cuando
+        #: aparecen los fallos mas informativos: un esclavo que no arranco, un
+        #: jumper de direccion mal puesto o un bus mal cableado se manifiestan en
+        #: los primeros segundos, y el limite anti-inundacion los silenciaba.
+        self._instante_volcado = time.ticks_add(
+            time.ticks_ms(), -diagnostico.opcion("MS_ENTRE_VOLCADOS", 8000)
+        )
 
         # Parametros de robustez leidos UNA vez, al construir, y no en cada uso.
         # Dos motivos: se evita repetir el acceso a config en el lazo, y se
@@ -960,6 +1056,33 @@ class MaestroModbus:
             ))
             estadistica.cerrar_ventana()
 
+    def volcar_tramas(self):
+        """
+        Imprime las ultimas tramas capturadas, a pedido desde el REPL.
+
+        Complementa el volcado automatico ante un fallo: permite mirar el bus en
+        un momento cualquiera, por ejemplo para documentar en el informe una
+        transaccion completa que funciona bien, que es tan necesaria como la que
+        falla.
+
+        Parametros
+        ----------
+        Ninguno.
+
+        Retorna
+        -------
+        None
+
+        Excepciones
+        -----------
+        Ninguna.
+
+        Ejemplo de uso
+        --------------
+        >>> MAESTRO.volcar_tramas()
+        """
+        CAPTURA.volcar(self._log, "CAPTURA A PEDIDO")
+
     def reiniciar_estadisticas(self):
         """
         Pone a cero los contadores de ambos esclavos y los del ciclo.
@@ -1088,6 +1211,17 @@ class MaestroModbus:
             funcion, self._id_activo, clasificar_error(error),
             self._fallos_consecutivos, error,
         ))
+
+        # Volcado de contexto: se imprime lo que estaba pasando en el bus justo
+        # antes del fallo. Es la informacion que explica el fallo y la unica que
+        # no se puede obtener a mano, porque para cuando el operador reacciona ya
+        # se perdio. El limite temporal evita que una rafaga de fallos inunde la
+        # consola y agrave el problema que se esta diagnosticando.
+        if diagnostico.opcion("VOLCAR_TRAMAS_AL_FALLAR", True):
+            desde_ultimo = time.ticks_diff(time.ticks_ms(), self._instante_volcado)
+            if desde_ultimo >= diagnostico.opcion("MS_ENTRE_VOLCADOS", 8000):
+                self._instante_volcado = time.ticks_ms()
+                CAPTURA.volcar(self._log, "CONTEXTO DEL FALLO")
 
         # Degradacion por AUSENCIA SOSTENIDA, no por fallos contados.
         #

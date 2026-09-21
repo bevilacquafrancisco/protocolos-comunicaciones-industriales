@@ -91,18 +91,37 @@ Para cada placa:
 |---|---|
 | `AttributeError: 'module' object has no attribute 'NIVEL_LOG'` | Falta el `config.py` actualizado en esa placa |
 | `AVISO: config.py en esta placa es de una versión anterior. Faltan: ...` | Lo mismo, ya detectado por el firmware |
+| `AttributeError: ... has no attribute '_uart'` | Versión vieja de `main.py`. Instrumentaba por herencia, que no funciona en el esclavo |
+| `ImportError: can't import name ...` | `diagnostico.py` viejo en esa placa |
+| `ERROR DE DESPLIEGUE ... versión en la placa: N` | Lo mismo, ya detectado: el firmware dice qué subir y se detiene |
 
 El firmware verifica la configuración al arrancar y, si falta algo, **sigue funcionando con valores por defecto seguros e informa cuáles faltan**, en lugar de abortar. Es el criterio habitual para configuración externa: un nodo que arranca degradado y lo declara es más útil que un nodo que no arranca.
 
 Aun así, **las correcciones del §2 no quedan realmente aplicadas hasta subir el `config.py` nuevo**: sin él se usan los valores por defecto del código, no los del proyecto.
+
+Cada firmware declara qué versión de `diagnostico.py` necesita y **lo comprueba antes de importar nada**, de modo que una placa desactualizada se detiene con un mensaje que dice exactamente qué archivo subir, en lugar de un `ImportError` que hay que interpretar:
+
+```
+==================================================================
+ERROR DE DESPLIEGUE
+diagnostico.py en esta placa es de una version anterior.
+  version en la placa : 2
+  version requerida   : 3
+
+Subir firmware/comun/diagnostico.py a la raiz del ESP32 y
+reiniciar con Ctrl+D. Recordar cerrar y reabrir el archivo en
+Thonny antes de subirlo: el editor trabaja sobre su propio buffer.
+==================================================================
+```
 
 ### 3.2. Pruebas en la PC, antes de tocar las placas
 
 Ninguna de las dos necesita hardware:
 
 ```
-python "tarea 1/herramientas/prueba_diagnostico.py"           → FALLAS: 0
-python "tarea 1/herramientas/prueba_config_desactualizado.py" → arranca y avisa
+python "tarea 1/herramientas/prueba_diagnostico.py"            → FALLAS: 0
+python "tarea 1/herramientas/prueba_config_desactualizado.py"  → arranca y avisa
+python "tarea 1/herramientas/prueba_version_despliegue.py"     → detiene y explica
 ```
 
 La primera verifica la lógica del módulo (21 comprobaciones). La segunda reproduce el fallo de despliegue descrito arriba y confirma que degrada bien.
@@ -195,7 +214,7 @@ Tras interrumpir con Ctrl+C, el maestro queda accesible como `MAESTRO`:
 
 `reiniciar_estadisticas()` separa la puesta a punto —donde los errores son esperables y no dicen nada del sistema terminado— de la corrida que se va a documentar, **sin reiniciar la placa**: un reinicio obligaría a rehacer la puesta en marcha del bus.
 
-### 4.4. Procedimiento con tres consolas
+### 4.6. Procedimiento con tres consolas
 
 Thonny maneja una sola conexión serie por ventana. Para ver los tres nodos a la vez:
 
@@ -203,6 +222,122 @@ Thonny maneja una sola conexión serie por ventana. Para ver los tres nodos a la
 2. En cada una, *Herramientas → Opciones → Intérprete* y elegir un puerto COM distinto.
 3. Ordenar las ventanas en columnas: Esclavo 1 · Maestro · Esclavo 2.
 4. Arrancar los **esclavos primero** y el maestro último: así el maestro no acumula timeouts de arranque que ensucien la traza.
+
+---
+
+### 4.7. Captura de tramas
+
+Los tres nodos registran **todas las tramas que ven**, en ambos sentidos, en un buffer circular en memoria. Está activo siempre y no hay que encender nada.
+
+#### Por qué en memoria y no impreso al vuelo
+
+Imprimir cada trama en el momento cuesta 1-3 ms. Una transacción son dos tramas, el ciclo tiene cuatro transacciones, y el esclavo debe contestar dentro de los 300 ms de timeout: **la traza inmediata consume el presupuesto temporal del propio protocolo y genera timeouts que no existen sin ella.**
+
+Registrar en un buffer cuesta una copia de ocho bytes: microsegundos. El costo de imprimir se paga una sola vez, al pedir el volcado, cuando ya no importa perturbar el bus porque el dato ya está guardado.
+
+#### Volcado a pedido
+
+Ctrl+C y después:
+
+```python
+>>> MAESTRO.volcar_tramas()     # en el maestro
+>>> VOLCAR()                    # en cualquiera de los dos esclavos
+```
+
+```
+[    40.132] I [MAESTRO] --- CAPTURA A PEDIDO (8 de 1204 vistas) ---
+           TX      8B | 01 02 00 00 00 01 B9 CA
+                        E1 FC=0x02 Read Discrete Inputs  dir=0x0000 n=1
+     +31ms RX      6B | 01 02 01 00 A1 88
+                        E1 FC=0x02 Read Discrete Inputs  -> bits=0b00000000
+      +2ms TX      8B | 01 04 00 00 00 01 31 CA
+                        E1 FC=0x04 Read Input Registers  dir=0x0000 n=1
+     +33ms RX      7B | 01 04 02 08 00 BE F0
+                        E1 FC=0x04 Read Input Registers  -> 2048
+      +2ms TX      8B | 01 05 00 00 FF 00 8C 3A
+                        E1 FC=0x05 Write Single Coil  dir=0x0000 valor=0xFF00 (ON)
+     +30ms RX      8B | 01 05 00 00 FF 00 8C 3A
+                        E1 FC=0x05 Write Single Coil  dir=0x0000 valor=0xFF00 (ON)
+```
+
+Cada trama ocupa dos líneas porque cumplen funciones distintas: el **hexadecimal es la evidencia** —permite contar campos y verificar el CRC byte a byte— y la **interpretación es la lectura**. Para un informe hacen falta las dos.
+
+| Columna | Qué es |
+|---|---|
+| `+33ms` | Intervalo desde la trama anterior. Es el que revela el tiempo de respuesta del esclavo y, cuando falta una respuesta, el hueco que dejó |
+| `TX` / `RX` / `RX(aj)` | Transmitida · recibida · recibida pero dirigida a otro nodo |
+| `8B` | Longitud en bytes, CRC incluido |
+| `E1` / `E2` | Unit ID del esclavo involucrado |
+| `FC=0x04 ...` | Código y nombre de función según la especificación |
+
+#### Volcado automático ante un fallo
+
+Es la función más útil. Cuando una transacción falla, el maestro imprime **lo que estaba pasando en el bus justo antes**:
+
+```
+[   594.201] E [MAESTRO] Fallo 0x04 Read Input Registers con Esclavo 2 [TIMEOUT] (1 consecutivos): ...
+[   594.203] I [MAESTRO] --- CONTEXTO DEL FALLO (3 de 2841 vistas) ---
+           TX      8B | 02 04 00 00 00 01 31 F9
+                        E2 FC=0x04 Read Input Registers  dir=0x0000 n=1
+    +300ms TX      8B | 02 04 00 00 00 01 31 F9
+                        E2 FC=0x04 Read Input Registers  dir=0x0000 n=1
+     +12ms RX      5B | 02 84 02 32 C1
+                        E2 EXCEPCION a FC=0x04 Read Input Registers  codigo=2 (direccion invalida)
+```
+
+Esa información es imposible de conseguir a mano: para cuando el operador reacciona al fallo, ya se perdió. Se limita a un volcado cada 8 s para que una ráfaga de fallos no inunde la consola ni agrave el problema que se está diagnosticando.
+
+#### Lo que ve cada nodo
+
+| Nodo | Qué captura |
+|---|---|
+| Maestro | Sus peticiones (`TX`) y las respuestas que recibe (`RX`) |
+| Esclavo | Las peticiones dirigidas a él (`RX`), **las dirigidas al otro esclavo** (`RX(aj)`), y sus propias respuestas (`TX`) |
+
+La captura del esclavo es la más completa de las tres: en un bus multipunto **todos los nodos oyen todo**. Sirve para dos cosas que desde el maestro no se pueden verificar:
+
+- Que el **filtrado por dirección funciona**: aparecen tramas `RX(aj)` y el nodo no responde a ninguna.
+- Distinguir **quién perdió la trama**: si el maestro reporta timeout y en el esclavo la petición aparece como `RX` con su `TX` de respuesta, el esclavo contestó y el problema está en el camino de vuelta.
+
+#### Ajustes
+
+En `config.py`:
+
+| Constante | Por defecto | Qué hace |
+|---|---|---|
+| `CAPTURA_TRAMAS` | 24 | Tramas conservadas. Cubre 3 ciclos completos. `0` desactiva |
+| `VOLCAR_TRAMAS_AL_FALLAR` | `True` | Volcado automático de contexto ante un fallo |
+| `MS_ENTRE_VOLCADOS` | 8000 | Intervalo mínimo entre volcados automáticos |
+
+#### Cómo se instrumenta, y por qué así
+
+La librería organiza sus dos clases de forma distinta, y eso condiciona el diseño:
+
+| Clase | Rol | Relación con el UART |
+|---|---|---|
+| `Serial` | Interfaz serie | **Tiene** el UART. El **maestro** la extiende |
+| `ModbusRTU` | Servidor esclavo | **Contiene** una `Serial` en un atributo interno. Composición, no herencia |
+
+Por eso la instrumentación se aplica **por envoltura en tiempo de ejecución** y no extendiendo la clase: `InstrumentacionBus` localiza la interfaz real en lugar de suponerla, y funciona igual en los tres nodos.
+
+> Extender `ModbusRTU` y sobrescribir su método de lectura de trama **no instrumenta nada**: ese método vive en el objeto contenido y nunca llega a invocarse. El síntoma es silencioso — contadores en cero para siempre, sin ningún error.
+
+Al arrancar, cada nodo confirma qué instrumentó:
+
+```
+[     0.312] I [ESCLAVO 2] Bus instrumentado (atributo _itf): TX y RX bajo observacion
+```
+
+Si esa línea no aparece, o aparece un error, el nodo **sigue operando sin captura**. Para averiguar dónde guarda el UART esa versión de la librería:
+
+```python
+>>> import diagnostico
+>>> diagnostico.explorar(cliente)
+```
+
+#### Traza inmediata (nivel 5)
+
+`NIVEL_LOG = 5` imprime cada trama en el instante en que ocurre, sin buffer. Sirve para mirar el bus en vivo, pero **altera el timing**. Para documentar el informe usar siempre la captura, no el nivel 5.
 
 ---
 
@@ -246,6 +381,64 @@ Su valor está en las tres lecturas que permite:
 | El latido sale pero `propias` **no crece** | El esclavo no está recibiendo sus peticiones. Problema en el sentido maestro → esclavo, o Unit ID equivocado |
 | El latido **deja de salir** | El nodo se colgó o se reinició. Revisar alimentación |
 | `ajenas` ≈ `propias` | Correcto: el otro esclavo habla y este nodo descarta bien esas tramas por dirección |
+
+---
+
+## 5.2. Verificar la retención de estado (Parte 3, requisito 3)
+
+> *"Verificar que el esclavo que no está seleccionado mantenga el último estado recibido en sus salidas hasta recibir una nueva orden."*
+
+El comportamiento se cumple **por construcción**: los registros MODBus conservan su valor mientras nadie los escriba, y `aplicar_salidas()` los refleja en el hardware en cada vuelta del lazo. No hay lógica de retención explícita porque no hace falta — la retención es una propiedad del modelo de datos de MODBus.
+
+Lo que sí depende del firmware es el requisito complementario: **no reinicializar esos registros dentro del lazo**. Los valores iniciales se fijan una única vez, en `configurar_servidor_modbus()`.
+
+Pero la consigna no pide implementarlo, pide **verificarlo**, y una propiedad que no se puede observar no está verificada. Por eso el esclavo emite evidencia con marca de tiempo.
+
+### Procedimiento
+
+1. Con el selector en el **Esclavo 2**, mover el potenciómetro y el switch del maestro hasta dejar las salidas del esclavo en un estado reconocible (por ejemplo LED encendido y PWM a media intensidad).
+2. Conmutar el selector al **Esclavo 1**.
+3. Observar la consola del Esclavo 2 durante al menos 15 s.
+4. Volver a conmutar al Esclavo 2.
+
+### Lo que debe aparecer en la consola del Esclavo 2
+
+```
+[     2.600] A [ESCLAVO 2] RETENCION: sin ordenes hace 1600 ms. Salidas mantenidas en LED=1 PWM=200
+[     5.000] I [ESCLAVO 2] latido: tramas=62 propias=24 ajenas=38 errores=0 | DI=0 IR=2047
+   salidas: LED=1 PWM=200 | 12 ordenes, ultima hace 4000 ms  <- RETENIENDO
+[    10.000] I [ESCLAVO 2] latido: tramas=112 propias=24 ajenas=88 errores=0 | DI=0 IR=2047
+   salidas: LED=1 PWM=200 | 12 ordenes, ultima hace 9000 ms  <- RETENIENDO
+[    15.000] I [ESCLAVO 2] latido: tramas=162 propias=24 ajenas=138 errores=0 | DI=0 IR=2047
+   salidas: LED=1 PWM=200 | 12 ordenes, ultima hace 14000 ms  <- RETENIENDO
+[    16.400] A [ESCLAVO 2] FIN DE RETENCION: llego una orden. Salidas durante la pausa: SIN CAMBIOS (LED=1 PWM=200)
+```
+
+### Por qué esto constituye una verificación
+
+| Observación | Qué demuestra |
+|---|---|
+| `salidas: LED=1 PWM=200` idéntico en los tres latidos | Las salidas **no cambiaron** durante la pausa |
+| `12 ordenes` no avanza | **Ninguna orden** llegó durante ese intervalo |
+| `ultima hace 4000 → 9000 → 14000 ms` | El intervalo sin órdenes crece: la pausa es real y sostenida |
+| `propias=24` congelado mientras `ajenas` crece | El nodo **está vivo y escuchando**, pero no se lo está direccionando. Descarta que las salidas se mantengan porque el esclavo se colgó |
+| `FIN DE RETENCION: ... SIN CAMBIOS` | El firmware comparó las salidas al entrar y al salir de la retención, y coinciden |
+
+La cuarta fila es la que cierra el argumento. Un nodo colgado también mantendría sus salidas quietas: lo que distingue la retención correcta de un cuelgue es que el nodo **siga procesando el bus** mientras retiene, y eso es exactamente lo que muestra `ajenas` creciendo.
+
+La última línea es la comparación que hace el propio firmware, no el autor del informe: registra los valores al entrar en retención y los contrasta al salir. Si algo hubiera modificado las salidas sin mediar una orden, diría `MODIFICADAS, revisar`.
+
+### Umbral
+
+`MS_PARA_DECLARAR_RETENCION = 1500` en `config.py`: más de siete períodos de sondeo. No se alcanza por una pérdida de tramas aislada, sólo porque el maestro dejó efectivamente de dirigirse a ese nodo. No cambia ningún comportamiento — la retención ocurre siempre; el umbral sólo decide cuándo registrarla.
+
+### Ensayo previo en la PC
+
+```
+python "tarea 1/herramientas/demo_retencion_estado.py"
+```
+
+Corre la misma lógica contra un servidor simulado y produce la salida de arriba. Sirve para saber qué esperar antes de ir al banco; **la verificación que vale para el informe es la del hardware**.
 
 ---
 
@@ -313,7 +506,10 @@ El Esclavo 2 es el nodo agregado más recientemente. Confirmar que lleva la resi
 |---|---|
 | Resumen por esclavo, antes y después de la corrección | `MAESTRO.reiniciar_estadisticas()`, dejar correr, copiar las líneas `E1` / `E2` |
 | Tiempo de ciclo con reintentos activos | Línea `t_ciclo=` del maestro |
-| Captura de tramas de una transacción completa | `NIVEL_LOG = 5` en el maestro, 5 segundos, copiar el bloque hexadecimal |
+| Captura de tramas de una transacción completa | Ctrl+C y `MAESTRO.volcar_tramas()` — no altera el timing del bus |
+| Contexto de un fallo real | Se vuelca solo. Copiar el bloque `CONTEXTO DEL FALLO` |
+| Evidencia de que un esclavo oye el tráfico ajeno | `VOLCAR()` en un esclavo: aparecen líneas `RX(aj)` |
+| **Retención de estado del esclavo no seleccionado** | Procedimiento §5.2. Copiar el bloque `RETENCION` → latidos → `FIN DE RETENCION` |
 | Evidencia de que el filtrado por dirección funciona | Latido del esclavo mostrando `ajenas` ≈ `propias` |
 | Evidencia del parpadeo original | Las líneas `Esclavo N AUSENTE` / `PRESENTE otra vez` con sus marcas de tiempo |
 | Medición de resistencia A-B | Valor del téster y la conclusión de la tabla 6.1 |

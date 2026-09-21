@@ -124,37 +124,42 @@ sondea. Ver §14.1.
 
 ## 4. Decisiones de banco propias de la Parte 2
 
-### 4.1 Potenciómetro de 2,2 kΩ en el maestro — sin cambios de firmware
+### 4.1 El potenciómetro del maestro puede ser de otro valor que el del esclavo
 
-El Esclavo 1 usa el de 10 kΩ (Parte 1) y el maestro usa el de **2,2 kΩ**.
+No hace falta que los tres nodos lleven potenciómetros iguales, y **no hay que
+modificar ni una línea de código** para mezclarlos.
 
-> **No hace falta modificar ni una línea de código.** El potenciómetro es un
-> **divisor de tensión**: lo que llega al ADC depende de la *relación* entre sus
-> dos mitades, no de su resistencia total. Con el cursor a la mitad, tanto un
-> potenciómetro de 2,2 kΩ como uno de 10 kΩ entregan 1,65 V a partir de 3,3 V.
-> El ADC lee 0-4095 en ambos casos, y `config.ADC_MAXIMO = 4095` describe los
-> **12 bits del conversor**, no el componente conectado.
+> El potenciómetro se conecta como **divisor de tensión**: lo que llega al
+> conversor depende de la *relación* entre sus dos mitades, no de su resistencia
+> total. Con el cursor a media carrera, un potenciómetro de 2,2 kΩ y uno de 10 kΩ
+> entregan exactamente la misma tensión. El conversor lee el mismo valor en ambos
+> casos, y la constante `ADC_MAXIMO = 4095` describe los **12 bits del conversor**,
+> no el componente conectado.
 
-Lo que sí cambia son dos parámetros eléctricos, y ninguno para peor:
+Lo que sí cambia con el valor son dos parámetros eléctricos:
 
-| Parámetro | 10 kΩ (Esclavo 1) | **2,2 kΩ (Maestro)** | Efecto |
-|---|---|---|---|
-| Corriente consumida | 3,3 V / 10 kΩ = 0,33 mA | 3,3 V / 2,2 kΩ = **1,5 mA** | 4,5 veces más, sigue siendo despreciable |
-| Impedancia de fuente vista por el ADC (peor caso: cursor al medio, R/4) | 2,5 kΩ | **550 Ω** | **Mejor**: el condensador de muestreo del ADC SAR se carga más rápido y completo |
+| Parámetro | Valor alto (p. ej. 10 kΩ) | Valor bajo (p. ej. 2,2 kΩ) |
+|---|---|---|
+| Corriente consumida | 0,33 mA | 1,5 mA — 4,5 veces más, igualmente despreciable |
+| Impedancia de fuente vista por el conversor (peor caso: cursor al medio, R/4) | 2,5 kΩ | 550 Ω |
+| Error de muestreo | Aceptable | **Menor**: el capacitor de muestreo se carga más rápido y más completo |
 
-**El de 2,2 kΩ es, de hecho, la mejor entrada de las dos.** El ADC del ESP32
-muestrea cargando un condensador interno a través de la impedancia de la fuente;
-cuanto menor sea esa impedancia, menor el error de muestreo. A 550 Ω el ADC opera
-con holgura.
+**Un valor más bajo es, eléctricamente, la mejor entrada.** El conversor muestrea
+cargando un capacitor interno a través de la impedancia de la fuente; cuanto menor
+sea esa impedancia, menor el error.
 
-**Trade-off explícito:** se gasta 1,17 mA más. Sobre un nodo alimentado por USB
-que consume unos 60 mA, es el 2 %: irrelevante. En un nodo a batería la decisión
-sería la inversa, y ahí sí convendría el de 10 kΩ o incluso uno de 100 kΩ con un
-buffer.
+**Trade-off explícito:** se gastan poco más de 1 mA adicionales. Sobre un nodo
+alimentado por USB que consume unos 60 mA, es el 2 %: irrelevante. **En un nodo a
+batería la decisión sería la inversa**, y ahí convendría un valor alto, o incluso
+100 kΩ con un amplificador separador.
 
-**Consecuencia práctica:** el promediado de 8 muestras (`config.MUESTRAS_ADC`)
-se mantiene sin cambios. Si acaso, con menor impedancia de fuente el ruido baja y
-el promediado es más efectivo.
+**Criterio para esta guía:** cualquier valor entre **1 kΩ y 100 kΩ** en cualquiera
+de los tres nodos, iguales o distintos entre sí. El montaje de referencia usó
+10 kΩ en el esclavo y 2,2 kΩ en el maestro precisamente para dejar constancia de
+que la mezcla funciona.
+
+El promediado de 8 muestras se mantiene sin cambios en todos los casos; con menor
+impedancia de fuente el ruido baja y el promediado resulta más efectivo.
 
 ### 4.2 El selector GPIO13 queda sin conectar
 
@@ -239,46 +244,75 @@ capturar tramas, va como **derivación corta en el medio**, nunca en un extremo.
 
 Todo lo de la Parte 1, más:
 
-| Componente | Cantidad | Valor | Función |
-|---|---|---|---|
-| ESP32 DevKit | 1 | — | Nodo maestro |
-| Módulo MAX485 | 1 | — | Transceptor del maestro |
-| Potenciómetro | 1 | **2,2 kΩ** | Entrada analógica local → HR del esclavo |
-| Pulsador | 1 | — | Entrada digital local → Coil del esclavo |
-| LED | 2 | — | Replicador digital y replicador PWM |
-| LED | 2 | — | Indicadores de selección (opcionales, §4.3) |
-| Resistencia | 2 o 4 | 330 Ω | Limitadoras de los LED |
-| Resistencia | 1 | 2,2 kΩ | R1 del divisor RO→RX |
-| Resistencia | 1 | 3,3 kΩ | R2 del divisor RO→RX |
-| Resistencia | 1 | **680 Ω** | **Pull-up de RO — obligatorio, ver §6.4** |
-| Resistencia | 2 | 120 Ω | Terminación — **solo si §4.4 lo indica** |
-| Resistencia | 2 | 680 Ω | Polarización — **solo junto con la terminación** |
-| **Protoboard 16 × 5,5 cm** | **1** | 830 contactos | Nodo maestro (la #1 ya está ocupada por el Esclavo 1) |
-| Cables dupont macho-macho | ~20 | cortos | Conexionado sobre la protoboard |
-| Cables dupont hembra-macho | 12 | — | Alternativa si el DevKit no entra cómodo en la protoboard |
+Lo que sigue es **lo que se agrega** a la Parte 1. El nodo esclavo ya construido
+no se modifica en absoluto.
 
-> **Inventario de protoboards:** con 2 placas se cubre la Parte 2 completa (una
-> por nodo). La tercera hace falta recién para el Esclavo 2 de la Parte 3.
+| Componente | Cant. | Valor de referencia | Rango admisible | Función |
+|---|---|---|---|---|
+| Placa ESP32 con MicroPython | 1 | — | Igual que la del esclavo | Nodo maestro |
+| Módulo transceptor TTL↔RS-485 | 1 | — | Igual que el del esclavo | Interfaz al bus |
+| Potenciómetro | 1 | 2,2 kΩ | **1 kΩ a 100 kΩ** (ver §4.1) | Entrada analógica local → HR del esclavo |
+| Pulsador o llave | 1 | — | Normal abierto, a masa | Entrada digital local → Coil del esclavo |
+| LED | 2 | — | Cualquier color | Replicador digital y replicador PWM |
+| LED | 2 | — | Cualquier color | Indicadores de selección (se usan en la Parte 3; conviene montarlos ya) |
+| Resistencia limitadora de LED | 2 o 4 | 330 Ω | **220 Ω a 1 kΩ** | Protege los LED y el GPIO |
+| Resistencia R1 del divisor | 1 | 2,2 kΩ | **1,5 kΩ a 10 kΩ** | Rama superior del divisor |
+| Resistencia R2 del divisor | 1 | 3,3 kΩ | **R2 ≈ 1,5 × R1** | Rama inferior del divisor |
+| Resistencia de pull-up | 1 | 680 Ω | **680 Ω a 1 kΩ** — obligatoria, ver §6.4 | Sostiene RO en alta impedancia |
+| Resistencia de terminación | 2 | 120 Ω | Valor fijo | **Solo si §4.4 lo indica** |
+| Resistencia de polarización | 2 | 680 Ω | Valor fijo | **Solo junto con la terminación** |
+| Superficie de montaje | — | — | — | Ver la nota siguiente |
+| Cable de conexión | ~20 | cortos | — | Conexionado del nodo |
 
-Valores alternativos de resistencias en
-[PARTE-1.md §4.1 y §4.2](PARTE-1.md#41-si-no-tenés-exactamente-22-kω-y-33-kω-divisor-rorx).
+> **Sobre el montaje.** Cada nodo necesita espacio para la placa ESP32, el módulo
+> transceptor y unos pocos pasivos. Entra cómodo en **media placa de prototipado
+> estándar** (400 contactos). Las opciones son equivalentes:
+>
+> - **Una placa por nodo.** Es lo más ordenado y lo que se recomienda: cada nodo
+>   queda físicamente separado y se puede desconectar del bus sin desarmar nada,
+>   que es exactamente lo que hace falta para diagnosticar.
+> - **Una placa grande compartida.** Funciona, siempre que los tres nodos
+>   mantengan **masa común** y que las derivaciones desde el bus hacia cada
+>   transceptor se mantengan cortas.
+> - **Sin placa, con cables hembra-macho.** Viable para el bus, pero el divisor y
+>   el pull-up necesitan algún punto de unión; conviene al menos una placa chica.
+>
+> Lo único que **no** es opcional es la masa común entre los tres nodos: ver
+> [arquitectura.md §6](docs/arquitectura.md).
+
+Cómo elegir dentro de cada rango: [PARTE-1.md §4.1 y §4.2](PARTE-1.md#4-lista-de-materiales).
 
 ## 6. Conexiones de hardware del maestro
 
 > ⚠️ **Armar todo con la alimentación desconectada.** Conectar el USB recién al
 > terminar el Paso 2 de §8.
 
-### 6.1 Dos protoboards, una por nodo
+### 6.1 Un área de montaje por nodo
 
-| Protoboard | Nodo | Estado |
-|---|---|---|
-| **#1** | Esclavo 1 | ✅ Ya montada y validada en la Parte 1 — **no se toca** |
-| **#2** | Maestro | ⬜ Se monta en esta parte |
-| #3 (a conseguir) | Esclavo 2 | Parte 3 |
+| Nodo | Estado en esta parte |
+|---|---|
+| Esclavo 1 | Ya montado y validado en la Parte 1 — **no se toca** |
+| **Maestro** | Se monta en esta parte |
+| Esclavo 2 | Se monta en la Parte 3 |
 
-Una protoboard por nodo, y no una sola compartida, porque cada nodo debe poder
-desconectarse del bus sin desarmar nada — es justo lo que exige la prueba 12 del
-checklist de §12 (desconectar el esclavo con el maestro corriendo).
+**Cada nodo debe poder desconectarse del bus sin desarmar nada.** No es una
+preferencia estética: es un requisito de diagnóstico. La prueba 12 del checklist
+de §12 consiste precisamente en desconectar el esclavo con el maestro corriendo,
+y varias de las verificaciones de las tres partes se apoyan en poder aislar un
+nodo por vez.
+
+La forma de conseguirlo es indistinta:
+
+- **Una placa de prototipado por nodo** — lo más cómodo. Media placa estándar
+  (400 contactos) alcanza para la placa ESP32, el transceptor y los pasivos.
+- **Una placa grande con los nodos en zonas separadas** — funciona, siempre que
+  cada nodo tenga su propia zona y las líneas del bus lleguen por cables
+  identificables que se puedan retirar de a uno.
+- **Nodos ya montados de forma permanente** — también sirve, con conectores
+  desmontables en las líneas A y B.
+
+Lo que **no** es opcional: **masa común entre los tres nodos**, y derivaciones
+cortas desde el bus hacia cada transceptor.
 
 ### 6.2 Tabla completa de conexiones
 
@@ -293,8 +327,8 @@ checklist de §12 (desconectar el esclavo con el maestro corriendo).
 | 7 | MAX485 **B** | Línea B del bus | dupont trenzado a mano |
 | 8 | ESP32 **GND** | GND del Esclavo 1 | ⚠️ **imprescindible** |
 | 9 | ESP32 **GPIO18** | Pulsador → GND | — (pull-up interno) |
-| 10 | ESP32 **3V3** | Potenciómetro **2,2 kΩ** extremo 1 | — |
-| 11 | ESP32 **GND** | Potenciómetro **2,2 kΩ** extremo 2 | — |
+| 10 | ESP32 **3V3** | Potenciómetro, extremo 1 | — |
+| 11 | ESP32 **GND** | Potenciómetro, extremo 2 | — |
 | 12 | Potenciómetro **cursor** | ESP32 **GPIO34** | — |
 | 13 | ESP32 **GPIO19** | LED replicador digital, ánodo | 330 Ω hacia GND |
 | 14 | ESP32 **GPIO21** | LED replicador PWM, ánodo | 330 Ω hacia GND |
@@ -425,7 +459,7 @@ se envía por el bus con la función 0x05 hacia el Coil del Esclavo 1 (ver §6.1
 
 No hace falta resistencia externa: el pull-up del ESP32 (≈45 kΩ) ya lo resuelve.
 
-### 6.6 Potenciómetro de 2,2 kΩ → escribe el Holding Register del esclavo
+### 6.6 Potenciómetro local → escribe el Holding Register del esclavo
 
 ```
    ESP32 3V3 ──────── extremo 1
@@ -495,7 +529,7 @@ lo deja en alto y el maestro dirige el 100 % de sus transacciones al Unit ID 1.
 Cero componentes, cero cambios de código: es la ventaja de haber diseñado la
 máquina de estados completa (Parte 3) desde el principio.
 
-### 6.10 Unión entre las dos protoboards
+### 6.10 Unión entre los dos nodos
 
 ```
    Protoboard #2 (maestro)                   Protoboard #1 (Esclavo 1)
@@ -511,11 +545,11 @@ Tres cables, y los tres son obligatorios:
 
 1. **A con A, B con B.** Si están cruzadas, ninguno responde. Probar
    intercambiándolas si algo no anda: no rompe nada.
-2. **GND común entre las dos protoboards.** Sin esto el bus puede fallar de
+2. **GND común entre los dos nodos.** Sin esto el bus puede fallar de
    forma intermitente, que es el modo de falla más difícil de diagnosticar en
    RS-485.
 3. **Sin terminación ni polarización** — igual que en la Parte 1. Con las dos
-   protoboards de 16 cm apoyadas una al lado de la otra, el bus mide 15 a 20 cm,
+   nodos apoyados uno al lado del otro sobre la mesa, el bus mide 15 a 20 cm,
    muy por debajo de la longitud crítica de 1,5 m calculada en §4.4. Medir la
    longitud real y anotarla: es el dato que respalda esta decisión en el informe.
 
@@ -1084,7 +1118,7 @@ sobrescribe `_uart_read_frame()` para imponer un piso de
 > de sondeo de 200 ms. Sobrescribir solo el timeout mantiene la delimitación de
 > tramas en los 4007 µs que manda la especificación.
 
-**Si tenés una versión anterior del firmware**, recargá
+**Si hay una versión anterior del firmware en la placa**, recargar
 [firmware/maestro/main.py](firmware/maestro/main.py) en el maestro y reiniciá con
 Ctrl+F2.
 
@@ -1181,7 +1215,7 @@ competencia comunicativa pondera el 30 % de la nota.
   deja de recibir tramas — la evidencia directa de la retención de estado.
 
 Para la Parte 3 hacen falta: el tercer ESP32 con su MAX485, **un potenciómetro
-más** (no lo tenés todavía), el switch selector en GPIO13 del maestro y el jumper
+más** (aún no montado), la llave selectora en GPIO13 del maestro y el jumper
 de GPIO13 a GND en el Esclavo 2.
 
 ---

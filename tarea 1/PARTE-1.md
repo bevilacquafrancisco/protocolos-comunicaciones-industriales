@@ -68,27 +68,27 @@ La consigna pide tres cosas:
 
 ### Inventario declarado y suficiencia
 
-| Componente | Disponible | Necesario Parte 1 | ¿Alcanza? |
-|---|---|---|---|
-| ESP32 | 3 | 1 | ✅ |
-| Módulo MAX485 | 3 *(supuesto S1)* | 1 | ✅ |
-| Conversor USB-RS485 | 1 *(supuesto S1)* | 1 | ✅ |
-| Botones (pulsadores) | varios | 1 | ✅ |
-| LEDs | varios | 2 | ✅ |
-| Potenciómetros | 2 (2,2 kΩ y 10 kΩ) | 1 | ✅ |
-| Resistencias | varias | ver §4 | ⚠️ verificar valores |
-| Cables dupont | sí | ~15 | ✅ |
+| Componente | Parte 1 | Sistema completo (Partes 1-3) |
+|---|---|---|
+| Placa ESP32 con MicroPython | 1 | 3 |
+| Módulo transceptor TTL↔RS-485 | 1 | 3 |
+| Conversor USB↔RS-485 | 1 | 1 |
+| Pulsador o llave | 1 | 3, más 2 jumpers de direccionamiento y 1 llave selectora |
+| LED | 2 | 8 |
+| Potenciómetro | 1 | 3 |
+| Resistencias | ver §4 | ver [arquitectura.md §9](docs/arquitectura.md#9-lista-de-materiales) |
+| Cable de conexión | ~15 | ~50 |
+| Placa de montaje sin soldadura | 1 | 1 por nodo, o una grande compartida |
 
-### ⚠️ Faltantes para las Partes 2 y 3 (no bloquean la Parte 1)
+**Ningún valor de esta guía está atado a un componente concreto.** Cada resistencia
+lleva su rango admisible y el criterio para elegir dentro de ese rango, de modo
+que el sistema pueda reproducirse con lo que haya disponible sin recalcular nada.
 
-| Componente | Tenés | Necesitás | Falta |
-|---|---|---|---|
-| Potenciómetros | 2 | 3 (maestro + 2 esclavos) | **1** |
-| Botones | varios | 5 (1 switch × 3 nodos + selector + jumper ID) | verificar |
-| Par trenzado | no | recomendable para el bus de 3 nodos | — |
-
-Conviene conseguir el tercer potenciómetro antes de la Parte 3. Cualquier valor
-entre 1 kΩ y 10 kΩ sirve.
+> **Planificar el sistema completo desde la Parte 1.** Conviene conseguir los tres
+> juegos de componentes antes de empezar, aunque la Parte 1 use uno solo. El
+> motivo no es comodidad: las Partes 2 y 3 **no modifican** lo construido en la
+> Parte 1, lo reutilizan tal cual. Montar el primer nodo sabiendo que va a
+> convivir con otros dos evita rehacerlo.
 
 ## 3. Decisiones de banco propias de la Parte 1
 
@@ -189,20 +189,40 @@ Anotar esta limitación en el informe, en la sección de resultados: es
 exactamente el tipo de observación que distingue un trabajo de banco real de uno
 copiado.
 
-### 3.4 Potenciómetro: se usa el de 10 kΩ
+### 3.4 Elección del potenciómetro: cualquier valor entre 1 kΩ y 100 kΩ
 
-| Criterio | 10 kΩ (elegido) | 2,2 kΩ |
+**El valor del potenciómetro no afecta la lectura.** Es la primera cosa que
+sorprende y conviene entender por qué, porque explica por qué esta guía no impone
+un valor:
+
+El potenciómetro se conecta como **divisor de tensión** entre la alimentación y
+masa, con el cursor a la entrada analógica. La tensión en el cursor es
+
+```
+V_cursor = V_alim × (fracción del recorrido)
+```
+
+y esa fracción **no depende de la resistencia total**. Un potenciómetro de 1 kΩ y
+uno de 100 kΩ, ambos a media carrera, entregan exactamente la misma tensión. El
+conversor mide tensión, no resistencia.
+
+Lo que sí cambia con el valor:
+
+| Criterio | Valor bajo (1-5 kΩ) | Valor alto (50-100 kΩ) |
 |---|---|---|
-| Corriente que consume | 3,3 V / 10 kΩ = **0,33 mA** | 3,3 V / 2,2 kΩ = 1,5 mA |
-| Impedancia de fuente vista por el ADC (peor caso, cursor al medio: R/4) | **2,5 kΩ** | 550 Ω |
-| ¿Compatible con el ADC del ESP32? | Sí — 2,5 kΩ está dentro de lo que el ADC carga sin error apreciable | Sí, mejor aún |
+| Corriente consumida | Mayor, pero despreciable en todos los casos | Menor |
+| Impedancia de fuente vista por el conversor (peor caso: R/4) | Baja — ideal | Alta: empieza a interactuar con el capacitor de muestreo |
+| Sensibilidad al ruido captado por el cable del cursor | Baja | Mayor |
 
-Se elige el de **10 kΩ** porque consume 4,5 veces menos y su impedancia de fuente
-sigue siendo perfectamente tolerable. El de 2,2 kΩ queda reservado para el nodo
-maestro de la Parte 2.
+**Criterio práctico:** cualquier valor entre **1 kΩ y 100 kΩ** funciona sin tocar
+una línea de código. Por debajo de 1 kΩ la corriente deja de ser despreciable;
+por encima de 100 kΩ conviene agregar un capacitor de desacople a la entrada.
 
-**Mejora opcional** (si tenés un capacitor de 100 nF): entre GPIO34 y GND, forma
-un filtro pasa bajos con la impedancia del cursor:
+El montaje de referencia usó un potenciómetro de 10 kΩ, que está cómodamente en el
+medio del rango útil, pero **la guía es válida con cualquier otro**.
+
+**Mejora opcional** (con un capacitor de 100 nF): entre la entrada analógica y
+masa, forma un filtro pasa bajos con la impedancia del cursor:
 
 ```
 f_corte = 1 / (2π × 2500 Ω × 100 nF) = 637 Hz
@@ -214,22 +234,25 @@ frecuencia. **No es necesario**: el promediado de 8 muestras por software
 
 ## 4. Lista de materiales
 
-| Componente | Cantidad | Valor | Función |
-|---|---|---|---|
-| ESP32 DevKit | 1 | — | Nodo esclavo |
-| Módulo MAX485 | 1 | — | Transceptor TTL↔RS-485 |
-| Conversor USB-RS485 | 1 | — | Maestro en la PC |
-| Potenciómetro | 1 | **10 kΩ** | Entrada analógica → IR 30001 |
-| Pulsador | 1 | — | Entrada digital → DI 10001 |
-| LED | 2 | — | Coil 00001 y HR 40001 |
-| Resistencia | 2 | **330 Ω** (ver tabla) | Limitadora de los LEDs |
-| Resistencia | 1 | **2,2 kΩ** (ver tabla) | R1 del divisor RO→RX |
-| Resistencia | 1 | **3,3 kΩ** (ver tabla) | R2 del divisor RO→RX |
-| Resistencia | 1 | **680 Ω** | **Pull-up de RO — obligatorio, ver §5.3** |
-| Protoboard | 1 | — | Montaje |
-| Cables dupont | ~15 | — | Interconexión |
+| Componente | Cant. | Valor de referencia | Rango admisible | Función |
+|---|---|---|---|---|
+| Placa ESP32 con MicroPython | 1 | — | Cualquier variante con UART libre y ADC | Nodo esclavo |
+| Módulo transceptor TTL↔RS-485 | 1 | — | Basado en MAX485 o equivalente | Interfaz al bus |
+| Conversor USB↔RS-485 | 1 | — | Cualquiera reconocido por el sistema | Maestro en la PC |
+| Potenciómetro | 1 | 10 kΩ | **1 kΩ a 100 kΩ** (ver §3.4) | Entrada analógica → IR 30001 |
+| Pulsador o llave | 1 | — | Normal abierto, a masa | Entrada digital → DI 10001 |
+| LED | 2 | — | Cualquier color | Coil 00001 y HR 40001 |
+| Resistencia limitadora de LED | 2 | 330 Ω | **220 Ω a 1 kΩ** (ver §4.2) | Protege los LED y el GPIO |
+| Resistencia R1 del divisor | 1 | 2,2 kΩ | **1,5 kΩ a 10 kΩ** (ver §4.1) | Rama superior del divisor |
+| Resistencia R2 del divisor | 1 | 3,3 kΩ | **Debe cumplir R2 ≈ 1,5 × R1** | Rama inferior del divisor |
+| Resistencia de pull-up | 1 | 680 Ω | **680 Ω a 1 kΩ** — obligatoria, ver §5.3 | Sostiene RO en alta impedancia |
+| Placa de montaje sin soldadura | 1 | — | Media placa estándar alcanza | Montaje del nodo |
+| Cable de conexión | ~15 | — | — | Interconexión |
 
-### 4.1 Si no tenés exactamente 2,2 kΩ y 3,3 kΩ (divisor RO→RX)
+Los valores de referencia son los del montaje con el que se validó el sistema. Las
+dos secciones siguientes dan las tablas para elegir dentro del rango admisible.
+
+### 4.1 Cómo elegir el par del divisor RO→RX
 
 Lo que importa es la **relación**, no los valores absolutos. Se necesita
 `R2/(R1+R2) ≈ 0,60`, lo que da ≈3,15 V en el peor caso de VCC = 5,25 V.
@@ -249,7 +272,7 @@ Lo que importa es la **relación**, no los valores absolutos. Se necesita
 Todas las opciones marcadas ✅ tienen una constante de tiempo despreciable frente
 al bit de 104 µs (la peor, 10 k/15 k, distorsiona un 0,63 %).
 
-### 4.2 Si no tenés exactamente 330 Ω (LEDs)
+### 4.2 Cómo elegir la resistencia limitadora de los LED
 
 | Valor | Corriente (LED rojo, Vf ≈ 2 V) | Observación |
 |---|---|---|
@@ -619,7 +642,7 @@ Registros: DI 10001 | IR 30001 | Coil 00001 | HR 40001
 > 💡 **Dejá Thonny conectado al COM del ESP32.** Son **dos puertos distintos** —
 > uno es el USB del ESP32 y el otro el del conversor— así que Thonny y
 > QModMaster conviven sin conflicto. Mantener el Shell a la vista es la mejor
-> herramienta de diagnóstico que tenés: si el firmware lanza una excepción
+> herramienta de diagnóstico disponible: si el firmware lanza una excepción
 > atendiendo el bus, la vas a ver ahí en el momento. Lo único que no hay que
 > hacer es pulsar **Ctrl+C**, que interrumpiría `main.py`.
 >
