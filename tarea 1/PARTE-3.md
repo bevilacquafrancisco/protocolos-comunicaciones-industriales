@@ -431,7 +431,171 @@ self._perifericos["indicador_1"].escribir(es_esclavo_1)
 self._perifericos["indicador_2"].escribir(not es_esclavo_1)
 ```
 
-### 7.7 Tabla completa de conexiones nuevas de esta parte
+### 7.7 Conexión completa de cada nodo, de punta a punta
+
+Las secciones anteriores muestran cada pieza por separado. Acá está **cómo queda
+cada dispositivo terminado**, con sus periféricos locales y su interfaz de bus en
+un mismo esquema. Es la referencia para armar el banco desde cero o para
+verificar un nodo que ya está montado.
+
+**Lo que es idéntico en los tres nodos:** el bloque MAX485 completo
+(GPIO17→DI, GPIO4→DE+RE, RO→GPIO16 vía divisor con pull-up, GND común,
+VIN→VCC), el pulsador en GPIO18, el potenciómetro en GPIO34 y los dos LEDs en
+GPIO19 y GPIO21. **Lo único que cambia entre los tres es GPIO13 y, en el
+maestro, el agregado de GPIO22 y GPIO23.**
+
+#### Figura 7 — Esclavo 1 completo (Unit ID = 1)
+
+```
+        PERIFÉRICOS LOCALES              ESP32 (Esclavo 1)                    MAX485
+                                    ┌───────────────────┐              ┌──────────────┐
+   pulsador ──┬── GND ──────────────┤ GPIO18            │              │              │
+              ⌇ pull-up interno     │  Discrete Input   │              │              │
+                (activo en BAJO)    │  10001            │              │              │
+                                    │                   │              │              │
+   3,3 V ──[ pot. 10 kΩ ]── GND     │                   │              │              │
+              cursor ───────────────┤ GPIO34  (ADC1)    │              │              │
+                                    │  Input Reg. 30001 │              │              │
+                                    │                   │              │              │
+   LED 1 ──[330 Ω]── GND ◄──────────┤ GPIO19            │              │              │
+                                    │  Coil 00001       │              │              │
+   LED 2 ──[330 Ω]── GND ◄──────────┤ GPIO21  (PWM)     │              │              │
+                                    │  Holding R. 40001 │              │              │
+                                    │                   │              │              │
+   jumper ABIERTO ──────────────────┤ GPIO13  →  ID = 1 │              │              │
+     (sin conectar nada)            │                   │              │              │
+                                    │                   │              │              │
+                                    │      GPIO17 (TX)  ├─────────────►│ DI    (4)    │
+                                    │                   │    directo   │              │
+                                    │      GPIO4        ├──────┬──────►│ DE    (3)    │   A (6) ──► bus
+                                    │                   │      └──────►│ RE    (2)    │   B (7) ──► bus
+                                    │                   │              │              │
+                                    │      GPIO16 (RX)  │◄──┬──────────┤ RO    (1)    │
+                                    │                   │   │  2,2 kΩ  │              │
+                                    │                   │ 3,3 kΩ       │              │
+                                    │                   │   │          │              │
+                                    │      GND          ├───┴──────────┤ GND   (5)    │
+                                    │                   │              │              │
+                                    │      VIN (5 V)    ├─────────────►│ VCC   (8)    │
+                                    └───────────────────┘              └──────────────┘
+
+                  ⚠ RO lleva ADEMÁS el pull-up de 680 Ω a 5 V — ver §7.2
+```
+
+#### Figura 8 — Esclavo 2 completo (Unit ID = 2)
+
+**Idéntico al Esclavo 1 salvo una sola conexión: el jumper de GPIO13.**
+
+```
+        PERIFÉRICOS LOCALES              ESP32 (Esclavo 2)                    MAX485
+                                    ┌───────────────────┐              ┌──────────────┐
+   pulsador ──┬── GND ──────────────┤ GPIO18            │              │              │
+              ⌇ pull-up interno     │  Discrete Input   │              │              │
+                (activo en BAJO)    │  10001            │              │              │
+                                    │                   │              │              │
+   3,3 V ──[ pot. 10 kΩ ]── GND     │                   │              │              │
+              cursor ───────────────┤ GPIO34  (ADC1)    │              │              │
+                                    │  Input Reg. 30001 │              │              │
+                                    │                   │              │              │
+   LED 1 ──[330 Ω]── GND ◄──────────┤ GPIO19            │              │              │
+                                    │  Coil 00001       │              │              │
+   LED 2 ──[330 Ω]── GND ◄──────────┤ GPIO21  (PWM)     │              │              │
+                                    │  Holding R. 40001 │              │              │
+                                    │                   │              │              │
+   jumper ──────── GND ─────────────┤ GPIO13  →  ID = 2 │              │              │
+     ▲ ÚNICA DIFERENCIA con el      │                   │              │              │
+       Esclavo 1                    │                   │              │              │
+                                    │      GPIO17 (TX)  ├─────────────►│ DI    (4)    │
+                                    │                   │    directo   │              │
+                                    │      GPIO4        ├──────┬──────►│ DE    (3)    │   A (6) ──► bus
+                                    │                   │      └──────►│ RE    (2)    │   B (7) ──► bus
+                                    │                   │              │              │
+                                    │      GPIO16 (RX)  │◄──┬──────────┤ RO    (1)    │
+                                    │                   │   │  2,2 kΩ  │              │
+                                    │                   │ 3,3 kΩ       │              │
+                                    │                   │   │          │              │
+                                    │      GND          ├───┴──────────┤ GND   (5)    │
+                                    │                   │              │              │
+                                    │      VIN (5 V)    ├─────────────►│ VCC   (8)    │
+                                    └───────────────────┘              └──────────────┘
+
+                  ⚠ RO lleva ADEMÁS el pull-up de 680 Ω a 5 V — ver §7.2
+```
+
+Que el mapa de registros sea el mismo en ambos esclavos **no es una omisión**:
+los distingue el Unit ID de la trama, no la dirección del registro. Por eso los
+dos corren exactamente el mismo `main.py`.
+
+#### Figura 9 — Maestro completo
+
+Suma cuatro conexiones que los esclavos no tienen: el **selector** en GPIO13 y
+los **dos LEDs indicadores** en GPIO22 y GPIO23. Sus GPIO19 y GPIO21 dejan de
+ser salidas comandadas por el bus y pasan a ser **replicadores** de lo que el
+maestro lee del esclavo activo.
+
+```
+        PERIFÉRICOS LOCALES              ESP32 (Maestro)                      MAX485
+                                    ┌───────────────────┐              ┌──────────────┐
+   pulsador ──┬── GND ──────────────┤ GPIO18            │              │              │
+              ⌇ pull-up interno     │  → FC05 al Coil   │              │              │
+                                    │    del esclavo    │              │              │
+                                    │                   │              │              │
+   3,3 V ──[ pot. 10 kΩ ]── GND     │                   │              │              │
+              cursor ───────────────┤ GPIO34  (ADC1)    │              │              │
+                                    │  → FC06 al HR     │              │              │
+                                    │    (ADC >> 4)     │              │              │
+                                    │                   │              │              │
+   LED repl. dig. ─[330 Ω]─ GND ◄───┤ GPIO19            │              │              │
+                                    │  ← FC02 del DI    │              │              │
+   LED repl. PWM ──[330 Ω]─ GND ◄───┤ GPIO21  (PWM)     │              │              │
+                                    │  ← FC04 del IR    │              │              │
+                                    │                   │              │              │
+   selector ──┬── GND ──────────────┤ GPIO13            │              │              │
+              ⌇ pull-up interno     │  abierto → Esc. 1 │              │              │
+                                    │  a GND   → Esc. 2 │              │              │
+                                    │                   │              │              │
+   LED ind. 1 ─[330 Ω]─ GND ◄───────┤ GPIO22            │              │              │
+   LED ind. 2 ─[330 Ω]─ GND ◄───────┤ GPIO23            │              │              │
+                                    │                   │              │              │
+                                    │      GPIO17 (TX)  ├─────────────►│ DI    (4)    │
+                                    │                   │    directo   │              │
+                                    │      GPIO4        ├──────┬──────►│ DE    (3)    │   A (6) ──► bus
+                                    │                   │      └──────►│ RE    (2)    │   B (7) ──► bus
+                                    │                   │              │              │
+                                    │      GPIO16 (RX)  │◄──┬──────────┤ RO    (1)    │
+                                    │                   │   │  2,2 kΩ  │              │
+                                    │                   │ 3,3 kΩ       │              │
+                                    │                   │   │          │              │
+                                    │      GND          ├───┴──────────┤ GND   (5)    │
+                                    │                   │              │              │
+                                    │      VIN (5 V)    ├─────────────►│ VCC   (8)    │
+                                    └───────────────────┘              └──────────────┘
+
+                  ⚠ RO lleva ADEMÁS el pull-up de 680 Ω a 5 V — ver §7.2
+```
+
+#### Resumen: qué hace cada GPIO en cada rol
+
+| GPIO | Esclavo 1 | Esclavo 2 | Maestro |
+|---|---|---|---|
+| 17 | TX → DI | TX → DI | TX → DI |
+| 16 | RX ← RO (divisor + pull-up) | Ídem | Ídem |
+| 4 | DE + RE unidos | Ídem | Ídem |
+| 18 | Pulsador → DI 10001 | Ídem | Pulsador local → FC05 |
+| 34 | Potenciómetro → IR 30001 | Ídem | Potenciómetro local → FC06 |
+| 19 | LED ← Coil 00001 | Ídem | LED replicador ← FC02 |
+| 21 | LED PWM ← HR 40001 | Ídem | LED replicador PWM ← FC04 |
+| **13** | **Abierto → Unit ID 1** | **A GND → Unit ID 2** | **Selector de esclavo** |
+| 22 | — | — | **LED indicador "Esc. 1 activo"** |
+| 23 | — | — | **LED indicador "Esc. 2 activo"** |
+
+El mismo pin **GPIO13 cumple dos funciones distintas según el rol del nodo**, y
+está documentado así en `config.py`: en un esclavo fija su dirección física; en
+el maestro elige el destino. No es una casualidad de asignación, es una decisión
+de diseño: en los dos casos se trata de un GPIO con pull-up interno cuyo estado
+define una condición física del nodo.
+
+### 7.8 Tabla completa de conexiones nuevas de esta parte
 
 | # | Desde | Hacia | Nodo | Nota |
 |---|---|---|---|---|
