@@ -81,6 +81,7 @@ desconexión.
 
 | Ruta | Contenido |
 |---|---|
+| [CHECKLIST.md](CHECKLIST.md) | **Recorrido completo de la consigna, paso a paso**, en el orden del laboratorio: qué hacer, dónde está explicado y qué evidencia guardar |
 | [node-red/README.md](node-red/README.md) | **Puesta a punto desde la microSD vacía**: grabación, SSH, red, Node-RED, copia de archivos, secretos, conexionado, importación, verificación |
 | [PARTE-1.md](PARTE-1.md) … [PARTE-4.md](PARTE-4.md) | Guías de banco por parte, con tablas de resultados y listas de verificación |
 | `docs/` | [arquitectura-red.md](docs/arquitectura-red.md) (capas, transportes, RS-485, **ADR**) · [modelo-informacion.md](docs/modelo-informacion.md) · [protocolo-opcua.md](docs/protocolo-opcua.md) · [seguridad.md](docs/seguridad.md) |
