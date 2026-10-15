@@ -482,7 +482,7 @@ La rutina propia se validó contra el **vector de prueba estándar** del
 CRC-16/MODBUS: la cadena `123456789` debe producir `0x4B37`.
 
 ```
-python "tarea 1/herramientas/modbus_tramas.py"
+python tarea-1/herramientas/modbus_tramas.py
 ```
 
 Ese vector no es un ejemplo cualquiera. Es lo que **distingue esta variante de

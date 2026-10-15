@@ -148,10 +148,10 @@ Cada una está justificada con números en el documento indicado.
 ### Sin hardware — verificar las herramientas
 
 ```bash
-python "tarea 1/herramientas/modbus_tramas.py"
-python "tarea 1/herramientas/prueba_diagnostico.py"
-python "tarea 1/herramientas/prueba_version_despliegue.py"
-python "tarea 1/herramientas/demo_retencion_estado.py"
+python tarea-1/herramientas/modbus_tramas.py
+python tarea-1/herramientas/prueba_diagnostico.py
+python tarea-1/herramientas/prueba_version_despliegue.py
+python tarea-1/herramientas/demo_retencion_estado.py
 ```
 
 ### Con hardware

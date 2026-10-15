@@ -221,7 +221,7 @@ Estas tramas se pueden reproducir y verificar con la herramienta propia del
 proyecto:
 
 ```
-python "tarea 1/herramientas/modbus_tramas.py"
+python tarea-1/herramientas/modbus_tramas.py
 ```
 
 ### 4.4 Un matiz que conviene conocer
@@ -569,7 +569,7 @@ inicial o distinta reflexión.
 La verificación se ejecuta sin hardware:
 
 ```
-python "tarea 1/herramientas/modbus_tramas.py"
+python tarea-1/herramientas/modbus_tramas.py
 ```
 
 Detalle del algoritmo y de los tres puntos donde se concentran los errores de

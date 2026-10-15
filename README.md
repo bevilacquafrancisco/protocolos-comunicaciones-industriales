@@ -72,14 +72,14 @@ especificaciones de los protocolos y normas.
 |---|---|---|---|---|
 | 1 | [Actividad Nº1](act1/) | Selección de instrumentos e interfaz con PLC | Investigación técnica | Entregado |
 | 2 | [Actividad Nº2](act2/) | Redes AS-i y su integración con Profibus | Análisis de caso real | Entregado |
-| 3 | [**Tarea Nº1**](tarea%201/) | **Red MODBus RTU sobre RS-485 con tres microcontroladores** | **Diseño, implementación y verificación** | **Completo y verificado** |
+| 3 | [**Tarea Nº1**](tarea-1/) | **Red MODBus RTU sobre RS-485 con tres microcontroladores** | **Diseño, implementación y verificación** | **Completo y verificado** |
 
 ---
 
 ### Tarea Nº1 — Red MODBus RTU sobre RS-485
 
 > **El trabajo más extenso del repositorio y el más representativo.**
-> [Documentación completa →](tarea%201/README.md)
+> [Documentación completa →](tarea-1/README.md)
 
 Diseño, construcción y verificación de una red de comunicación industrial con
 tres nodos **ESP32 programados en MicroPython**: un maestro MODBus RTU y dos
@@ -115,7 +115,7 @@ instrumentación del propio firmware o de un banco de pruebas reproducible.
 - **Herramientas de análisis** que corren sin hardware: implementación propia del
   CRC-16 validada contra el vector de prueba estándar, decodificador de tramas y
   analizador pasivo del bus.
-- **[Registro de los problemas encontrados](tarea%201/evidencia/INCONVENIENTES.md)**
+- **[Registro de los problemas encontrados](tarea-1/evidencia/INCONVENIENTES.md)**
   y cómo se resolvieron.
 
 
@@ -171,14 +171,14 @@ consultados están en la carpeta.
 
 | Competencia | Evidencia |
 |---|---|
-| **Firmware embebido** | [Tres nodos en MicroPython](tarea%201/firmware/) con capa de abstracción de hardware, máquina de estados explícita y configuración centralizada |
-| **Protocolos industriales** | [MODBus RTU implementado y analizado](tarea%201/docs/protocolo-comunicacion.md) a nivel de trama, con CRC propio validado contra el vector estándar |
-| **Electrónica y puesta en marcha** | [Adaptación de niveles, líneas de transmisión, terminación y polarización](tarea%201/docs/arquitectura.md), con dimensionamiento calculado y verificado con instrumento |
-| **Diagnóstico sistemático** | [Registro de los tres defectos encontrados](tarea%201/evidencia/INCONVENIENTES.md), con las hipótesis descartadas y el experimento que falsó cada una |
-| **Observabilidad** | [Capa de diagnóstico](tarea%201/firmware/comun/diagnostico.py): traza por niveles, captura de tramas sin alterar el timing del bus, estadística por nodo |
-| **Testing** | [70 verificaciones automáticas](tarea%201/herramientas/prueba_diagnostico.py) que corren en la PC sin hardware, incluidas las de despliegue incompleto |
+| **Firmware embebido** | [Tres nodos en MicroPython](tarea-1/firmware/) con capa de abstracción de hardware, máquina de estados explícita y configuración centralizada |
+| **Protocolos industriales** | [MODBus RTU implementado y analizado](tarea-1/docs/protocolo-comunicacion.md) a nivel de trama, con CRC propio validado contra el vector estándar |
+| **Electrónica y puesta en marcha** | [Adaptación de niveles, líneas de transmisión, terminación y polarización](tarea-1/docs/arquitectura.md), con dimensionamiento calculado y verificado con instrumento |
+| **Diagnóstico sistemático** | [Registro de los tres defectos encontrados](tarea-1/evidencia/INCONVENIENTES.md), con las hipótesis descartadas y el experimento que falsó cada una |
+| **Observabilidad** | [Capa de diagnóstico](tarea-1/firmware/comun/diagnostico.py): traza por niveles, captura de tramas sin alterar el timing del bus, estadística por nodo |
+| **Testing** | [70 verificaciones automáticas](tarea-1/herramientas/prueba_diagnostico.py) que corren en la PC sin hardware, incluidas las de despliegue incompleto |
 | **Documentación técnica** | Todo este repositorio. Más de 6000 líneas de documentación con decisiones justificadas y trade-offs explícitos |
-| **Medición sobre opinión** | [Contraste entre el modelo temporal calculado y el medido](tarea%201/docs/protocolo-comunicacion.md), conservando ambos números y explicando la diferencia |
+| **Medición sobre opinión** | [Contraste entre el modelo temporal calculado y el medido](tarea-1/docs/protocolo-comunicacion.md), conservando ambos números y explicando la diferencia |
 
 ### Cómo se trabajo
 
@@ -209,7 +209,7 @@ trabajo, con el análisis de qué implicarían en una instalación real.
 
 ```
 .
-├── tarea 1/          Red MODBus RTU sobre RS-485  ← el trabajo principal
+├── tarea-1/          Red MODBus RTU sobre RS-485  ← el trabajo principal
 │   ├── README.md         Punto de entrada: matriz de cumplimiento y resultados
 │   ├── PARTE-1/2/3.md    Guías para reproducir el sistema desde cero
 │   ├── docs/             Marco teórico: capa física, protocolo, mapa de registros
@@ -222,8 +222,8 @@ trabajo, con el análisis de qué implicarían en una instalación real.
 └── act1/             Selección de instrumentos: consigna, entrega y datasheets
 ```
 
-**Por dónde empezar:** [tarea 1/README.md](tarea%201/README.md) para el panorama
-general, o [tarea 1/evidencia/INCONVENIENTES.md](tarea%201/evidencia/INCONVENIENTES.md)
+**Por dónde empezar:** [tarea-1/README.md](tarea-1/README.md) para el panorama
+general, o [tarea-1/evidencia/INCONVENIENTES.md](tarea-1/evidencia/INCONVENIENTES.md)
 si interesa más el proceso de diagnóstico que el resultado.
 
 ---

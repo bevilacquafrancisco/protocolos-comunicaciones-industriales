@@ -119,9 +119,9 @@ Thonny antes de subirlo: el editor trabaja sobre su propio buffer.
 Ninguna de las dos necesita hardware:
 
 ```
-python "tarea 1/herramientas/prueba_diagnostico.py"            → FALLAS: 0
-python "tarea 1/herramientas/prueba_config_desactualizado.py"  → arranca y avisa
-python "tarea 1/herramientas/prueba_version_despliegue.py"     → detiene y explica
+python tarea-1/herramientas/prueba_diagnostico.py            → FALLAS: 0
+python tarea-1/herramientas/prueba_config_desactualizado.py  → arranca y avisa
+python tarea-1/herramientas/prueba_version_despliegue.py     → detiene y explica
 ```
 
 La primera verifica la lógica del módulo (21 comprobaciones). La segunda reproduce el fallo de despliegue descrito arriba y confirma que degrada bien.
@@ -435,7 +435,7 @@ La última línea es la comparación que hace el propio firmware, no el autor de
 ### Ensayo previo en la PC
 
 ```
-python "tarea 1/herramientas/demo_retencion_estado.py"
+python tarea-1/herramientas/demo_retencion_estado.py
 ```
 
 Corre la misma lógica contra un servidor simulado y produce la salida de arriba. Sirve para saber qué esperar antes de ir al banco; **la verificación que vale para el informe es la del hardware**.
