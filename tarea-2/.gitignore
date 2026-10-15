@@ -1,0 +1,17 @@
+# [SEC] Secretos y material criptografico: nunca al repositorio.
+.env
+*.env
+!.env.ejemplo
+flows_cred.json
+opcua-pki/
+pki/
+*.pem
+*.der
+*.key
+*.pfx
+
+# Copias de trabajo de Node-RED que se generan al usarlo en la PC
+.config.*.json
+.flows*.backup
+node_modules/
+__pycache__/
