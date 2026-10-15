@@ -12,9 +12,14 @@ decisión.
 Todo se hace **dos veces**, una por placa. Donde los pasos difieren, la guía lo
 indica con una tabla **RPi 1 · servidor / RPi 2 · cliente**.
 
+**Placas del laboratorio.** Las Raspberry Pi que se usan son las del
+laboratorio, y cada una trae **su propia microSD con otro programa cargado**.
+Grabar el sistema desde cero **borra ese programa**. Por eso, antes de grabar se
+respalda la tarjeta (§4.1) y al terminar se devuelve como estaba (§18).
+
 > ⚠️ **Antes de conectar periféricos:** los GPIO de la Raspberry Pi trabajan a
 > **3,3 V y no toleran 5 V**. Conectar 5 V a un GPIO lo daña de forma
-> permanente. Cablear siempre **con la placa apagada** (§10).
+> permanente. Cablear siempre **con la placa apagada** (§11).
 
 ---
 
@@ -37,6 +42,7 @@ indica con una tabla **RPi 1 · servidor / RPi 2 · cliente**.
 15. [Actualizar después de un cambio](#15-actualizar-después-de-un-cambio)
 16. [Problemas frecuentes](#16-problemas-frecuentes)
 17. [Probar el sistema sin las placas](#17-probar-el-sistema-sin-las-placas)
+18. [Devolver las placas del laboratorio](#18-devolver-las-placas-del-laboratorio)
 
 ---
 
@@ -61,12 +67,12 @@ descargas e instalaciones.
 | Cantidad | Elemento | Observación |
 |---|---|---|
 | 2 | Raspberry Pi 3B+ o 4 | Con una **RPi 5** ver §16: `pigpiod` no la soporta |
-| 2 | microSD de **16 GB o más**, clase **A1** | A1 garantiza un mínimo de IOPS aleatorias. El sistema hace muchas escrituras chicas y las tarjetas sin clasificar lo vuelven lento |
+| 2 | microSD de **16 GB o más**, clase **A1**: las del laboratorio (respaldadas, §4.1) o propias | A1 garantiza un mínimo de IOPS aleatorias. El sistema hace muchas escrituras chicas y las tarjetas sin clasificar lo vuelven lento |
 | 2 | Fuente oficial: **5,1 V / 3 A USB-C** (RPi 4) o **5,1 V / 2,5 A micro-USB** (RPi 3B+) | Un cargador de teléfono suele caer por debajo de 4,75 V bajo carga; la placa lo informa como *undervoltage* y puede corromper la microSD |
 | 1 | Cable Ethernet categoría 5e o superior | **Directo o cruzado, da igual**: ambas placas tienen auto MDI-X (explicado en [PARTE-1.md](../PARTE-1.md)) |
 | 1 | Lector de microSD para la PC | |
 | 2 + 4 | Pulsadores + LED (2 por placa: digital y PWM) | |
-| 4 | Resistencias de **330 Ω** | Una por LED (cálculo en §11) |
+| 4 | Resistencias de **330 Ω** | Una por LED (cálculo en §11). Con **220 Ω** también sirve: ≈ 5,9 mA, debajo de los 16 mA por pin |
 | — | Protoboard y cables dupont hembra-macho | |
 | — | Red Wi-Fi **WPA2 personal** (router doméstico o **punto de acceso del teléfono**) | La Wi-Fi de la facultad suele usar portal cautivo o WPA2-Enterprise, que no se configuran desde el grabador. El punto de acceso del teléfono es la opción más simple para el banco |
 
@@ -77,6 +83,8 @@ Todo es software libre y gratuito.
 | Programa | Para qué | De dónde |
 |---|---|---|
 | **Raspberry Pi Imager** | Grabar el sistema operativo en la microSD | raspberrypi.com/software |
+| **Win32 Disk Imager** | **Respaldar** la microSD del laboratorio en un archivo `.img` y restaurarla | sourceforge.net/projects/win32diskimager |
+| 7-Zip *(opcional)* | Comprimir la imagen de respaldo (ocupa el tamaño completo de la tarjeta) | 7-zip.org |
 | Cliente SSH (`ssh`, `scp`) | Entrar a las placas y copiar archivos | Ya viene en Windows 10/11 (PowerShell) |
 | WinSCP *(opcional)* | Copiar archivos con interfaz gráfica | winscp.net |
 | **Wireshark** | Analizar las capturas (Parte 4) | wireshark.org |
@@ -98,6 +106,49 @@ copia a las placas en el paso siguiente. La privada (`id_ed25519`, sin
 extensión) **no sale de la PC**.
 
 ## 4. Grabar las microSD
+
+### 4.1 Si la microSD es del laboratorio: respaldarla primero
+
+Grabar el sistema **borra todo** lo que tiene la tarjeta. Las del laboratorio
+traen el programa de otra cátedra o de otro grupo: hay que poder dejarlas
+exactamente como estaban.
+
+**Alternativa más simple:** usar **dos microSD propias** (16 GB, clase A1) y no
+tocar las del laboratorio. Solo hay que cambiar la tarjeta al empezar y al
+terminar, y no hace falta nada de esta sección.
+
+Si se usan las del laboratorio:
+
+1. **Pedir autorización** a la cátedra o al responsable del laboratorio para
+   regrabar las tarjetas, y avisar que se van a devolver restauradas.
+2. **Identificar cada placa y su tarjeta**: anotar el modelo (está serigrafiado
+   en la placa: "Raspberry Pi 4 Model B", "3 Model B+", etc.), el número de
+   inventario si tiene, y marcar la microSD (cinta con "RPi 1" / "RPi 2").
+   ⚠️ Si alguna es una **Raspberry Pi 5**, detenerse: `pigpiod` no funciona en
+   ella (§16) y hay que decidir antes cómo seguir.
+3. **Sacar la imagen completa** con Win32 Disk Imager:
+   - insertar la microSD en el lector de la PC. Si Windows ofrece
+     **"formatear el disco"**, elegir **Cancelar**: es la partición Linux, que
+     Windows no reconoce, y formatearla borra el programa;
+   - en *Image File*, poner una ruta con espacio libre suficiente (la imagen
+     ocupa **el tamaño total** de la tarjeta: 16 GB, 32 GB…), por ejemplo
+     `D:espaldo-labpi1-original.img`;
+   - en *Device*, la letra de la microSD (verificar el tamaño);
+   - tildar *Hash* → **SHA256** y botón **Read**. Tarda varios minutos;
+   - al terminar, botón **Verify Only**: compara la imagen con la tarjeta.
+     Anotar el SHA256 que muestra.
+4. Repetir con la otra tarjeta (`rpi2-original.img`).
+5. **Guardar los respaldos** fuera de la carpeta del repositorio (son de varios
+   GB y no son nuestros) y, opcionalmente, comprimirlos con 7-Zip.
+
+| Tarjeta | Placa (modelo / inventario) | Archivo de respaldo | SHA256 | Verificado |
+|---|---|---|---|---|
+| RPi 1 | *completar* | `rpi1-original.img` | *completar* | ☐ |
+| RPi 2 | *completar* | `rpi2-original.img` | *completar* | ☐ |
+
+Recién con los dos respaldos verificados se pasa a §4.2.
+
+### 4.2 Grabar el sistema
 
 Repetir para cada tarjeta.
 
@@ -645,3 +696,28 @@ misma PC (puertos 1880 y 1881), con el endpoint del cliente apuntando a
 pruebas y se documenta en [settings.pdci-t2.js](settings.pdci-t2.js). Los nodos
 GPIO quedan en rojo, porque no hay `pigpiod`, y el resto funciona de punta a
 punta.
+
+## 18. Devolver las placas del laboratorio
+
+Al terminar la jornada (o el trabajo), cada microSD vuelve a su estado original:
+
+1. Apagar la placa: `sudo poweroff` y esperar a que el LED verde deje de
+   parpadear.
+2. Antes de borrar, **copiar a la PC lo que haga falta**: capturas
+   (`~/captura_*.pcapng`), registros (`journalctl -u nodered > …`) y la carpeta
+   `~/evidencia`. Después de restaurar, no hay forma de recuperarlos.
+3. Restaurar con Win32 Disk Imager: *Image File* = `rpiN-original.img`,
+   *Device* = la microSD, botón **Write**, y luego **Verify Only**.
+   (También sirve Raspberry Pi Imager → *Usar imagen personalizada* → el
+   `.img`, **sin** personalización.)
+4. Volver a colocar cada tarjeta en **su** placa (la cinta "RPi 1" / "RPi 2") y,
+   si se puede, encenderla para comprobar que arranca el programa original.
+
+**[SEC]** La tarjeta regrabada contiene los secretos del trabajo
+(`/etc/nodered-pdci.env`, las claves privadas de `~/.node-red/opcua-pki`). La
+restauración los borra por completo. **No devolver nunca una tarjeta sin
+restaurar.**
+
+Para la próxima sesión hay dos opciones: volver a hacer la puesta a punto
+(unos 30 minutos si ya se tiene práctica), o guardar también una imagen de
+**nuestra** tarjeta ya configurada (`rpi1-pdci-t2.img`) y restaurarla directo.
