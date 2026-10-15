@@ -1,0 +1,361 @@
+TP2 OPC UA - GUÍA DE PUESTA EN MARCHA
+UNRaf - Protocolos de Comunicaciones Industriales
+
+OBJETIVO
+--------
+Dejar operativas dos Raspberry Pi conectadas directamente por Ethernet:
+
+Raspberry Pi 1 = Servidor OPC UA
+IP Ethernet = 192.168.10.1/24
+
+Raspberry Pi 2 = Cliente OPC UA
+IP Ethernet = 192.168.10.2/24
+
+Endpoint del servidor:
+opc.tcp://192.168.10.1:4840
+
+
+============================================================
+1. CONEXIONADO FÍSICO
+============================================================
+
+En ambas Raspberry Pi:
+
+- Pulsador -> GPIO 17
+- LED digital -> GPIO 27
+- LED PWM -> GPIO 18
+- GND común
+- Alimentación lógica -> 3.3 V
+
+Conectar ambas Raspberry directamente con el cable Ethernet.
+
+IMPORTANTE:
+No conectar ni retirar cables GPIO con la Raspberry alimentada si no es necesario.
+Verificar dos veces los pines antes de encender.
+
+
+============================================================
+2. IDENTIFICAR LA INTERFAZ ETHERNET
+============================================================
+
+En cada Raspberry ejecutar:
+
+ip link
+
+Buscar una interfaz llamada normalmente:
+
+eth0
+
+Luego:
+
+ip addr
+
+
+============================================================
+3. CONFIGURAR IP FIJA EN RASPBERRY PI 1
+============================================================
+
+Primero listar las conexiones de NetworkManager:
+
+nmcli connection show
+
+Identificar el nombre de la conexión Ethernet.
+En muchas instalaciones puede llamarse:
+"Wired connection 1"
+
+Si se llama exactamente así:
+
+sudo nmcli connection modify "Wired connection 1" \
+ipv4.method manual \
+ipv4.addresses 192.168.10.1/24 \
+ipv4.gateway "" \
+ipv4.dns ""
+
+Activar la conexión:
+
+sudo nmcli connection up "Wired connection 1"
+
+Verificar:
+
+ip addr show eth0
+
+
+============================================================
+4. CONFIGURAR IP FIJA EN RASPBERRY PI 2
+============================================================
+
+Listar conexiones:
+
+nmcli connection show
+
+Si la conexión Ethernet se llama "Wired connection 1":
+
+sudo nmcli connection modify "Wired connection 1" \
+ipv4.method manual \
+ipv4.addresses 192.168.10.2/24 \
+ipv4.gateway "" \
+ipv4.dns ""
+
+Activar:
+
+sudo nmcli connection up "Wired connection 1"
+
+Verificar:
+
+ip addr show eth0
+
+
+============================================================
+5. VERIFICAR EL ENLACE
+============================================================
+
+Desde Raspberry Pi 1:
+
+ping -c 4 192.168.10.2
+
+Desde Raspberry Pi 2:
+
+ping -c 4 192.168.10.1
+
+Verificar tabla ARP / vecinos:
+
+ip neigh
+
+Verificar estado del enlace:
+
+ip link show eth0
+
+Si ethtool está instalado:
+
+ethtool eth0
+
+Debe documentarse:
+- estado del enlace
+- velocidad
+- modo dúplex
+- direcciones IP
+- conectividad
+- tabla ARP
+
+
+============================================================
+6. PREPARAR ENTORNO PYTHON
+============================================================
+
+En cada Raspberry:
+
+python3 --version
+
+Crear entorno virtual:
+
+python3 -m venv ~/opcua-env
+
+Activar:
+
+source ~/opcua-env/bin/activate
+
+Actualizar pip:
+
+python -m pip install --upgrade pip
+
+Instalar dependencias:
+
+pip install asyncua gpiozero
+
+Si gpiozero ya está instalado por el sistema, igualmente puede dejarse instalado
+en el entorno virtual.
+
+
+============================================================
+7. COPIAR LOS PROGRAMAS
+============================================================
+
+Copiar a Raspberry Pi 1:
+
+servidor.py
+
+Copiar a Raspberry Pi 2:
+
+cliente.py
+
+Ejemplo de carpetas:
+
+Raspberry Pi 1:
+~/TP2_OPC/servidor.py
+
+Raspberry Pi 2:
+~/TP2_OPC/cliente.py
+
+
+============================================================
+8. EJECUTAR EL SERVIDOR
+============================================================
+
+En Raspberry Pi 1:
+
+cd ~/TP2_OPC
+
+source ~/opcua-env/bin/activate
+
+python servidor.py
+
+Debe aparecer un mensaje similar a:
+
+SERVIDOR OPC UA INICIADO
+Endpoint: opc.tcp://192.168.10.1:4840
+
+
+============================================================
+9. PROBAR CON UAEXPERT DESDE LA NOTEBOOK
+============================================================
+
+Con el servidor ejecutándose:
+
+Abrir UaExpert.
+
+Agregar servidor:
+
+opc.tcp://<IP-WIFI-DE-RASPBERRY-1>:4840
+
+o, si la notebook puede alcanzar directamente la red Ethernet:
+
+opc.tcp://192.168.10.1:4840
+
+Para la primera prueba usar:
+
+Security Policy: None
+Message Security Mode: None
+
+Navegar:
+
+Objects
+  Servidor
+    EstadoPulsador
+    Rampa
+  Cliente
+    EstadoPulsador
+    Rampa
+
+Comprobar:
+- NodeId
+- BrowseName
+- DataType
+- AccessLevel
+- Value
+- StatusCode
+- SourceTimestamp
+- ServerTimestamp
+
+
+============================================================
+10. EJECUTAR EL CLIENTE
+============================================================
+
+En Raspberry Pi 2:
+
+cd ~/TP2_OPC
+
+source ~/opcua-env/bin/activate
+
+python cliente.py
+
+Debe aparecer:
+
+CLIENTE OPC UA CONECTADO
+
+Luego deben verse valores enviados y recibidos en consola.
+
+
+============================================================
+11. PRUEBA FUNCIONAL RÁPIDA
+============================================================
+
+Comprobar:
+
+1. Pulsador de Raspberry Pi 1
+   -> LED digital de Raspberry Pi 2
+
+2. Rampa del servidor
+   -> brillo del LED PWM de Raspberry Pi 2
+
+3. Pulsador de Raspberry Pi 2
+   -> LED digital de Raspberry Pi 1
+
+4. Rampa triangular del cliente
+   -> brillo del LED PWM de Raspberry Pi 1
+
+
+============================================================
+12. CAPTURA PARA WIRESHARK
+============================================================
+
+En una Raspberry, por ejemplo la Raspberry Pi 1:
+
+sudo tcpdump -i eth0 -w captura.pcapng
+
+Mientras captura:
+- iniciar cliente
+- dejar intercambiar datos
+- accionar pulsadores
+- detener cliente
+- detener tcpdump con Ctrl+C
+
+Copiar luego captura.pcapng a la notebook.
+
+En Wireshark usar filtro:
+
+opcua
+
+
+============================================================
+13. PRUEBA DE DESCONEXIÓN
+============================================================
+
+Con servidor y cliente funcionando:
+
+1. Desconectar el cable Ethernet.
+2. Observar:
+   - estado del LED PWM
+   - generadores locales
+   - mensajes de error
+   - comportamiento de la sesión
+3. Reconectar Ethernet.
+4. Registrar cómo se recupera la comunicación.
+
+
+============================================================
+14. COMANDOS DE COMPROBACIÓN RÁPIDA
+============================================================
+
+ip addr
+ip link
+ip neigh
+ping -c 4 192.168.10.1
+ping -c 4 192.168.10.2
+ethtool eth0
+nmcli connection show
+python3 --version
+
+Para saber la IP Wi-Fi:
+
+hostname -I
+
+
+============================================================
+15. ORDEN RECOMENDADO PARA EL DÍA DE LA DEFENSA
+============================================================
+
+1. Conectar GPIO y protoboards.
+2. Conectar cable Ethernet.
+3. Encender ambas Raspberry.
+4. Verificar IPs.
+5. Hacer ping en ambos sentidos.
+6. Iniciar servidor.
+7. Probar servidor con UaExpert.
+8. Iniciar cliente.
+9. Probar pulsadores y LEDs.
+10. Si la defensa lo requiere, abrir captura previamente preparada en Wireshark.
+
+META:
+La puesta en marcha debe poder realizarse en pocos minutos si las Raspberry ya
+tienen Raspberry Pi OS, Python y las dependencias instaladas.
