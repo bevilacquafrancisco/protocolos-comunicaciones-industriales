@@ -1,0 +1,469 @@
+logs maestro:
+>>> %Run -c $EDITOR_CONTENT
+                                                              MPY: soft reboot
+[     0.010] I [MAESTRO] Bus instrumentado (el objeto mismo): TX y RX bajo observacion
+==========================================================
+MAESTRO MODBus RTU
+Bus: 9600 baudios, 8N1
+UART2  TX=GPIO17  RX=GPIO16  DE/RE=GPIO4
+Periodo de sondeo: 200 ms  |  Timeout: 300 ms  |  Reintentos: 1
+Nivel de traza: 3 (0 silencio ... 5 trama)
+Selector GPIO13: abierto = Esclavo 1, a GND = Esclavo 2
+==========================================================
+[     0.048] A [MAESTRO] Seleccion -> Esclavo 2 (cambios=0 rechazos=0)
+[     0.091] I [MAESTRO] DI Esclavo 2 -> 0 (LED digital local)
+[     0.124] I [MAESTRO] IR Esclavo 2 -> 2265 = PWM 141 (LED PWM local)
+[     0.262] I [MAESTRO] IR Esclavo 2 -> 3001 = PWM 187 (LED PWM local)
+[     0.461] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[     2.272] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[     2.460] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[     5.094] I [MAESTRO] ciclos=26 fallos=0 (0.0%) t_ciclo=101ms | ID=2 DI=0 IR=0 -> PWM=0
+      E1 pausa 5s              sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          79tx 0err (0.0%)  acum: 79tx 0err (0.0%)
+[    10.125] I [MAESTRO] ciclos=51 fallos=0 (0.0%) t_ciclo=132ms | ID=2 DI=0 IR=0 -> PWM=0
+      E1 pausa 10s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          84tx 0err (0.0%)  acum: 163tx 0err (0.0%)
+[    10.261] I [MAESTRO] IR Esclavo 2 -> 148 = PWM 9 (LED PWM local)
+[    10.461] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    11.861] I [MAESTRO] IR Esclavo 2 -> 648 = PWM 40 (LED PWM local)
+[    12.060] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    15.298] I [MAESTRO] ciclos=77 fallos=0 (0.0%) t_ciclo=105ms | ID=2 DI=0 IR=0 -> PWM=0
+      E1 pausa 15s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          84tx 0err (0.0%)  acum: 247tx 0err (0.0%)
+[    17.061] I [MAESTRO] IR Esclavo 2 -> 146 = PWM 9 (LED PWM local)
+[    17.261] I [MAESTRO] IR Esclavo 2 -> 554 = PWM 34 (LED PWM local)
+[    17.460] I [MAESTRO] IR Esclavo 2 -> 895 = PWM 55 (LED PWM local)
+[    17.661] I [MAESTRO] IR Esclavo 2 -> 1235 = PWM 77 (LED PWM local)
+[    17.861] I [MAESTRO] IR Esclavo 2 -> 1498 = PWM 93 (LED PWM local)
+[    18.061] I [MAESTRO] IR Esclavo 2 -> 1983 = PWM 123 (LED PWM local)
+[    18.261] I [MAESTRO] IR Esclavo 2 -> 2454 = PWM 153 (LED PWM local)
+[    18.461] I [MAESTRO] IR Esclavo 2 -> 2576 = PWM 161 (LED PWM local)
+[    18.661] I [MAESTRO] IR Esclavo 2 -> 2680 = PWM 167 (LED PWM local)
+[    18.861] I [MAESTRO] IR Esclavo 2 -> 2177 = PWM 136 (LED PWM local)
+[    19.060] I [MAESTRO] IR Esclavo 2 -> 2433 = PWM 152 (LED PWM local)
+[    19.261] I [MAESTRO] IR Esclavo 2 -> 2568 = PWM 160 (LED PWM local)
+[    19.461] I [MAESTRO] IR Esclavo 2 -> 2887 = PWM 180 (LED PWM local)
+[    19.865] I [MAESTRO] IR Esclavo 2 -> 2814 = PWM 175 (LED PWM local)
+[    20.061] I [MAESTRO] IR Esclavo 2 -> 2956 = PWM 184 (LED PWM local)
+[    20.261] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    20.461] I [MAESTRO] IR Esclavo 2 -> 3193 = PWM 199 (LED PWM local)
+[    20.497] I [MAESTRO] ciclos=103 fallos=0 (0.0%) t_ciclo=103ms | ID=2 DI=0 IR=3193 -> PWM=199
+      E1 pausa 20s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          78tx 0err (0.0%)  acum: 325tx 0err (0.0%)
+[    20.857] I [MAESTRO] IR Esclavo 2 -> 3475 = PWM 217 (LED PWM local)
+[    21.057] I [MAESTRO] IR Esclavo 2 -> 3821 = PWM 238 (LED PWM local)
+[    21.257] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    21.867] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    22.025] I [MAESTRO] DI Esclavo 2 -> 1 (LED digital local)
+[    22.257] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    23.425] I [MAESTRO] DI Esclavo 2 -> 0 (LED digital local)
+[    25.257] I [MAESTRO] IR Esclavo 2 -> 3872 = PWM 242 (LED PWM local)
+[    25.457] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    25.501] I [MAESTRO] ciclos=128 fallos=0 (0.0%) t_ciclo=108ms | ID=2 DI=0 IR=4095 -> PWM=255
+      E1 pausa 25s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          75tx 0err (0.0%)  acum: 400tx 0err (0.0%)
+[    27.067] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    27.256] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    30.695] I [MAESTRO] ciclos=154 fallos=0 (0.0%) t_ciclo=101ms | ID=2 DI=0 IR=4095 -> PWM=255
+      E1 pausa 30s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          78tx 0err (0.0%)  acum: 478tx 0err (0.0%)
+[    35.694] I [MAESTRO] ciclos=179 fallos=0 (0.0%) t_ciclo=101ms | ID=2 DI=0 IR=4095 -> PWM=255
+      E1 pausa 35s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          75tx 0err (0.0%)  acum: 553tx 0err (0.0%)
+[    40.256] I [MAESTRO] IR Esclavo 2 -> 2882 = PWM 180 (LED PWM local)
+[    40.457] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    40.695] I [MAESTRO] ciclos=204 fallos=0 (0.0%) t_ciclo=101ms | ID=2 DI=0 IR=4095 -> PWM=255
+      E1 pausa 40s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          75tx 0err (0.0%)  acum: 628tx 0err (0.0%)
+[    42.867] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    43.056] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    45.056] I [MAESTRO] IR Esclavo 2 -> 4009 = PWM 250 (LED PWM local)
+[    45.256] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    45.457] I [MAESTRO] IR Esclavo 2 -> 4076 = PWM 254 (LED PWM local)
+                                                                45.698] I [MAESTRO] ciclos=229 fallos=0 (0.0%) t_ciclo=105ms | ID=2 DI=0 IR=4072 -> PWM=254
+      E1 pausa 45s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          75tx 0err (0.0%)  acum: 703tx 0err (0.0%)
+[    46.257] I [MAESTRO] IR Esclavo 2 -> 3525 = PWM 220 (LED PWM local)
+[    46.457] I [MAESTRO] IR Esclavo 2 -> 3407 = PWM 212 (LED PWM local)
+[    46.657] I [MAESTRO] IR Esclavo 2 -> 4038 = PWM 252 (LED PWM local)
+[    47.257] I [MAESTRO] IR Esclavo 2 -> 3987 = PWM 249 (LED PWM local)
+[    47.657] I [MAESTRO] IR Esclavo 2 -> 4033 = PWM 252 (LED PWM local)
+[    47.857] I [MAESTRO] IR Esclavo 2 -> 3926 = PWM 245 (LED PWM local)
+[    48.057] I [MAESTRO] IR Esclavo 2 -> 4006 = PWM 250 (LED PWM local)
+[    48.257] I [MAESTRO] IR Esclavo 2 -> 4081 = PWM 255 (LED PWM local)
+[    48.457] I [MAESTRO] IR Esclavo 2 -> 4041 = PWM 252 (LED PWM local)
+[    48.657] I [MAESTRO] IR Esclavo 2 -> 4089 = PWM 255 (LED PWM local)
+[    48.857] I [MAESTRO] IR Esclavo 2 -> 3330 = PWM 208 (LED PWM local)
+[    49.057] I [MAESTRO] IR Esclavo 2 -> 3645 = PWM 227 (LED PWM local)
+[    49.257] I [MAESTRO] IR Esclavo 2 -> 3584 = PWM 224 (LED PWM local)
+[    49.457] I [MAESTRO] IR Esclavo 2 -> 3786 = PWM 236 (LED PWM local)
+[    49.657] I [MAESTRO] IR Esclavo 2 -> 3651 = PWM 228 (LED PWM local)
+[    49.857] I [MAESTRO] IR Esclavo 2 -> 3738 = PWM 233 (LED PWM local)
+[    50.256] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    50.457] I [MAESTRO] IR Esclavo 2 -> 4044 = PWM 252 (LED PWM local)
+[    50.657] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    50.701] I [MAESTRO] ciclos=254 fallos=0 (0.0%) t_ciclo=107ms | ID=2 DI=0 IR=4095 -> PWM=255
+      E1 pausa 50s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          75tx 0err (0.0%)  acum: 778tx 0err (0.0%)
+[    53.425] I [MAESTRO] DI Esclavo 2 -> 1 (LED digital local)
+[    53.458] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    53.657] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    55.256] I [MAESTRO] IR Esclavo 2 -> 2904 = PWM 181 (LED PWM local)
+[    55.456] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    55.894] I [MAESTRO] ciclos=280 fallos=0 (0.0%) t_ciclo=100ms | ID=2 DI=1 IR=4095 -> PWM=255
+      E1 pausa 55s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          78tx 0err (0.0%)  acum: 856tx 0err (0.0%)
+[    56.225] I [MAESTRO] DI Esclavo 2 -> 0 (LED digital local)
+[    56.258] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    56.457] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    57.025] I [MAESTRO] DI Esclavo 2 -> 1 (LED digital local)
+[    57.625] I [MAESTRO] DI Esclavo 2 -> 0 (LED digital local)
+[    57.658] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    57.857] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    58.067] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    58.256] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    60.894] I [MAESTRO] ciclos=305 fallos=0 (0.0%) t_ciclo=100ms | ID=2 DI=0 IR=4095 -> PWM=255
+      E1 pausa 60s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          75tx 0err (0.0%)  acum: 931tx 0err (0.0%)
+[    61.857] I [MAESTRO] IR Esclavo 2 -> 2813 = PWM 175 (LED PWM local)
+[    62.057] I [MAESTRO] IR Esclavo 2 -> 2091 = PWM 130 (LED PWM local)
+[    62.257] I [MAESTRO] IR Esclavo 2 -> 899 = PWM 56 (LED PWM local)
+[    62.457] I [MAESTRO] IR Esclavo 2 -> 725 = PWM 45 (LED PWM local)
+[    62.657] I [MAESTRO] IR Esclavo 2 -> 649 = PWM 40 (LED PWM local)
+[    62.857] I [MAESTRO] IR Esclavo 2 -> 712 = PWM 44 (LED PWM local)
+[    63.057] I [MAESTRO] IR Esclavo 2 -> 670 = PWM 41 (LED PWM local)
+[    63.267] I [MAESTRO] IR Esclavo 2 -> 1493 = PWM 93 (LED PWM local)
+[    63.456] I [MAESTRO] IR Esclavo 2 -> 477 = PWM 29 (LED PWM local)
+[    63.656] I [MAESTRO] IR Esclavo 2 -> 749 = PWM 46 (LED PWM local)
+[    64.057] I [MAESTRO] IR Esclavo 2 -> 1009 = PWM 63 (LED PWM local)
+[    64.257] I [MAESTRO] IR Esclavo 2 -> 872 = PWM 54 (LED PWM local)
+[    64.457] I [MAESTRO] IR Esclavo 2 -> 775 = PWM 48 (LED PWM local)
+[    64.657] I [MAESTRO] IR Esclavo 2 -> 839 = PWM 52 (LED PWM local)
+[    64.857] I [MAESTRO] IR Esclavo 2 -> 548 = PWM 34 (LED PWM local)
+[    65.057] I [MAESTRO] IR Esclavo 2 -> 724 = PWM 45 (LED PWM local)
+[    65.257] I [MAESTRO] IR Esclavo 2 -> 3591 = PWM 224 (LED PWM local)
+[    65.457] I [MAESTRO] IR Esclavo 2 -> 851 = PWM 53 (LED PWM local)
+[    65.657] I [MAESTRO] IR Esclavo 2 -> 650 = PWM 40 (LED PWM local)
+[    65.857] I [MAESTRO] IR Esclavo 2 -> 848 = PWM 53 (LED PWM local)
+[    65.901] I [MAESTRO] ciclos=330 fallos=0 (0.0%) t_ciclo=107ms | ID=2 DI=0 IR=848 -> PWM=53
+      E1 pausa 65s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          75tx 0err (0.0%)  acum: 1006tx 0err (0.0%)
+[    66.057] I [MAESTRO] IR Esclavo 2 -> 962 = PWM 60 (LED PWM local)
+[    66.257] I [MAESTRO] IR Esclavo 2 -> 807 = PWM 50 (LED PWM local)
+[    66.457] I [MAESTRO] IR Esclavo 2 -> 875 = PWM 54 (LED PWM local)
+[    66.857] I [MAESTRO] IR Esclavo 2 -> 1033 = PWM 64 (LED PWM local)
+[    67.057] I [MAESTRO] IR Esclavo 2 -> 953 = PWM 59 (LED PWM local)
+[    67.257] I [MAESTRO] IR Esclavo 2 -> 856 = PWM 53 (LED PWM local)
+[    67.457] I [MAESTRO] IR Esclavo 2 -> 1143 = PWM 71 (LED PWM local)
+[    67.657] I [MAESTRO] IR Esclavo 2 -> 1564 = PWM 97 (LED PWM local)
+[    67.857] I [MAESTRO] IR Esclavo 2 -> 1714 = PWM 107 (LED PWM local)
+[    68.067] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    68.257] I [MAESTRO] IR Esclavo 2 -> 1596 = PWM 99 (LED PWM local)
+[    68.457] I [MAESTRO] IR Esclavo 2 -> 757 = PWM 47 (LED PWM local)
+[    68.656] I [MAESTRO] IR Esclavo 2 -> 691 = PWM 43 (LED PWM local)
+[    68.857] I [MAESTRO] IR Esclavo 2 -> 562 = PWM 35 (LED PWM local)
+[    69.457] I [MAESTRO] IR Esclavo 2 -> 447 = PWM 27 (LED PWM local)
+[    70.256] I [MAESTRO] IR Esclavo 2 -> 3663 = PWM 228 (LED PWM local)
+[    70.457] I [MAESTRO] IR Esclavo 2 -> 1307 = PWM 81 (LED PWM local)
+[    70.657] I [MAESTRO] IR Esclavo 2 -> 2439 = PWM 152 (LED PWM local)
+[    70.857] I [MAESTRO] IR Esclavo 2 -> 2922 = PWM 182 (LED PWM local)
+[    70.901] I [MAESTRO] ciclos=355 fallos=0 (0.0%) t_ciclo=107ms | ID=2 DI=0 IR=2922 -> PWM=182
+      E1 pausa 70s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          75tx 0err (0.0%)  acum: 1081tx 0err (0.0%)
+[    71.058] I [MAESTRO] IR Esclavo 2 -> 3603 = PWM 225 (LED PWM local)
+[    71.257] I [MAESTRO] IR Esclavo 2 -> 3351 = PWM 209 (LED PWM local)
+[    71.457] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    73.856] I [MAESTRO] IR Esclavo 2 -> 3652 = PWM 228 (LED PWM local)
+[    74.057] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    75.457] I [MAESTRO] IR Esclavo 2 -> 2386 = PWM 149 (LED PWM local)
+[    75.657] I [MAESTRO] IR Esclavo 2 -> 2614 = PWM 163 (LED PWM local)
+[    75.857] I [MAESTRO] IR Esclavo 2 -> 2433 = PWM 152 (LED PWM local)
+[    76.057] I [MAESTRO] IR Esclavo 2 -> 2390 = PWM 149 (LED PWM local)
+[    76.101] I [MAESTRO] ciclos=381 fallos=0 (0.0%) t_ciclo=107ms | ID=2 DI=0 IR=2390 -> PWM=149
+      E1 pausa 76s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          78tx 0err (0.0%)  acum: 1159tx 0err (0.0%)
+[    76.257] I [MAESTRO] IR Esclavo 2 -> 3138 = PWM 196 (LED PWM local)
+[    76.457] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    77.457] I [MAESTRO] IR Esclavo 2 -> 2394 = PWM 149 (LED PWM local)
+[    77.657] I [MAESTRO] IR Esclavo 2 -> 1091 = PWM 68 (LED PWM local)
+[    78.057] I [MAESTRO] IR Esclavo 2 -> 1189 = PWM 74 (LED PWM local)
+[    78.267] I [MAESTRO] IR Esclavo 2 -> 1850 = PWM 115 (LED PWM local)
+[    78.456] I [MAESTRO] IR Esclavo 2 -> 677 = PWM 42 (LED PWM local)
+[    78.657] I [MAESTRO] IR Esclavo 2 -> 475 = PWM 29 (LED PWM local)
+[    78.856] I [MAESTRO] IR Esclavo 2 -> 428 = PWM 26 (LED PWM local)
+[    79.057] I [MAESTRO] IR Esclavo 2 -> 477 = PWM 29 (LED PWM local)
+[    79.257] I [MAESTRO] IR Esclavo 2 -> 335 = PWM 20 (LED PWM local)
+[    79.856] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    80.256] I [MAESTRO] IR Esclavo 2 -> 4095 = PWM 255 (LED PWM local)
+[    80.456] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    81.225] I [MAESTRO] DI Esclavo 2 -> 1 (LED digital local)
+[    81.259] I [MAESTRO] IR Esclavo 2 -> 3640 = PWM 227 (LED PWM local)
+[    81.303] I [MAESTRO] ciclos=407 fallos=0 (0.0%) t_ciclo=109ms | ID=2 DI=1 IR=3640 -> PWM=227
+      E1 pausa 81s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          78tx 0err (0.0%)  acum: 1237tx 0err (0.0%)
+[    81.457] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    82.425] I [MAESTRO] DI Esclavo 2 -> 0 (LED digital local)
+[    82.459] I [MAESTRO] IR Esclavo 2 -> 3782 = PWM 236 (LED PWM local)
+[    82.656] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    85.257] I [MAESTRO] IR Esclavo 2 -> 1415 = PWM 88 (LED PWM local)
+[    85.456] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    86.495] I [MAESTRO] ciclos=433 fallos=0 (0.0%) t_ciclo=102ms | ID=2 DI=0 IR=0 -> PWM=0
+      E1 pausa 86s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          78tx 0err (0.0%)  acum: 1315tx 0err (0.0%)
+[    91.725] I [MAESTRO] ciclos=459 fallos=0 (0.0%) t_ciclo=132ms | ID=2 DI=0 IR=0 -> PWM=0
+      E1 pausa 91s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          79tx 0err (0.0%)  acum: 1394tx 0err (0.0%)
+[    96.865] I [MAESTRO] IR Esclavo 2 -> 160 = PWM 10 (LED PWM local)
+[    96.931] I [MAESTRO] ciclos=485 fallos=0 (0.0%) t_ciclo=138ms | ID=2 DI=0 IR=160 -> PWM=10
+      E1 pausa 96s             sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          91tx 0err (0.0%)  acum: 1485tx 0err (0.0%)
+[    97.060] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    97.265] I [MAESTRO] IR Esclavo 2 -> 147 = PWM 9 (LED PWM local)
+[    97.865] I [MAESTRO] IR Esclavo 2 -> 111 = PWM 6 (LED PWM local)
+[    98.065] I [MAESTRO] IR Esclavo 2 -> 551 = PWM 34 (LED PWM local)
+[    98.271] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[    98.460] I [MAESTRO] IR Esclavo 2 -> 124 = PWM 7 (LED PWM local)
+[    98.660] I [MAESTRO] IR Esclavo 2 -> 1091 = PWM 68 (LED PWM local)
+[    98.860] I [MAESTRO] IR Esclavo 2 -> 1260 = PWM 78 (LED PWM local)
+[    99.061] I [MAESTRO] IR Esclavo 2 -> 208 = PWM 13 (LED PWM local)
+[    99.260] I [MAESTRO] IR Esclavo 2 -> 1455 = PWM 90 (LED PWM local)
+[    99.460] I [MAESTRO] IR Esclavo 2 -> 934 = PWM 58 (LED PWM local)
+[    99.660] I [MAESTRO] IR Esclavo 2 -> 1071 = PWM 66 (LED PWM local)
+[    99.860] I [MAESTRO] IR Esclavo 2 -> 1479 = PWM 92 (LED PWM local)
+[   100.060] I [MAESTRO] IR Esclavo 2 -> 397 = PWM 24 (LED PWM local)
+[   100.260] I [MAESTRO] IR Esclavo 2 -> 590 = PWM 36 (LED PWM local)
+[   100.465] I [MAESTRO] IR Esclavo 2 -> 878 = PWM 54 (LED PWM local)
+[   100.665] I [MAESTRO] IR Esclavo 2 -> 436 = PWM 27 (LED PWM local)
+[   100.865] I [MAESTRO] IR Esclavo 2 -> 812 = PWM 50 (LED PWM local)
+[   101.060] I [MAESTRO] IR Esclavo 2 -> 756 = PWM 47 (LED PWM local)
+[   101.262] I [MAESTRO] IR Esclavo 2 -> 1066 = PWM 66 (LED PWM local)
+[   101.461] I [MAESTRO] IR Esclavo 2 -> 141 = PWM 8 (LED PWM local)
+[   101.661] I [MAESTRO] IR Esclavo 2 -> 286 = PWM 17 (LED PWM local)
+[   101.861] I [MAESTRO] IR Esclavo 2 -> 53 = PWM 3 (LED PWM local)
+[   102.061] I [MAESTRO] IR Esclavo 2 -> 797 = PWM 49 (LED PWM local)
+[   102.097] I [MAESTRO] ciclos=511 fallos=0 (0.0%) t_ciclo=103ms | ID=2 DI=0 IR=797 -> PWM=49
+      E1 pausa 102s            sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          78tx 0err (0.0%)  acum: 1563tx 0err (0.0%)
+[   102.261] I [MAESTRO] IR Esclavo 2 -> 334 = PWM 20 (LED PWM local)
+[   102.461] I [MAESTRO] IR Esclavo 2 -> 141 = PWM 8 (LED PWM local)
+[   102.661] I [MAESTRO] IR Esclavo 2 -> 71 = PWM 4 (LED PWM local)
+[   102.861] I [MAESTRO] IR Esclavo 2 -> 186 = PWM 11 (LED PWM local)
+[   103.061] I [MAESTRO] IR Esclavo 2 -> 467 = PWM 29 (LED PWM local)
+[   103.271] I [MAESTRO] IR Esclavo 2 -> 0 = PWM 0 (LED PWM local)
+[   103.465] I [MAESTRO] IR Esclavo 2 -> 123 = PWM 7 (LED PWM local)
+[   103.665] I [MAESTRO] IR Esclavo 2 -> 365 = PWM 22 (LED PWM local)
+[   104.060] I [MAESTRO] IR Esclavo 2 -> 298 = PWM 18 (LED PWM local)
+[   104.260] I [MAESTRO] IR Esclavo 2 -> 553 = PWM 34 (LED PWM local)
+[   104.460] I [MAESTRO] IR Esclavo 2 -> 361 = PWM 22 (LED PWM local)
+[   104.660] I [MAESTRO] IR Esclavo 2 -> 243 = PWM 15 (LED PWM local)
+[   105.065] I [MAESTRO] IR Esclavo 2 -> 345 = PWM 21 (LED PWM local)
+[   105.265] I [MAESTRO] IR Esclavo 2 -> 167 = PWM 10 (LED PWM local)
+[   105.460] I [MAESTRO] IR Esclavo 2 -> 320 = PWM 20 (LED PWM local)
+[   105.865] I [MAESTRO] IR Esclavo 2 -> 567 = PWM 35 (LED PWM local)
+[   106.064] I [MAESTRO] IR Esclavo 2 -> 372 = PWM 23 (LED PWM local)
+[   106.465] I [MAESTRO] IR Esclavo 2 -> 203 = PWM 12 (LED PWM local)
+[   106.661] I [MAESTRO] IR Esclavo 2 -> 261 = PWM 16 (LED PWM local)
+[   106.861] I [MAESTRO] IR Esclavo 2 -> 157 = PWM 9 (LED PWM local)
+[   107.061] I [MAESTRO] IR Esclavo 2 -> 216 = PWM 13 (LED PWM local)
+[   107.127] I [MAESTRO] ciclos=536 fallos=0 (0.0%) t_ciclo=133ms | ID=2 DI=0 IR=216 -> PWM=13
+      E1 pausa 107s            sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          76tx 0err (0.0%)  acum: 1639tx 0err (0.0%)
+[   107.261] I [MAESTRO] IR Esclavo 2 -> 538 = PWM 33 (LED PWM local)
+[   107.461] I [MAESTRO] IR Esclavo 2 -> 1074 = PWM 67 (LED PWM local)
+[   107.661] I [MAESTRO] IR Esclavo 2 -> 285 = PWM 17 (LED PWM local)
+[   107.861] I [MAESTRO] IR Esclavo 2 -> 467 = PWM 29 (LED PWM local)
+[   108.061] I [MAESTRO] IR Esclavo 2 -> 1238 = PWM 77 (LED PWM local)
+[   108.260] I [MAESTRO] IR Esclavo 2 -> 1423 = PWM 88 (LED PWM local)
+[   108.460] I [MAESTRO] IR Esclavo 2 -> 948 = PWM 59 (LED PWM local)
+[   108.660] I [MAESTRO] IR Esclavo 2 -> 1148 = PWM 71 (LED PWM local)
+[   108.865] I [MAESTRO] IR Esclavo 2 -> 1350 = PWM 84 (LED PWM local)
+[   109.065] I [MAESTRO] IR Esclavo 2 -> 1501 = PWM 93 (LED PWM local)
+[   109.265] I [MAESTRO] IR Esclavo 2 -> 1593 = PWM 99 (LED PWM local)
+[   109.465] I [MAESTRO] IR Esclavo 2 -> 1392 = PWM 87 (LED PWM local)
+[   109.660] I [MAESTRO] IR Esclavo 2 -> 1681 = PWM 105 (LED PWM local)
+[   109.860] I [MAESTRO] IR Esclavo 2 -> 1332 = PWM 83 (LED PWM local)
+[   110.060] I [MAESTRO] IR Esclavo 2 -> 499 = PWM 31 (LED PWM local)
+[   110.460] I [MAESTRO] IR Esclavo 2 -> 334 = PWM 20 (LED PWM local)
+[   110.661] I [MAESTRO] IR Esclavo 2 -> 436 = PWM 27 (LED PWM local)
+[   110.856] I [MAESTRO] IR Esclavo 2 -> 599 = PWM 37 (LED PWM local)
+[   111.660] I [MAESTRO] IR Esclavo 2 -> 402 = PWM 25 (LED PWM local)
+[   111.865] I [MAESTRO] IR Esclavo 2 -> 704 = PWM 44 (LED PWM local)
+[   112.065] I [MAESTRO] IR Esclavo 2 -> 936 = PWM 58 (LED PWM local)
+[   112.261] I [MAESTRO] IR Esclavo 2 -> 555 = PWM 34 (LED PWM local)
+[   112.297] I [MAESTRO] ciclos=562 fallos=0 (0.0%) t_ciclo=103ms | ID=2 DI=0 IR=555 -> PWM=34
+      E1 pausa 112s            sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          89tx 0err (0.0%)  acum: 1728tx 0err (0.0%)
+[   112.461] I [MAESTRO] IR Esclavo 2 -> 376 = PWM 23 (LED PWM local)
+[   112.660] I [MAESTRO] IR Esclavo 2 -> 198 = PWM 12 (LED PWM local)
+[   112.860] I [MAESTRO] IR Esclavo 2 -> 340 = PWM 21 (LED PWM local)
+[   113.265] I [MAESTRO] IR Esclavo 2 -> 152 = PWM 9 (LED PWM local)
+[   113.460] I [MAESTRO] IR Esclavo 2 -> 253 = PWM 15 (LED PWM local)
+[   113.660] I [MAESTRO] IR Esclavo 2 -> 184 = PWM 11 (LED PWM local)
+[   113.861] I [MAESTRO] IR Esclavo 2 -> 229 = PWM 14 (LED PWM local)
+[   114.060] I [MAESTRO] IR Esclavo 2 -> 114 = PWM 7 (LED PWM local)
+[   114.465] I [MAESTRO] IR Esclavo 2 -> 62 = PWM 3 (LED PWM local)
+[   114.665] I [MAESTRO] IR Esclavo 2 -> 238 = PWM 14 (LED PWM local)
+[   115.060] I [MAESTRO] IR Esclavo 2 -> 67 = PWM 4 (LED PWM local)
+[   115.260] I [MAESTRO] IR Esclavo 2 -> 115 = PWM 7 (LED PWM local)
+[   115.460] I [MAESTRO] IR Esclavo 2 -> 31 = PWM 1 (LED PWM local)
+[   115.660] I [MAESTRO] IR Esclavo 2 -> 120 = PWM 7 (LED PWM local)
+                                                                  115.865] I [MAESTRO] IR Esclavo 2 -> 222 = PWM 13 (LED PWM local)
+[   116.061] I [MAESTRO] IR Esclavo 2 -> 384 = PWM 24 (LED PWM local)
+[   116.261] I [MAESTRO] IR Esclavo 2 -> 522 = PWM 32 (LED PWM local)
+[   116.461] I [MAESTRO] IR Esclavo 2 -> 615 = PWM 38 (LED PWM local)
+[   116.661] I [MAESTRO] IR Esclavo 2 -> 359 = PWM 22 (LED PWM local)
+[   117.065] I [MAESTRO] IR Esclavo 2 -> 1168 = PWM 73 (LED PWM local)
+[   117.265] I [MAESTRO] IR Esclavo 2 -> 1036 = PWM 64 (LED PWM local)
+[   117.301] I [MAESTRO] ciclos=587 fallos=0 (0.0%) t_ciclo=107ms | ID=2 DI=0 IR=1036 -> PWM=64
+      E1 pausa 117s            sin sondeo  acum: sin transacciones
+   -> E2 ACTIVO          75tx 0err (0.0%)  acum: 1803tx 0err (0.0%)
+[   117.865] I [MAESTRO] IR Esclavo 2 -> 1625 = PWM 101 (LED PWM local)
+[   118.065] I [MAESTRO] IR Esclavo 2 -> 1447 = PWM 90 (LED PWM local)
+[   118.260] I [MAESTRO] IR Esclavo 2 -> 866 = PWM 54 (LED PWM local)
+[   118.461] I [MAESTRO] IR Esclavo 2 -> 756 = PWM 47 (LED PWM local)
+[   118.660] I [MAESTRO] IR Esclavo 2 -> 349 = PWM 21 (LED PWM local)
+[   118.860] I [MAESTRO] IR Esclavo 2 -> 1108 = PWM 69 (LED PWM local)
+[   119.060] I [MAESTRO] IR Esclavo 2 -> 248 = PWM 15 (LED PWM local)
+[   119.260] I [MAESTRO] IR Esclavo 2 -> 299 = PWM 18 (LED PWM local)
+[   119.460] I [MAESTRO] IR Esclavo 2 -> 579 = PWM 36 (LED PWM local)
+[   119.660] I [MAESTRO] IR Esclavo 2 -> 972 = PWM 60 (LED PWM local)
+[   119.860] I [MAESTRO] IR Esclavo 2 -> 1048 = PWM 65 (LED PWM local)
+[   120.060] I [MAESTRO] IR Esclavo 2 -> 1159 = PWM 72 (LED PWM local)
+[   120.464] I [MAESTRO] IR Esclavo 2 -> 948 = PWM 59 (LED PWM local)
+[   120.661] I [MAESTRO] IR Esclavo 2 -> 900 = PWM 56 (LED PWM local)
+[   120.993] A [MAESTRO] Seleccion -> Esclavo 1 (cambios=1 rechazos=0)
+[   121.035] I [MAESTRO] DI Esclavo 1 -> 0 (LED digital local)
+[   121.076] I [MAESTRO] IR Esclavo 1 -> 0 = PWM 0 (LED PWM local)
+[   122.318] I [MAESTRO] ciclos=612 fallos=0 (0.0%) t_ciclo=125ms | ID=1 DI=0 IR=0 -> PWM=0
+   -> E1 ACTIVO          22tx 0err (0.0%)  acum: 22tx 0err (0.0%)
+      E2 pausa 1s        54tx 0err (0.0%)  acum: 1857tx 0err (0.0%)
+[   127.514] I [MAESTRO] ciclos=638 fallos=0 (0.0%) t_ciclo=121ms | ID=1 DI=0 IR=0 -> PWM=0
+   -> E1 ACTIVO          78tx 0err (0.0%)  acum: 100tx 0err (0.0%)
+      E2 pausa 6s              sin sondeo  acum: 1857tx 0err (0.0%)
+[   132.514] I [MAESTRO] ciclos=663 fallos=0 (0.0%) t_ciclo=121ms | ID=1 DI=0 IR=0 -> PWM=0
+   -> E1 ACTIVO          80tx 0err (0.0%)  acum: 180tx 0err (0.0%)
+      E2 pausa 11s             sin sondeo  acum: 1857tx 0err (0.0%)
+[   137.524] I [MAESTRO] ciclos=688 fallos=0 (0.0%) t_ciclo=131ms | ID=1 DI=0 IR=0 -> PWM=0
+   -> E1 ACTIVO          85tx 0err (0.0%)  acum: 265tx 0err (0.0%)
+      E2 pausa 16s             sin sondeo  acum: 1857tx 0err (0.0%)
+[   142.529] I [MAESTRO] ciclos=713 fallos=0 (0.0%) t_ciclo=135ms | ID=1 DI=0 IR=0 -> PWM=0
+   -> E1 ACTIVO          81tx 0err (0.0%)  acum: 346tx 0err (0.0%)
+      E2 pausa 21s             sin sondeo  acum: 1857tx 0err (0.0%)
+[   147.718] I [MAESTRO] ciclos=739 fallos=0 (0.0%) t_ciclo=125ms | ID=1 DI=0 IR=0 -> PWM=0
+   -> E1 ACTIVO          78tx 0err (0.0%)  acum: 424tx 0err (0.0%)
+      E2 pausa 26s             sin sondeo  acum: 1857tx 0err (0.0%)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Traceback (most recent call last):
+  File "<stdin>", line 1449, in <module>
+  File "<stdin>", line 1445, in main
+  File "<stdin>", line 1290, in ejecutar_paso
+  File "<stdin>", line 1124, in _accion_espera
+KeyboardInterrupt: 
+
+MPY: soft reboot
+MicroPython v1.28.0 on 2026-04-06; Generic ESP32 module with ESP32
+Type "help()" for more information.
+>>> 
+log esclavo 2:
+>>> %Run -c $EDITOR_CONTENT
+
+MPY: soft reboot
+[     0.023] I [ESCLAVO 2] Bus instrumentado (atributo _itf): TX y RX bajo observacion
+==========================================================
+ESCLAVO MODBus RTU  |  Unit ID = 2
+Bus: 9600 baudios, 8N1
+UART2  TX=GPIO17  RX=GPIO16  DE/RE=GPIO4
+Registros: DI 10001 | IR 30001 | Coil 00001 | HR 40001
+Nivel de traza: 3 (0 silencio ... 5 trama)
+==========================================================
+[     0.070] I [ESCLAVO 2] Coil 00001 -> 0  (LED digital, transicion nro 0)
+[     0.072] I [ESCLAVO 2] HR 40001 -> 0  (LED PWM, transicion nro 0)
+[     5.072] I [ESCLAVO 2] HR 40001 -> 89  (LED PWM, transicion nro 1)
+[     5.076] I [ESCLAVO 2] latido: tramas=4 propias=4 ajenas=0 errores=0 | DI=0 IR=4095
+[    10.079] I [ESCLAVO 2] latido: tramas=79 propias=79 ajenas=0 errores=0 | DI=0 IR=3384
+[    12.217] I [ESCLAVO 2] HR 40001 -> 92  (LED PWM, transicion nro 2)
+[    12.409] I [ESCLAVO 2] HR 40001 -> 116  (LED PWM, transicion nro 3)
+[    12.605] I [ESCLAVO 2] HR 40001 -> 149  (LED PWM, transicion nro 4)
+[    12.805] I [ESCLAVO 2] HR 40001 -> 176  (LED PWM, transicion nro 5)
+[    13.005] I [ESCLAVO 2] HR 40001 -> 181  (LED PWM, transicion nro 6)
+[    13.410] I [ESCLAVO 2] HR 40001 -> 197  (LED PWM, transicion nro 7)
+[    13.605] I [ESCLAVO 2] HR 40001 -> 255  (LED PWM, transicion nro 8)
+[    14.809] I [ESCLAVO 2] HR 40001 -> 206  (LED PWM, transicion nro 9)
+[    15.006] I [ESCLAVO 2] HR 40001 -> 149  (LED PWM, transicion nro 10)
+[    15.105] I [ESCLAVO 2] latido: tramas=164 propias=164 ajenas=0 errores=0 | DI=0 IR=0
+[    15.208] I [ESCLAVO 2] HR 40001 -> 141  (LED PWM, transicion nro 11)
+[    15.610] I [ESCLAVO 2] HR 40001 -> 106  (LED PWM, transicion nro 12)
+[    15.806] I [ESCLAVO 2] HR 40001 -> 51  (LED PWM, transicion nro 13)
+[    16.006] I [ESCLAVO 2] HR 40001 -> 37  (LED PWM, transicion nro 14)
+[    16.410] I [ESCLAVO 2] HR 40001 -> 4  (LED PWM, transicion nro 15)
+[    16.616] I [ESCLAVO 2] HR 40001 -> 0  (LED PWM, transicion nro 16)
+[    20.105] I [ESCLAVO 2] latido: tramas=245 propias=245 ajenas=0 errores=0 | DI=0 IR=0
+[    25.105] I [ESCLAVO 2] latido: tramas=320 propias=320 ajenas=0 errores=0 | DI=0 IR=3569
+[    30.105] I [ESCLAVO 2] latido: tramas=395 propias=395 ajenas=0 errores=0 | DI=0 IR=4095
+[    35.105] I [ESCLAVO 2] latido: tramas=470 propias=470 ajenas=0 errores=0 | DI=0 IR=4095
+[    40.105] I [ESCLAVO 2] latido: tramas=545 propias=545 ajenas=0 errores=0 | DI=0 IR=3997
+[    45.105] I [ESCLAVO 2] latido: tramas=620 propias=620 ajenas=0 errores=0 | DI=0 IR=4095
+[    50.105] I [ESCLAVO 2] latido: tramas=695 propias=695 ajenas=0 errores=0 | DI=0 IR=4095
+[    55.105] I [ESCLAVO 2] latido: tramas=770 propias=770 ajenas=0 errores=0 | DI=0 IR=4095
+[    60.105] I [ESCLAVO 2] latido: tramas=845 propias=845 ajenas=0 errores=0 | DI=1 IR=4095
+[    65.106] I [ESCLAVO 2] latido: tramas=920 propias=920 ajenas=0 errores=0 | DI=0 IR=3112
+[    70.106] I [ESCLAVO 2] latido: tramas=995 propias=995 ajenas=0 errores=0 | DI=0 IR=31
+[    75.106] I [ESCLAVO 2] latido: tramas=1070 propias=1070 ajenas=0 errores=0 | DI=0 IR=275
+[    80.106] I [ESCLAVO 2] latido: tramas=1145 propias=1145 ajenas=0 errores=0 | DI=0 IR=1613
+[    85.106] I [ESCLAVO 2] latido: tramas=1220 propias=1220 ajenas=0 errores=0 | DI=0 IR=0
+[    90.106] I [ESCLAVO 2] latido: tramas=1295 propias=1295 ajenas=0 errores=0 | DI=0 IR=0
+[    95.107] I [ESCLAVO 2] latido: tramas=1370 propias=1370 ajenas=0 errores=0 | DI=0 IR=0
+[    96.608] I [ESCLAVO 2] HR 40001 -> 30  (LED PWM, transicion nro 17)
+[    96.812] I [ESCLAVO 2] HR 40001 -> 77  (LED PWM, transicion nro 18)
+[    97.008] I [ESCLAVO 2] HR 40001 -> 92  (LED PWM, transicion nro 19)
+[    97.612] I [ESCLAVO 2] HR 40001 -> 152  (LED PWM, transicion nro 20)
+[    97.808] I [ESCLAVO 2] HR 40001 -> 224  (LED PWM, transicion nro 21)
+[    98.008] I [ESCLAVO 2] HR 40001 -> 255  (LED PWM, transicion nro 22)
+[   100.011] I [ESCLAVO 2] HR 40001 -> 234  (LED PWM, transicion nro 23)
+[   100.107] I [ESCLAVO 2] latido: tramas=1452 propias=1452 ajenas=0 errores=0 | DI=0 IR=0
+[   100.207] I [ESCLAVO 2] HR 40001 -> 173  (LED PWM, transicion nro 24)
+[   100.407] I [ESCLAVO 2] HR 40001 -> 133  (LED PWM, transicion nro 25)
+[   100.607] I [ESCLAVO 2] HR 40001 -> 119  (LED PWM, transicion nro 26)
+[   101.012] I [ESCLAVO 2] HR 40001 -> 86  (LED PWM, transicion nro 27)
+[   101.207] I [ESCLAVO 2] HR 40001 -> 26  (LED PWM, transicion nro 28)
+[   101.408] I [ESCLAVO 2] HR 40001 -> 3  (LED PWM, transicion nro 29)
+[   101.815] I [ESCLAVO 2] HR 40001 -> 0  (LED PWM, transicion nro 30)
+[   105.146] I [ESCLAVO 2] latido: tramas=1535 propias=1535 ajenas=0 errores=0 | DI=0 IR=1615
+[   110.147] I [ESCLAVO 2] latido: tramas=1610 propias=1610 ajenas=0 errores=0 | DI=0 IR=424
+[   112.010] I [ESCLAVO 2] HR 40001 -> 12  (LED PWM, transicion nro 31)
+[   112.211] I [ESCLAVO 2] HR 40001 -> 69  (LED PWM, transicion nro 32)
+[   112.411] I [ESCLAVO 2] HR 40001 -> 120  (LED PWM, transicion nro 33)
+[   112.611] I [ESCLAVO 2] HR 40001 -> 155  (LED PWM, transicion nro 34)
+[   113.210] I [ESCLAVO 2] HR 40001 -> 194  (LED PWM, transicion nro 35)
+[   113.410] I [ESCLAVO 2] HR 40001 -> 255  (LED PWM, transicion nro 36)
+[   114.414] I [ESCLAVO 2] HR 40001 -> 200  (LED PWM, transicion nro 37)
+[   114.610] I [ESCLAVO 2] HR 40001 -> 142  (LED PWM, transicion nro 38)
+[   114.810] I [ESCLAVO 2] HR 40001 -> 105  (LED PWM, transicion nro 39)
+[   115.176] I [ESCLAVO 2] latido: tramas=1695 propias=1695 ajenas=0 errores=0 | DI=0 IR=0
+[   115.208] I [ESCLAVO 2] HR 40001 -> 101  (LED PWM, transicion nro 40)
+[   115.410] I [ESCLAVO 2] HR 40001 -> 45  (LED PWM, transicion nro 41)
+[   115.611] I [ESCLAVO 2] HR 40001 -> 0  (LED PWM, transicion nro 42)
+[   120.179] I [ESCLAVO 2] latido: tramas=1773 propias=1773 ajenas=0 errores=0 | DI=0 IR=309
+[   125.187] I [ESCLAVO 2] latido: tramas=1848 propias=1848 ajenas=0 errores=0 | DI=0 IR=1804
+[   130.205] I [ESCLAVO 2] latido: tramas=1983 propias=1857 ajenas=126 errores=0 | DI=0 IR=836
+[   135.215] I [ESCLAVO 2] latido: tramas=2129 propias=1857 ajenas=272 errores=0 | DI=0 IR=745
+[   140.221] I [ESCLAVO 2] latido: tramas=2290 propias=1857 ajenas=433 errores=0 | DI=0 IR=0
+[   145.223] I [ESCLAVO 2] latido: tramas=2455 propias=1857 ajenas=598 errores=0 | DI=0 IR=0
+[   150.229] I [ESCLAVO 2] latido: tramas=2595 propias=1857 ajenas=738 errores=0 | DI=0 IR=531
+[   155.235] I [ESCLAVO 2] latido: tramas=2738 propias=1857 ajenas=881 errores=0 | DI=0 IR=0
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Traceback (most recent call last):
+  File "<stdin>", line 522, in <module>
+  File "<stdin>", line 491, in main
+  File "/lib/umodbus/modbus.py", line 64, in process
+  File "/lib/umodbus/serial.py", line 432, in get_request
+  File "diagnostico.py", line 1693, in leer_trama
+  File "/lib/umodbus/serial.py", line 236, in _uart_read_frame
+KeyboardInterrupt: 
+
+MPY: soft reboot
+MicroPython v1.28.0 on 2026-04-06; Generic ESP32 module with ESP32
+Type "help()" for more information.
+>>> 

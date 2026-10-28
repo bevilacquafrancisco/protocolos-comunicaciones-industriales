@@ -1,0 +1,5 @@
+# Dependencias Python de la Tarea 2 (version probada en la PC con prueba_local.py).
+# gpiozero y lgpio se instalan con apt en la Raspberry Pi (python3-gpiozero,
+# python3-lgpio) y el entorno virtual se crea con --system-site-packages:
+# asi no hay que compilar lgpio. Ver README.md §4.
+asyncua==2.1.0

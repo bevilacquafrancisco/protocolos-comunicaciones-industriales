@@ -1,0 +1,347 @@
+"""
+config.py
+Autores: Bevilacqua Francisco, Peralta Agustina
+Fecha de creacion: 2026-09-01
+Version: 1.0 
+
+Descripcion general
+-------------------
+Parametros de configuracion compartidos por los tres nodos del trabajo practico
+(Maestro, Esclavo 1 y Esclavo 2): asignacion de pines, parametros de la linea
+serie RS-485, mapa de direcciones MODBus y constantes de temporizacion.
+
+Este modulo NO contiene logica: es la unica fuente de verdad para los valores que
+deben coincidir entre los tres firmwares. Centralizarlo evita la clase de error
+mas cara del trabajo, que es tener un nodo configurado a 9600 baudios y otro a
+19200 y perder horas diagnosticando el bus.
+
+La justificacion numerica de cada valor esta en docs/arquitectura.md (pines y niveles
+electricos), en docs/protocolo-comunicacion.md (baudrate, paridad, timing) y en
+docs/mapa-registros.md (direcciones, rangos y escalas).
+
+Dependencias externas
+---------------------
+Ninguna. Se importa tanto desde MicroPython como desde CPython (las herramientas
+de analisis de tramas en herramientas/ leen de aca los parametros del bus).
+"""
+
+# =============================================================================
+# 1. PARAMETROS DE LA LINEA SERIE (identicos en TODOS los nodos y en Modbus Poll)
+# =============================================================================
+
+#: Velocidad del bus en baudios.
+#: 9600 y no 19200/115200: a 9600 el intervalo inter-caracter permitido antes de
+#: descartar una trama (t1,5) es de 1,72 ms, suficiente para absorber una pausa
+#: del recolector de basura de MicroPython. A 115200 ese margen cae a 143 us y
+#: una sola pausa del GC corrompe la recepcion. Ver docs/protocolo-comunicacion.md §3.1.
+BAUDRATE = 9600
+
+#: Bits de datos. En modo RTU son obligatoriamente 8 (el modo ASCII usa 7).
+BITS_DATOS = 8
+
+#: Paridad. None = sin paridad. La trama ya viaja protegida por CRC-16, que es
+#: estrictamente mas fuerte que la paridad. Ver docs/protocolo-comunicacion.md §3.3.
+PARIDAD = None
+
+#: Bits de parada.
+#: Matiz que conviene conocer: la especificacion de MODBus serie exige que el
+#: caracter ocupe 11 bits, y por eso indica DOS bits de parada cuando no se usa
+#: paridad. En la practica, machine.UART de MicroPython y la mayoria de los
+#: conversores USB-RS485 usan uno solo, dando 10 bits por caracter. La diferencia
+#: afecta el calculo de t1,5/t3,5 en un 10 %, muy por debajo del margen que da
+#: haber elegido 9600 baudios. Los calculos de este proyecto usan el valor
+#: conservador de 11 bits por caracter, que sobreestima los tiempos y deja del
+#: lado seguro. Ver docs/protocolo-comunicacion.md §3.4.
+BITS_PARADA = 1
+
+#: Identificador del periferico UART del ESP32. Se usa el UART2 porque el UART0
+#: esta ocupado por la consola REPL de MicroPython sobre USB: si se usara el
+#: UART0 para el bus, cada mensaje de depuracion se inyectaria en el bus RS-485.
+UART_ID = 2
+
+
+# =============================================================================
+# 2. ASIGNACION DE PINES
+# =============================================================================
+# Criterios de seleccion y descarte de GPIO documentados en docs/arquitectura.md §8.1.
+# Resumen: se evitan GPIO 6-11 (flash SPI interna), GPIO 0/2/12/15 (strapping,
+# afectan el modo de arranque) y se usa ADC1 (GPIO 32-39) por compatibilidad
+# futura con WiFi.
+
+# --- Interfaz RS-485 (identica en los tres nodos) ---------------------------
+
+#: UART2 TX -> pin DI del MAX485. Conexion directa: el MAX485 exige VIH >= 2,0 V
+#: y el ESP32 entrega 3,3 V (margen de 1,3 V).
+PIN_UART_TX = 17
+
+#: UART2 RX <- pin RO del MAX485, OBLIGATORIAMENTE a traves del divisor
+#: resistivo 2,2 kOhm / 3,3 kOhm. RO entrega hasta ~5 V y el maximo absoluto del
+#: GPIO del ESP32 es 3,6 V. Ver docs/arquitectura.md §4.3.
+PIN_UART_RX = 16
+
+#: Pin de control de direccion del transceptor. Se conecta a DE y a RE unidos
+#: entre si: alto = el nodo transmite, bajo = el nodo escucha. RS-485 es
+#: half-duplex, por lo que el firmware debe conmutar explicitamente este pin
+#: antes y despues de cada transmision (lo hace la libreria umodbus).
+PIN_DE_RE = 4
+
+# --- Perifericos comunes a maestro y esclavos -------------------------------
+
+#: Switch / pulsador. Configurado con pull-up interno, por lo que es ACTIVO EN
+#: BAJO: pin en 0 significa "presionado". Ver perifericos.EntradaDigital.
+PIN_SWITCH = 18
+
+#: Potenciometro. GPIO34 pertenece al ADC1 y es un pin de solo entrada, lo que lo
+#: hace inmune a quedar configurado como salida por error.
+PIN_POTENCIOMETRO = 34
+
+#: LED gobernado de forma digital (on/off).
+PIN_LED_DIGITAL = 19
+
+#: LED gobernado por PWM (intensidad regulable).
+PIN_LED_PWM = 21
+
+# --- Selector (significado distinto segun el nodo) --------------------------
+
+#: En un ESCLAVO: jumper que fija la direccion fisica. Abierto = Unit ID 1,
+#: puenteado a GND = Unit ID 2. Equivale a las llaves DIP de direccionamiento de
+#: un modulo de E/S remoto industrial, y permite que ambos esclavos corran
+#: exactamente el mismo firmware.
+#: En el MAESTRO: switch selector del esclavo destino. Abierto = Esclavo 1,
+#: a GND = Esclavo 2.
+PIN_SELECTOR = 13
+
+# --- Perifericos exclusivos del maestro (Parte 3) ---------------------------
+
+#: LED que indica que la comunicacion en curso es con el Esclavo 1.
+PIN_LED_INDICADOR_1 = 22
+
+#: LED que indica que la comunicacion en curso es con el Esclavo 2.
+PIN_LED_INDICADOR_2 = 23
+
+
+# =============================================================================
+# 3. MAPA DE DIRECCIONES MODBUS
+# =============================================================================
+# Las cuatro variables comparten el offset 0x0000 y eso NO es una colision: cada
+# area de MODBus tiene su propio espacio de direcciones, y el codigo de funcion
+# empleado es el que determina en que area se busca el offset.
+#
+# Correspondencia con la notacion Modicon que pide la consigna:
+#   Discrete Input  0x0000  <->  10001
+#   Input Register  0x0000  <->  30001
+#   Coil            0x0000  <->  00001
+#   Holding Reg.    0x0000  <->  40001
+
+#: Offset del Discrete Input que expone el estado del switch (Modicon 10001).
+#: Se lee con la funcion 0x02 (Read Discrete Inputs). Solo lectura.
+DIR_DISCRETE_INPUT_SWITCH = 0x0000
+
+#: Offset del Input Register que expone el valor crudo del ADC (Modicon 30001).
+#: Se lee con la funcion 0x04 (Read Input Registers). Solo lectura.
+DIR_INPUT_REGISTER_POTE = 0x0000
+
+#: Offset del Coil que gobierna el LED digital (Modicon 00001).
+#: Se lee con 0x01 y se escribe con 0x05 (Write Single Coil).
+DIR_COIL_LED_DIGITAL = 0x0000
+
+#: Offset del Holding Register que gobierna el PWM del LED 2 (Modicon 40001).
+#: Se lee con 0x03 y se escribe con 0x06 (Write Single Register).
+DIR_HOLDING_REGISTER_PWM = 0x0000
+
+
+# =============================================================================
+# 4. DIRECCIONES DE ESCLAVO (Unit ID)
+# =============================================================================
+# Rango valido en MODBus serie: 1 a 247. El 0 se reserva para difusion
+# (broadcast) y no se usa en este trabajo, porque un mensaje de difusion no
+# genera respuesta y por lo tanto no permite confirmar que la orden llego.
+
+ID_ESCLAVO_1 = 1
+ID_ESCLAVO_2 = 2
+
+
+# =============================================================================
+# 5. RANGOS Y ESCALAS
+# =============================================================================
+
+#: Valor maximo del ADC del ESP32 configurado a 12 bits de resolucion.
+#: Un Arduino UNO daria 1023 (10 bits): el rango es una caracteristica del
+#: hardware del esclavo y por eso se documenta en el mapa de registros.
+ADC_MAXIMO = 4095
+
+#: Valor maximo admitido en el Holding Register de PWM. Lo fija la consigna
+#: ("rango 0 a 255"), no el hardware: el ESP32 podria manejar 16 bits de
+#: resolucion de PWM. Se respeta el rango pedido y se convierte internamente.
+PWM_MAXIMO = 255
+
+#: Frecuencia de la portadora PWM en Hz. Muy por encima del umbral de fusion de
+#: parpadeo del ojo humano (~60-90 Hz), por lo que la variacion de intensidad se
+#: percibe continua y no como titileo.
+PWM_FRECUENCIA_HZ = 1000
+
+#: Desplazamiento a derecha para convertir una lectura del ADC (0-4095) al rango
+#: de PWM (0-255). Equivale a dividir por 16, es exacto y no requiere punto
+#: flotante: 4095 >> 4 = 255. Ver docs/mapa-registros.md §5.2.
+DESPLAZAMIENTO_ADC_A_PWM = 4
+
+
+# =============================================================================
+# 6. TEMPORIZACION
+# =============================================================================
+
+#: Periodo del ciclo de sondeo del maestro, en milisegundos.
+#:
+#: NO es un numero elegido "porque queda bien": surge de calcular cuanto tiempo
+#: ocupa el bus un ciclo completo de cuatro transacciones y dejar margen.
+#:
+#:   Bytes por transaccion (peticion + respuesta), segun la especificacion:
+#:     0x02 Read Discrete Inputs   ->  8 +  6 = 14 bytes
+#:     0x04 Read Input Registers   ->  8 +  7 = 15 bytes
+#:     0x05 Write Single Coil      ->  8 +  8 = 16 bytes  (la respuesta es un eco)
+#:     0x06 Write Single Register  ->  8 +  8 = 16 bytes  (la respuesta es un eco)
+#:                                          Total = 61 bytes
+#:
+#:   Tiempo de transmision:  61 bytes x 11 bits/byte / 9600 bit/s = 69,9 ms
+#:   Silencios entre tramas: 8 tramas x t3,5 (4,01 ms)            = 32,1 ms
+#:                                        Ocupacion minima del bus = 102,0 ms
+#:
+#: Con un periodo de 100 ms el bus quedaria al 100 % de ocupacion: no habria
+#: margen para reintentos ni para la latencia de procesamiento del esclavo, y el
+#: sistema entraria en timeouts permanentes. Con 200 ms la ocupacion es del 51 %,
+#: que deja lugar a un reintento completo dentro del mismo ciclo, y la respuesta
+#: al mover el potenciometro sigue percibiendose como instantanea.
+#:
+#: Trade-off explicito: se resigna frecuencia de actualizacion (5 Hz en vez de
+#: 10 Hz) a cambio de margen temporal. Es la decision correcta en un bus
+#: half-duplex, donde saturar el medio no acelera nada: solo genera colisiones
+#: de turno y reintentos.
+PERIODO_SONDEO_MS = 200
+
+#: Tiempo maximo de espera de la respuesta de un esclavo, en milisegundos.
+#: Si vence, la transaccion se da por perdida y el ciclo continua sin bloquearse:
+#: un maestro que se cuelga esperando a un esclavo caido deja de atender al resto
+#: del bus, que es exactamente lo que no debe pasar en un sistema de control.
+TIMEOUT_RESPUESTA_MS = 300
+
+#: Ventana de antirrebote del switch, en milisegundos. Los contactos mecanicos
+#: rebotan tipicamente entre 1 y 10 ms; 20 ms cubre ese fenomeno con margen sin
+#: que el usuario perciba retardo.
+ANTIRREBOTE_MS = 20
+
+#: Cantidad de muestras que se promedian en cada lectura del ADC. El ADC del
+#: ESP32 tiene un ruido de algunas unidades de LSB; sin promediar, el Input
+#: Register cambiaria de valor en cada sondeo aun con el potenciometro quieto, y
+#: el LED PWM del maestro titilaria. 8 muestras es potencia de 2, por lo que el
+#: promedio se calcula con un desplazamiento en vez de una division.
+MUESTRAS_ADC = 8
+
+
+# =============================================================================
+# 5. ROBUSTEZ DEL SONDEO (Parte 3)
+# =============================================================================
+# Esta seccion aparece al incorporar el tercer nodo. Con dos nodos el bus toleraba
+# una politica de fallo binaria; con tres, una perdida esporadica de trama deja de
+# ser un evento raro y pasa a ser parte del regimen normal de operacion, por lo
+# que la reaccion del maestro ante un fallo aislado debe ser proporcional.
+
+#: Reintentos de una misma transaccion antes de darla por perdida.
+#:
+#: MODBus no numera las tramas ni las confirma, de modo que el reintento es el
+#: unico mecanismo de recuperacion que define la especificacion, y es el que usa
+#: cualquier maestro industrial. Las cuatro transacciones del ciclo son
+#: idempotentes -dos lecturas y dos escrituras de valor absoluto, no incrementos-,
+#: por lo que repetir una es seguro por construccion: escribir dos veces el mismo
+#: valor deja el esclavo en el mismo estado que escribirlo una vez.
+#:
+#: Costo en el peor caso: 1 reintento x 300 ms de timeout = 300 ms adicionales
+#: sobre un periodo de 200 ms. El ciclo se estira, pero el maestro nunca se
+#: bloquea indefinidamente y el sistema degrada de forma gradual.
+REINTENTOS_TRANSACCION = 1
+
+#: Tiempo sostenido sin ninguna transaccion exitosa antes de declarar ausente al
+#: esclavo y apagar los LED replicadores locales, en milisegundos.
+#:
+#: Sustituye al criterio anterior, que contaba ciclos consecutivos con fallo. El
+#: cambio corrige un defecto concreto: contando ciclos, tres fallos aislados
+#: separados por ciclos buenos podian igualmente disparar la degradacion, y el
+#: resultado visible era un parpadeo de los LED del maestro. Con un criterio
+#: temporal, la degradacion exige AUSENCIA SOSTENIDA de comunicacion, que es lo
+#: que realmente significa "el esclavo no esta".
+#:
+#: 2000 ms equivalen a diez periodos de sondeo: suficiente para que el operador
+#: distinga una perdida momentanea de una desconexion real.
+MS_PARA_DECLARAR_AUSENTE = 2000
+
+#: Muestras consecutivas coincidentes exigidas para aceptar un cambio del switch
+#: selector del maestro.
+#:
+#: El selector se muestrea una sola vez por ciclo, por lo que un unico pulso
+#: espurio en ese instante desvia las cuatro transacciones del ciclo al esclavo
+#: equivocado. El pull-up interno del ESP32 ronda los 45 kOhm, valor alto: un
+#: cable dupont tendido en paralelo al bus acopla lo suficiente como para
+#: producir ese pulso. Ver diagnostico.EntradaConfirmada.
+CONFIRMACIONES_SELECTOR = 3
+
+#: Variacion minima del valor PWM para reescribirlo en el esclavo.
+#:
+#: El ADC del ESP32 conserva un ruido de algunas unidades aun promediando 8
+#: muestras. Tras el escalado a 0-255 ese ruido se traduce en oscilaciones de una
+#: o dos unidades, que producen un titileo perceptible en el LED del esclavo y,
+#: sobre todo, consumen una transaccion del bus para no cambiar nada. La zona
+#: muerta suprime ambos efectos. Se aplica a la ESCRITURA, no a la lectura: el
+#: Input Register sigue publicando el valor real del conversor.
+ZONA_MUERTA_PWM = 2
+
+
+# =============================================================================
+# 6. DIAGNOSTICO Y TRAZA
+# =============================================================================
+# Ver firmware/comun/diagnostico.py para el detalle de cada nivel.
+#
+#   0 SILENCIO   1 ERROR   2 AVISO   3 INFO   4 DETALLE   5 TRAMA
+#
+# ADVERTENCIA SOBRE EL EFECTO SONDA: cada print() por la consola USB de Thonny
+# cuesta entre 1 y 3 ms. En nivel 5 el esclavo puede tardar mas que el timeout
+# del maestro en volver a atender el bus, generando timeouts que NO existen con
+# la traza apagada. Por eso el nivel 5 se usa en capturas cortas y de a un nodo
+# por vez, nunca en los tres a la vez ni durante una medicion de tasa de error.
+
+#: Nivel de traza activo en este nodo.
+NIVEL_LOG = 3
+
+#: Periodo del resumen estadistico periodico del maestro, en milisegundos.
+PERIODO_RESUMEN_MS = 5000
+
+
+# =============================================================================
+# 7. CAPTURA DE TRAMAS
+# =============================================================================
+# Ver firmware/comun/diagnostico.py, clase CapturaTramas.
+
+#: Cantidad de tramas conservadas en memoria por cada nodo. Con 24 se cubren
+#: tres ciclos de sondeo completos (4 transacciones x 2 tramas por ciclo), que
+#: es el contexto necesario para entender un fallo aislado. Cero desactiva la
+#: captura por completo.
+#:
+#: Costo: cada trama ocupa unos 8 a 12 bytes mas la sobrecarga de una tupla.
+#: Registrarla cuesta microsegundos, frente a los 1 a 3 ms de imprimirla, y por
+#: eso la captura puede quedar activa de forma permanente sin alterar el timing
+#: del bus. Esa es exactamente su razon de ser.
+CAPTURA_TRAMAS = 24
+
+#: Volcar automaticamente la captura cuando una transaccion falla.
+#:
+#: Es la funcion mas util del mecanismo: en el instante de un fallo se imprime
+#: lo que estaba pasando en el bus justo antes, que es la informacion que
+#: explica el fallo y la que resulta imposible de obtener a mano, porque para
+#: cuando el operador reacciona ya se perdio.
+VOLCAR_TRAMAS_AL_FALLAR = True
+
+#: Intervalo minimo entre dos volcados automaticos, en milisegundos.
+#:
+#: Sin este limite, una rafaga de fallos dispararia un volcado por cada uno,
+#: inundaria la consola y -al costar cada volcado unos 50 ms de impresion-
+#: agravaria el propio fallo que se intenta diagnosticar. El limite convierte
+#: la traza en una muestra representativa en lugar de un torrente.
+MS_ENTRE_VOLCADOS = 8000

@@ -17,6 +17,7 @@ académica como para mostrar cómo se trabajo.
 
 - [La materia](#la-materia)
 - [Trabajos](#trabajos)
+  - [Tarea Nº2 — OPC UA cliente-servidor sobre Raspberry Pi](#tarea-nº2--opc-ua-cliente-servidor-sobre-raspberry-pi)
   - [Tarea Nº1 — Red MODBus RTU sobre RS-485](#tarea-nº1--red-modbus-rtu-sobre-rs-485)
   - [Actividad Nº2 — Redes AS-i](#actividad-nº2--redes-as-i)
   - [Actividad Nº1 — Selección de instrumentos industriales](#actividad-nº1--selección-de-instrumentos-industriales)
@@ -55,6 +56,7 @@ entender el contrato que hace eso posible.
 | **Buses de nivel superior** | Profibus DP · integración de subredes de campo bajo un maestro de nivel superior · arranque de motores con SIMOCODE |
 | **MODBus** | Modo RTU y ASCII · modelo de datos de cuatro áreas · códigos de función · CRC-16 · delimitación de tramas por silencio · manejo de excepciones |
 | **Capa física** | RS-485: señalización diferencial, half-duplex, teoría de líneas de transmisión, terminación y polarización · adaptación de niveles lógicos |
+| **OPC UA** | Modelo de información y espacio de direcciones · servicios (Read, Write, Subscription) · transporte binario UA TCP · canal seguro y sesión · certificados X.509 y políticas de seguridad (IEC 62541) |
 | **Arquitectura y seguridad** | Modelo de niveles Purdue / ISA-95 · integración OT/IT · ciberseguridad industrial (IEC 62443) y por qué las prioridades se invierten respecto de IT |
 
 ### Modalidad
@@ -72,14 +74,40 @@ especificaciones de los protocolos y normas.
 |---|---|---|---|---|
 | 1 | [Actividad Nº1](act1/) | Selección de instrumentos e interfaz con PLC | Investigación técnica | Entregado |
 | 2 | [Actividad Nº2](act2/) | Redes AS-i y su integración con Profibus | Análisis de caso real | Entregado |
-| 3 | [**Tarea Nº1**](tarea%201/) | **Red MODBus RTU sobre RS-485 con tres microcontroladores** | **Diseño, implementación y verificación** | **Completo y verificado** |
+| 3 | [**Tarea Nº1**](tarea-1/) | **Red MODBus RTU sobre RS-485 con tres microcontroladores** | **Diseño, implementación y verificación** | **Completo y verificado** |
+| 4 | [**Tarea Nº2**](tarea-2/) | **OPC UA cliente-servidor sobre dos Raspberry Pi** | **Diseño, implementación y verificación** | Implementado y verificado en PC; pendiente el banco |
+
+---
+
+### Tarea Nº2 — OPC UA cliente-servidor sobre Raspberry Pi
+
+> [Documentación completa →](tarea-2/README.md)
+
+Dos **Raspberry Pi** unidas por un enlace **Ethernet punto a punto** intercambian
+el estado de un pulsador y una rampa por **OPC UA** (IEC 62541): una es servidor
+y la otra cliente, ambas en **Node-RED** con la pila **node-opcua**. Se compara la
+lectura por sondeo con la suscripción, se analizan las tramas byte a byte y se
+evalúan los modos de seguridad (None, Sign, SignAndEncrypt) y la autenticación de
+usuario.
+
+#### Verificado en la PC (sin hardware)
+
+| Verificación | Resultado |
+|---|---|
+| Servidor y cliente reales: NodeIds, tipos, EURange, Modo A/B, 3 endpoints, usuario | **15/15** |
+| Decodificador UA Binary propio contra mensajes reales en los tres modos de seguridad | **82/82**, 0 errores en 334 mensajes |
+| Eficiencia de una word: OPC UA frente a MODBus RTU de la Tarea 1 | **0,98 %** frente a **25 %**, pero 730 veces menos tiempo en el medio |
+
+Antes del banco se detectó que el servidor OPC UA de la paleta de Node-RED
+**aceptaba cualquier contraseña**, lo que motivó un cambio de diseño documentado.
+Las mediciones de banco están planificadas en las guías PARTE-1 a PARTE-4.
 
 ---
 
 ### Tarea Nº1 — Red MODBus RTU sobre RS-485
 
 > **El trabajo más extenso del repositorio y el más representativo.**
-> [Documentación completa →](tarea%201/README.md)
+> [Documentación completa →](tarea-1/README.md)
 
 Diseño, construcción y verificación de una red de comunicación industrial con
 tres nodos **ESP32 programados en MicroPython**: un maestro MODBus RTU y dos
@@ -115,7 +143,7 @@ instrumentación del propio firmware o de un banco de pruebas reproducible.
 - **Herramientas de análisis** que corren sin hardware: implementación propia del
   CRC-16 validada contra el vector de prueba estándar, decodificador de tramas y
   analizador pasivo del bus.
-- **[Registro de los problemas encontrados](tarea%201/evidencia/INCONVENIENTES.md)**
+- **[Registro de los problemas encontrados](tarea-1/evidencia/INCONVENIENTES.md)**
   y cómo se resolvieron.
 
 
@@ -171,14 +199,15 @@ consultados están en la carpeta.
 
 | Competencia | Evidencia |
 |---|---|
-| **Firmware embebido** | [Tres nodos en MicroPython](tarea%201/firmware/) con capa de abstracción de hardware, máquina de estados explícita y configuración centralizada |
-| **Protocolos industriales** | [MODBus RTU implementado y analizado](tarea%201/docs/protocolo-comunicacion.md) a nivel de trama, con CRC propio validado contra el vector estándar |
-| **Electrónica y puesta en marcha** | [Adaptación de niveles, líneas de transmisión, terminación y polarización](tarea%201/docs/arquitectura.md), con dimensionamiento calculado y verificado con instrumento |
-| **Diagnóstico sistemático** | [Registro de los tres defectos encontrados](tarea%201/evidencia/INCONVENIENTES.md), con las hipótesis descartadas y el experimento que falsó cada una |
-| **Observabilidad** | [Capa de diagnóstico](tarea%201/firmware/comun/diagnostico.py): traza por niveles, captura de tramas sin alterar el timing del bus, estadística por nodo |
-| **Testing** | [70 verificaciones automáticas](tarea%201/herramientas/prueba_diagnostico.py) que corren en la PC sin hardware, incluidas las de despliegue incompleto |
+| **OPC UA y seguridad** | [Servidor y cliente OPC UA](tarea-2/node-red/) con tres endpoints de seguridad, confianza de certificados y contraseñas con hash; [decodificador propio del transporte binario](tarea-2/herramientas/opcua_tramas.py) validado contra la pila real |
+| **Firmware embebido** | [Tres nodos en MicroPython](tarea-1/firmware/) con capa de abstracción de hardware, máquina de estados explícita y configuración centralizada |
+| **Protocolos industriales** | [MODBus RTU implementado y analizado](tarea-1/docs/protocolo-comunicacion.md) a nivel de trama, con CRC propio validado contra el vector estándar |
+| **Electrónica y puesta en marcha** | [Adaptación de niveles, líneas de transmisión, terminación y polarización](tarea-1/docs/arquitectura.md), con dimensionamiento calculado y verificado con instrumento |
+| **Diagnóstico sistemático** | [Registro de los tres defectos encontrados](tarea-1/evidencia/INCONVENIENTES.md), con las hipótesis descartadas y el experimento que falsó cada una |
+| **Observabilidad** | [Capa de diagnóstico](tarea-1/firmware/comun/diagnostico.py): traza por niveles, captura de tramas sin alterar el timing del bus, estadística por nodo |
+| **Testing** | [70 verificaciones automáticas](tarea-1/herramientas/prueba_diagnostico.py) que corren en la PC sin hardware, incluidas las de despliegue incompleto |
 | **Documentación técnica** | Todo este repositorio. Más de 6000 líneas de documentación con decisiones justificadas y trade-offs explícitos |
-| **Medición sobre opinión** | [Contraste entre el modelo temporal calculado y el medido](tarea%201/docs/protocolo-comunicacion.md), conservando ambos números y explicando la diferencia |
+| **Medición sobre opinión** | [Contraste entre el modelo temporal calculado y el medido](tarea-1/docs/protocolo-comunicacion.md), conservando ambos números y explicando la diferencia |
 
 ### Cómo se trabajo
 
@@ -209,7 +238,15 @@ trabajo, con el análisis de qué implicarían en una instalación real.
 
 ```
 .
-├── tarea 1/          Red MODBus RTU sobre RS-485  ← el trabajo principal
+├── tarea-2/          OPC UA cliente-servidor sobre Raspberry Pi
+│   ├── README.md         Punto de entrada: cumplimiento de la consigna y verificaciones
+│   ├── PARTE-1..4.md     Guías de banco por parte
+│   ├── docs/             Red, modelo de información, protocolo, seguridad
+│   ├── diagramas/        Red, flujo del servidor y del cliente, secuencia de sesión
+│   ├── node-red/         Configuración, módulos OPC UA y flujos (+ guía de puesta a punto)
+│   ├── herramientas/     Decodificador UA Binary, eficiencia, latencia y pruebas
+│   └── evidencia/        Registro de problemas
+├── tarea-1/          Red MODBus RTU sobre RS-485  ← el trabajo principal
 │   ├── README.md         Punto de entrada: matriz de cumplimiento y resultados
 │   ├── PARTE-1/2/3.md    Guías para reproducir el sistema desde cero
 │   ├── docs/             Marco teórico: capa física, protocolo, mapa de registros
@@ -222,8 +259,8 @@ trabajo, con el análisis de qué implicarían en una instalación real.
 └── act1/             Selección de instrumentos: consigna, entrega y datasheets
 ```
 
-**Por dónde empezar:** [tarea 1/README.md](tarea%201/README.md) para el panorama
-general, o [tarea 1/evidencia/INCONVENIENTES.md](tarea%201/evidencia/INCONVENIENTES.md)
+**Por dónde empezar:** [tarea-1/README.md](tarea-1/README.md) para el panorama
+general, o [tarea-1/evidencia/INCONVENIENTES.md](tarea-1/evidencia/INCONVENIENTES.md)
 si interesa más el proceso de diagnóstico que el resultado.
 
 ---
@@ -235,6 +272,7 @@ realizaron con la siguiente autoría:
 
 | Trabajo | Autoría |
 |---|---|
+| Tarea Nº2 — OPC UA | **Francisco Bevilacqua** · **Agustina Peralta** |
 | Tarea Nº1 — MODBus RTU | **Francisco Bevilacqua** · **Agustina Peralta** |
 | Actividad Nº2 — Redes AS-i | **Francisco Bevilacqua** · **Agustina Peralta** |
 | Actividad Nº1 — Instrumentos | **Francisco Bevilacqua** |

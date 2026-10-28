@@ -1,0 +1,402 @@
+[
+  {
+    "id": "7ed3fc1e2bfbd10e",
+    "type": "tab",
+    "label": "T2 · Servidor OPC UA (RPi 1)",
+    "disabled": false,
+    "info": "Generado por generar_flujos.js desde config.js v1. No editar a mano: regenerar."
+  },
+  {
+    "id": "d5befdb56847950a",
+    "type": "comment",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "Tarea 2 · Servidor OPC UA · bloques S1-S7 de diagramas/flujo_servidor.md",
+    "x": 330,
+    "y": 40,
+    "info": "Ver node-red/README.md",
+    "wires": []
+  },
+  {
+    "id": "a39955b1e7d435b8",
+    "type": "inject",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S1 · Arranque",
+    "x": 130,
+    "y": 100,
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "0.5",
+    "topic": "",
+    "payload": "servidorOpcua",
+    "payloadType": "str",
+    "wires": [
+      [
+        "9a7ffa18f07ef0e2"
+      ]
+    ]
+  },
+  {
+    "id": "9a7ffa18f07ef0e2",
+    "type": "function",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S1 · Verificar configuracion",
+    "x": 370,
+    "y": 100,
+    "func": "// =====================================================================\r\n// BLOQUES S1 / C0 · Inicializacion (comun a ambas placas)\r\n// diagramas/flujo_servidor.md S1 · diagramas/flujo_cliente.md C0\r\n// ---------------------------------------------------------------------\r\n// Descripcion: se ejecuta una vez al desplegar el flujo. Verifica que\r\n//   settings.js haya cargado los modulos compartidos y que config.js sea\r\n//   la version que este flujo espera, y lleva los dos LED a su estado\r\n//   seguro (apagados) antes de que exista cualquier dato.\r\n// Entrada: msg del inject de arranque; msg.payload = nombre del modulo\r\n//   OPC UA que esta placa necesita ('servidorOpcua' | 'clienteOpcua').\r\n// Salidas: [1] LED digital (payload 0) · [2] LED PWM (payload 0 %).\r\n// Excepciones: si falta un modulo, informa con node.error() y no envia\r\n//   nada: un nodo mal desplegado avisa, no se comporta a medias.\r\n// =====================================================================\r\nconst VERSION_CONFIG_REQUERIDA = 1;\r\n\r\nconst config = global.get('config');\r\nconst senales = global.get('senales');\r\nconst faltantes = ['config', 'senales', 'opcua', 'pdciRutas', String(msg.payload)].filter((n) => !global.get(n));\r\nif (faltantes.length > 0) {\r\n    node.error('settings.js no cargo: ' + faltantes.join(', ') + ' (ver node-red/README.md §3)');\r\n    node.status({ fill: 'red', shape: 'dot', text: 'falta ' + faltantes.join(', ') });\r\n    return null;\r\n}\r\nif (config.VERSION !== VERSION_CONFIG_REQUERIDA) {\r\n    // Igual que en la Tarea 1: un nodo con configuracion vieja arranca\r\n    // avisando, no aborta.\r\n    node.warn('config.js version ' + config.VERSION + ', este flujo espera ' + VERSION_CONFIG_REQUERIDA);\r\n}\r\nnode.status({ fill: 'green', shape: 'dot', text: 'config v' + config.VERSION });\r\nreturn [{ payload: 0 }, { payload: senales.dutyAPorcentajePiGpiod(0) }];\r\n",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "wires": [
+      [
+        "e0745ad0991cbe4f"
+      ],
+      [
+        "1a531b74d783ede6"
+      ]
+    ]
+  },
+  {
+    "id": "bfa9583fbb9b42f4",
+    "type": "inject",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S3 · Tick 50 ms",
+    "x": 130,
+    "y": 180,
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "0.05",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "0.5",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "wires": [
+      [
+        "73c85629cd9f0894"
+      ]
+    ]
+  },
+  {
+    "id": "fea49b9ece056cf7",
+    "type": "inject",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S3 · Detener rampa",
+    "x": 130,
+    "y": 140,
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": "0.5",
+    "topic": "pausa",
+    "payload": "true",
+    "payloadType": "bool",
+    "wires": [
+      [
+        "73c85629cd9f0894"
+      ]
+    ]
+  },
+  {
+    "id": "a6fc9a93dfe86f5c",
+    "type": "inject",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S3 · Reanudar rampa",
+    "x": 680,
+    "y": 140,
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": "0.5",
+    "topic": "pausa",
+    "payload": "false",
+    "payloadType": "bool",
+    "wires": [
+      [
+        "73c85629cd9f0894"
+      ]
+    ]
+  },
+  {
+    "id": "73c85629cd9f0894",
+    "type": "function",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S3 · Generar rampa diente de sierra",
+    "x": 400,
+    "y": 180,
+    "func": "// =====================================================================\n// BLOQUE S3 · Rampa diente de sierra — Raspberry Pi 1\n// diagramas/flujo_servidor.md, bloque S3 · consigna Parte 2.3\n// ---------------------------------------------------------------------\n// Descripcion: cada 50 ms (inject \"S3 · Tick\") calcula el valor de la\n//   sierra 0-65535 de periodo 4 s A PARTIR DEL RELOJ (senales.sierra) y lo\n//   envia a S2 para publicarlo en Servidor.Rampa.\n//   Los botones \"S3 · Detener rampa\" / \"S3 · Reanudar rampa\" envian\n//   msg.topic = 'pausa' (true/false): con la rampa detenida el valor queda\n//   fijo y la suscripcion solo emite KeepAlive (consigna Parte 3.4).\n// Entrada: msg del inject de 50 ms, o { topic: 'pausa', payload: boolean }.\n// Salida: { topic: 'rampa', payload: UInt16, instante: Date } -> S2.\n// Excepciones: ninguna (senales.sierra solo falla con una config invalida,\n//   que prueba_senales.js descarta antes del despliegue).\n//\n// Firma: senales.sierra(tMs: number, periodoMs: number, tickMs: number,\n//   maximo?: number) : number\n// =====================================================================\nif (msg.topic === 'pausa') {\n    const pausada = msg.payload === true;\n    flow.set('rampaPausada', pausada);\n    node.status(pausada ? { fill: 'grey', shape: 'ring', text: 'rampa detenida' } : {});\n    node.log(new Date().toISOString() + ' rampa ' + (pausada ? 'DETENIDA' : 'reanudada'));\n    return null;\n}\n// Detenida: no se publica nada, asi el valor (y su SourceTimestamp) no cambia.\nif (flow.get('rampaPausada')) return null;\n\nconst config = global.get('config');\nconst senales = global.get('senales');\nconst instante = new Date();\nconst valor = senales.sierra(instante.getTime(), config.senales.periodoSierraMs, config.senales.tickMs,\n    config.senales.maximo);\nflow.set('rampaGenerada', valor); // para la consola (S7)\nreturn { topic: 'rampa', payload: valor, instante };\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "wires": [
+      [
+        "a65574074c6111e5"
+      ]
+    ]
+  },
+  {
+    "id": "7dfff67494d798b7",
+    "type": "pi-gpiod in",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S4 · GPIO pulsador",
+    "x": 130,
+    "y": 240,
+    "host": "127.0.0.1",
+    "port": 8888,
+    "pin": "17",
+    "intype": "PUD_UP",
+    "debounce": "25000",
+    "read": true,
+    "wires": [
+      [
+        "164b372d1777ded7"
+      ]
+    ]
+  },
+  {
+    "id": "164b372d1777ded7",
+    "type": "function",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S4 · Leer pulsador",
+    "x": 370,
+    "y": 240,
+    "func": "// =====================================================================\r\n// BLOQUES S4 / C5 · Lectura del pulsador local (comun a ambas placas)\r\n// diagramas/flujo_servidor.md S4 · diagramas/flujo_cliente.md C5\r\n// ---------------------------------------------------------------------\r\n// Descripcion: convierte el nivel del GPIO en el Boolean del modelo. El\r\n//   pulsador va a GND con pull-up interno: nivel 0 = presionado. El\r\n//   antirrebote lo hace pigpio (set_glitch_filter, 25 000 us) antes de que\r\n//   llegue el mensaje.\r\n// Entrada: msg.payload 0 | 1 desde \"pi gpiod in\" (un mensaje por flanco).\r\n// Salida: { topic: 'pulsador', payload: boolean, instante: Date }\r\n//   -> S2 (servidor: publica Servidor.EstadoPulsador)\r\n//   -> C1 (cliente: escribe Cliente.EstadoPulsador)\r\n// Registro: una linea 'LATENCIA pulsador_local=...' por flanco.\r\n// Excepciones: un payload que no sea 0/1 se descarta con advertencia.\r\n// =====================================================================\r\nconst nivel = Number(msg.payload);\r\nif (nivel !== 0 && nivel !== 1) {\r\n    node.warn('nivel GPIO invalido: ' + msg.payload);\r\n    return null;\r\n}\r\nconst presionado = nivel === 0; // activo en bajo\r\nconst instante = new Date();\r\nflow.set('pulsadorLocal', presionado);\r\n// Marca para medir la latencia pulsador -> LED de la otra placa (Parte 3.4):\r\n// se compara con la linea \"LED digital\" del otro equipo, con los relojes\r\n// sincronizados por chrony (node-red/README.md §14).\r\nnode.log('LATENCIA pulsador_local=' + (presionado ? 'ON' : 'OFF') + ' t=' + instante.toISOString());\r\nreturn { topic: 'pulsador', payload: presionado, instante };\r\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "wires": [
+      [
+        "a65574074c6111e5"
+      ]
+    ]
+  },
+  {
+    "id": "a65574074c6111e5",
+    "type": "function",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S2 · Servidor OPC UA",
+    "x": 680,
+    "y": 210,
+    "func": "// =====================================================================\n// BLOQUES S3 y S4 -> S2 · Publicacion de los datos del servidor\n// diagramas/flujo_servidor.md\n// ---------------------------------------------------------------------\n// Descripcion: recibe la rampa (S3) y el pulsador (S4) y los publica en\n//   Servidor.Rampa y Servidor.EstadoPulsador con setValueFromSource(), que\n//   fija el SourceTimestamp en el instante de generacion.\n// Entrada: msg.topic 'rampa' (payload 0-65535) o 'pulsador' (boolean);\n//   msg.instante (Date) opcional.\n// Salidas: ninguna (las escrituras del cliente salen desde On Start).\n// Excepciones: si el servidor no termino de arrancar, el dato se descarta\n//   y se cuenta: el siguiente tick lo reemplaza.\n// =====================================================================\nconst controlador = context.get('controlador');\nif (!controlador) {\n    context.set('descartados', (context.get('descartados') || 0) + 1);\n    return null;\n}\nconst instante = msg.instante instanceof Date ? msg.instante : new Date();\nif (msg.topic === 'rampa') {\n    controlador.publicarRampa(msg.payload, instante);\n} else if (msg.topic === 'pulsador') {\n    controlador.publicarPulsador(msg.payload === true, instante);\n    node.status({ fill: 'green', shape: msg.payload ? 'dot' : 'ring', text: 'pulsador ' + (msg.payload ? 'ON' : 'OFF') });\n}\nreturn null;\n",
+    "outputs": 3,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "// =====================================================================\n// BLOQUES S2 y S5 · Servidor OPC UA — \"On Start\" de la function node\n// diagramas/flujo_servidor.md, bloques S2 (espacio de direcciones) y\n// S5 (atencion de escrituras)\n// ---------------------------------------------------------------------\n// Descripcion: crea y arranca el servidor con\n//   servidor_opcua.iniciarServidor() y deja el controlador en el contexto\n//   del nodo. Cada escritura del cliente sale por las salidas 1/2.\n// Salidas: [1] Cliente.EstadoPulsador (payload boolean)\n//          [2] Cliente.Rampa (payload 0-65535)\n//          [3] eventos de sesion y canal (payload texto)\n// Excepciones: si el puerto 4840 sigue ocupado por el despliegue\n//   anterior (EADDRINUSE) reintenta hasta 10 veces cada 500 ms; cualquier\n//   otro error se informa en el estado del nodo.\n//\n// Firma de la biblioteca (consigna: \"especificar parametros con tipo\"):\n//   iniciarServidor({ opcua: object, config: object, directorioPki: string,\n//     credenciales: {usuario: string, hashClave: string} | null,\n//     alEscribirCliente: (nombre: string, valor: boolean|number,\n//                         dataValue: DataValue) => void,\n//     registrar: (texto: string) => void }) : Promise<Controlador>\n// =====================================================================\nconst config = global.get('config');\nconst opcua = global.get('opcua');\nconst modulo = global.get('servidorOpcua');\nconst rutas = global.get('pdciRutas');\nconst leerCredenciales = global.get('pdciCredencialesServidor');\n\n// [SEC] Las credenciales se leen del entorno en el momento, a traves de una\n// funcion: el hash nunca queda guardado en el contexto global, que el\n// editor de Node-RED muestra en la barra lateral.\nconst cred = typeof leerCredenciales === 'function' ? leerCredenciales() : null;\nconst credenciales = cred && cred.usuario && cred.hashClave ? cred : null;\nif (!credenciales) node.warn('sin OPCUA_USUARIO/OPCUA_CLAVE_HASH: solo acceso anonimo');\n\nnode.status({ fill: 'yellow', shape: 'ring', text: 'iniciando' });\n\nconst esperar = (ms) => new Promise((r) => setTimeout(r, ms));\nlet controlador = null;\nfor (let intento = 1; intento <= 10 && !controlador; intento++) {\n    try {\n        controlador = await modulo.iniciarServidor({\n            opcua,\n            config,\n            directorioPki: rutas.pkiServidor,\n            credenciales,\n            // ---- BLOQUE S5: atencion de escrituras ----------------------\n            alEscribirCliente: (nombre, valor, dataValue) => {\n                flow.set(nombre, {\n                    valor,\n                    sourceTimestamp: dataValue.sourceTimestamp,\n                    serverTimestamp: dataValue.serverTimestamp,\n                });\n                const m = { topic: nombre, payload: valor };\n                node.send(nombre === 'clientePulsador' ? [m, null, null] : [null, m, null]);\n            },\n            registrar: (texto) => {\n                node.log(texto);\n                node.send([null, null, { topic: 'evento', payload: texto }]);\n            },\n        });\n    } catch (error) {\n        if (error.code === 'EADDRINUSE' && intento < 10) {\n            await esperar(500);\n        } else {\n            node.status({ fill: 'red', shape: 'dot', text: error.message });\n            node.error('no se pudo iniciar el servidor OPC UA: ' + error.message);\n            break;\n        }\n    }\n}\n\nif (controlador) {\n    context.set('controlador', controlador);\n    for (const e of controlador.endpoints()) node.log('Endpoint: ' + e);\n    node.status({ fill: 'green', shape: 'dot', text: 'escuchando :' + config.red.puertoOpcUa });\n}\n",
+    "finalize": "// =====================================================================\n// BLOQUE S2 · Servidor OPC UA — \"On Close\" de la function node\n// ---------------------------------------------------------------------\n// Descripcion: detiene el servidor al redesplegar o al detener Node-RED.\n//   On Close es sincrono en Node-RED: se lanza el cierre sin esperarlo y\n//   sin demora de cortesia (detener(0)), para liberar el puerto 4840 lo\n//   antes posible. Si el nuevo despliegue llega antes, On Start reintenta.\n// =====================================================================\nconst controlador = context.get('controlador');\nif (controlador) {\n    controlador.detener(0).catch((e) => node.warn('cierre del servidor: ' + e.message));\n    context.set('controlador', undefined);\n}\n",
+    "libs": [],
+    "wires": [
+      [
+        "da6c4ea80dfd29fb"
+      ],
+      [
+        "5bed95b936c569f0"
+      ],
+      [
+        "6b27e07b1635c339"
+      ]
+    ]
+  },
+  {
+    "id": "6b27e07b1635c339",
+    "type": "debug",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S2 · Eventos de sesion",
+    "x": 950,
+    "y": 300,
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "wires": []
+  },
+  {
+    "id": "da6c4ea80dfd29fb",
+    "type": "function",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S6 · LED digital",
+    "x": 930,
+    "y": 160,
+    "func": "// =====================================================================\r\n// BLOQUES S6 / C4 · LED digital (comun a ambas placas)\r\n// diagramas/flujo_servidor.md S6 · diagramas/flujo_cliente.md C4\r\n// ---------------------------------------------------------------------\r\n// Descripcion: el LED digital refleja el EstadoPulsador del OTRO equipo\r\n//   (servidor: Cliente.EstadoPulsador; cliente: Servidor.EstadoPulsador).\r\n// Entrada: msg.payload boolean.\r\n// Salida: msg.payload 1 | 0 -> \"pi gpiod out\" en modo digital.\r\n// Registro: una linea 'LATENCIA led_digital=...' por cada cambio.\r\n// Excepciones: un payload que no sea boolean se descarta: nunca se\r\n//   enciende un actuador con un dato de tipo dudoso.\r\n// =====================================================================\r\nif (msg.payload !== true && msg.payload !== false) {\r\n    node.warn('EstadoPulsador no booleano: ' + msg.payload);\r\n    return null;\r\n}\r\nnode.status({ fill: msg.payload ? 'green' : 'grey', shape: 'dot', text: msg.payload ? 'ON' : 'OFF' });\r\n// Marca para medir la latencia (Parte 3.4): solo cuando el LED CAMBIA. En\r\n// Modo A llega el mismo valor 10 veces por segundo; registrar cada uno\r\n// inundaria el registro y no aporta nada.\r\nif (context.get('ultimo') !== msg.payload) {\r\n    context.set('ultimo', msg.payload);\r\n    node.log('LATENCIA led_digital=' + (msg.payload ? 'ON' : 'OFF') + ' t=' + new Date().toISOString());\r\n}\r\nreturn { payload: msg.payload ? 1 : 0 };\r\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "wires": [
+      [
+        "e0745ad0991cbe4f"
+      ]
+    ]
+  },
+  {
+    "id": "5bed95b936c569f0",
+    "type": "function",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S6 · LED PWM",
+    "x": 930,
+    "y": 220,
+    "func": "// =====================================================================\n// BLOQUES S6 / C4 · LED PWM (comun a ambas placas)\n// diagramas/flujo_servidor.md S6 · diagramas/flujo_cliente.md C4\n// consigna Partes 2.4 y 3.7\n// ---------------------------------------------------------------------\n// Descripcion: escala la Rampa recibida del OTRO equipo (UInt16) a ciclo\n//   de trabajo 0-255, con correccion gamma opcional (config.senales), y\n//   la convierte al porcentaje que espera \"pi gpiod out\" en modo PWM.\n// Entrada: msg.payload entero 0-65535.\n// Salida: msg.payload porcentaje 0-100 (exacto para pigpio, ver\n//   senales.dutyAPorcentajePiGpiod); msg.duty con el 0-255 para la traza.\n// Excepciones: un valor fuera de rango se descarta con advertencia.\n//\n// Firmas: senales.escala255(valor: number, maximo?: number,\n//   gamma?: number) : number · senales.dutyAPorcentajePiGpiod(duty: number)\n//   : number\n// =====================================================================\nconst config = global.get('config');\nconst senales = global.get('senales');\nif (!senales.esUInt16(msg.payload)) {\n    node.warn('Rampa fuera de rango: ' + msg.payload);\n    return null;\n}\nconst gamma = config.senales.usarGamma ? config.senales.gamma : 1;\nconst duty = senales.escala255(msg.payload, config.senales.maximo, gamma);\nreturn { payload: senales.dutyAPorcentajePiGpiod(duty), duty };\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "wires": [
+      [
+        "1a531b74d783ede6"
+      ]
+    ]
+  },
+  {
+    "id": "e0745ad0991cbe4f",
+    "type": "pi-gpiod out",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S6 · GPIO LED digital",
+    "x": 1180,
+    "y": 160,
+    "host": "127.0.0.1",
+    "port": 8888,
+    "pin": "27",
+    "set": true,
+    "level": "0",
+    "out": "out",
+    "sermin": "1000",
+    "sermax": "2000",
+    "freq": "800",
+    "wires": []
+  },
+  {
+    "id": "1a531b74d783ede6",
+    "type": "pi-gpiod out",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S6 · GPIO LED PWM",
+    "x": 1180,
+    "y": 220,
+    "host": "127.0.0.1",
+    "port": 8888,
+    "pin": "18",
+    "set": true,
+    "level": "0",
+    "out": "pwm",
+    "sermin": "1000",
+    "sermax": "2000",
+    "freq": "800",
+    "wires": []
+  },
+  {
+    "id": "67e6e1c614b2d605",
+    "type": "inject",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S7 · Cada 1000 ms",
+    "x": 130,
+    "y": 360,
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "1",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "0.5",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "wires": [
+      [
+        "acf16d73eed56967"
+      ]
+    ]
+  },
+  {
+    "id": "acf16d73eed56967",
+    "type": "function",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S7 · Registro en consola",
+    "x": 370,
+    "y": 360,
+    "func": "// =====================================================================\n// BLOQUE S7 · Registro en consola — Raspberry Pi 1\n// diagramas/flujo_servidor.md, bloque S7 · consigna Parte 3.5\n// ---------------------------------------------------------------------\n// Descripcion: una vez por segundo imprime la rampa que genera esta placa,\n//   la que recibe del cliente (Cliente.Rampa) y el SourceTimestamp de ese\n//   dato. Va a node.log(): en la RPi sale por \"journalctl -u nodered\" y por\n//   la consola de node-red-log, sin pasar por el editor.\n// Entrada: msg del inject \"S7 · Cada 1 s\".\n// Salida: msg.payload con la linea (para un nodo debug opcional).\n// Excepciones: ninguna.\n//\n// Por que 1 s y no cada tick: imprimir 20 lineas por segundo suma carga\n// al mismo event loop que genera las senales (el \"efecto sonda\" de la\n// Tarea 1).\n// =====================================================================\nconst generada = flow.get('rampaGenerada');\nconst recibido = flow.get('clienteRampa');\nconst ts = recibido && recibido.sourceTimestamp ? new Date(recibido.sourceTimestamp).toISOString() : 'sin dato';\nconst linea = 'SERVIDOR generada=' + (generada === undefined ? '-' : generada) +\n    ' recibida(Cliente.Rampa)=' + (recibido ? recibido.valor : '-') +\n    ' SourceTimestamp=' + ts;\nnode.log(linea);\nreturn { payload: linea };\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "wires": [
+      [
+        "a764846a9ca9c34c"
+      ]
+    ]
+  },
+  {
+    "id": "a764846a9ca9c34c",
+    "type": "debug",
+    "z": "7ed3fc1e2bfbd10e",
+    "name": "S7 · Consola",
+    "x": 600,
+    "y": 360,
+    "active": false,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "wires": []
+  }
+]
