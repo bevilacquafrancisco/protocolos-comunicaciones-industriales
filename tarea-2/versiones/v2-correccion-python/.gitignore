@@ -1,0 +1,8 @@
+# [SEC] Material criptografico y secretos: nunca al repositorio.
+pki/
+*.pem
+*.der
+*.env
+.env
+
+__pycache__/

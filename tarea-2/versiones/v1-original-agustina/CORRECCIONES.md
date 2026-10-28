@@ -28,6 +28,25 @@ reconexión funcionan. Lo verificado:
 
 Lo que sigue es lo que falta o hay que corregir, en orden de prioridad.
 
+## Estado (2026-10-20)
+
+Todas las correcciones de este documento están **aplicadas y probadas** en
+[`../v2-correccion-python/`](../v2-correccion-python/): código, guía de instalación desde cero
+([README.md](../v2-correccion-python/README.md)) y recorrido completo de la consigna
+([CONSIGNA.md](../v2-correccion-python/CONSIGNA.md)). `../v2-correccion-python/prueba_local.py` las
+verifica en la PC sin placas (50/50). Al aplicarlas aparecieron dos problemas
+que este documento no tenía:
+
+| # | Problema | Consecuencia | Solución en `../v2-correccion-python/` |
+|---|---|---|---|
+| A | El código del §7.3 devuelve `UserRole.Anonymous`, pero la regla por defecto de asyncua (`SimpleRoleRuleset`) **no le permite ningún servicio** al anónimo | UaExpert y el cliente sin usuario quedan sin poder ni leer (`BadUserAccessDenied`) | Regla propia: anónimo lee, navega y se suscribe; `operador` además escribe |
+| B | asyncua **no envía GetEndpoints** al conectar (toma los endpoints de la CreateSessionResponse) | La secuencia de la consigna 4.2 no aparece completa en la captura | El cliente hace el descubrimiento explícito (conexión TCP aparte: HEL, OPN, GetEndpoints, CLO) y verifica que el modo pedido exista |
+
+Otras decisiones nuevas, explicadas en los diagramas de `../v2-correccion-python/diagramas/`:
+pulsador por eventos de gpiozero, LED del servidor por evento de escritura
+(sin sondeo), validación de certificados con carpeta `pki/rechazados/`, y
+`ipv4.never-default` en el perfil de `eth0`.
+
 ---
 
 ## Índice
@@ -53,11 +72,14 @@ Lo que sigue es lo que falta o hay que corregir, en orden de prioridad.
 *"Nota: contraseña: …"* con la contraseña real de las placas, que además sirve
 para SSH y `sudo`.
 
-**Todavía no se filtró** (la carpeta no está en git ni en GitHub). Antes de
-subir nada:
+**Actualización 2026-10-20: ya se filtró.** El `.docx` se subió a GitHub el
+2026-10-14 (commit `65df5b9`) y queda en el historial aunque se borre la línea.
+Por eso:
 
-1. Borrar esa línea del `.docx`.
-2. Cambiar la contraseña en las dos placas: `passwd`.
+1. **Cambiar la contraseña en las dos placas ya:** `passwd`. Es la única medida
+   que la invalida.
+2. Borrar la línea del `.docx` (la guía nueva, `../v2-correccion-python/README.md`, ya no
+   tiene contraseñas).
 3. Recomendado: pasar SSH a **clave pública**. En Windows,
    `ssh-keygen -t ed25519`, y luego copiar el contenido de `id_ed25519.pub`
    a `~/.ssh/authorized_keys` en cada placa.
@@ -235,7 +257,7 @@ el encendido del LED en la otra. Hoy no se mide.
 
 **Corrección.** Imprimir una línea con la hora en el flanco del pulsador y en
 cada cambio del LED, **con este formato exacto**. Así sirve la herramienta del
-grupo `tarea-2/herramientas/medir_latencia.py`, que empareja los eventos y
+grupo `../v3-node-red/herramientas/medir_latencia.py`, que empareja los eventos y
 calcula mínimo, media, mediana, percentil 95 y máximo:
 
 ```python
@@ -249,7 +271,7 @@ print(f"LATENCIA led_digital={'ON' if estado_remoto else 'OFF'} t={ahora()}")
 Requisitos:
 
 1. **Relojes sincronizados** entre las placas: `chrony`, con la RPi 1 como
-   servidor NTP por `eth0`. Procedimiento en `tarea-2/node-red/README.md` §14.
+   servidor NTP por `eth0`. Procedimiento en `../v3-node-red/node-red/README.md` §14.
 2. Guardar la salida de cada placa (`python cliente.py | tee cliente.log`) y en
    la PC correr:
    `python medir_latencia.py servidor.log cliente.log`.
@@ -427,7 +449,7 @@ También medir la latencia de cada modo.
 **Token de identidad (4.9):** en Wireshark, el `ActivateSessionRequest` lleva
 un `UserNameIdentityToken`. El nombre de usuario viaja legible y la contraseña
 cifrada con RSA-OAEP usando el certificado del servidor. Explicación completa
-en `tarea-2/docs/seguridad.md` §5.
+en `../v3-node-red/docs/seguridad.md` §5.
 
 ## 8. Diagramas de flujo y trazabilidad del código
 
@@ -448,7 +470,7 @@ programa.
 
 1. Dibujar los dos diagramas con bloques numerados: **S1…S7** para el servidor
    y **C1…C7** para el cliente. Hay un modelo en
-   `tarea-2/diagramas/flujo_servidor.md` y `flujo_cliente.md`. Los bloques
+   `../v3-node-red/diagramas/flujo_servidor.md` y `flujo_cliente.md`. Los bloques
    tienen que reflejar **tu** código: por ejemplo, tu servidor lee las escrituras
    del cliente por sondeo en el mismo bucle, no por evento.
 2. En el código, marcar cada sección con su bloque:
@@ -494,13 +516,13 @@ que ya está hecho, adaptándolo a lo que vos implementaste:
 
 | Pregunta | Desarrollo | Qué adaptar a tu versión |
 |---|---|---|
-| 1.5 — Red Ethernet punto a punto (física, enlace, red, herramientas) | `tarea-2/docs/arquitectura-red.md` §2 | Tus valores reales: 1000 Mb/s full, `netplan-eth0`, Debian 13 |
-| 2.6 — Cliente-servidor frente a maestro-esclavo; navegar frente a tabla de registros | `tarea-2/docs/modelo-informacion.md` §7 | Que UaExpert navegó tu servidor sin configuración previa |
+| 1.5 — Red Ethernet punto a punto (física, enlace, red, herramientas) | `../v3-node-red/docs/arquitectura-red.md` §2 | Tus valores reales: 1000 Mb/s full, `netplan-eth0`, Debian 13 |
+| 2.6 — Cliente-servidor frente a maestro-esclavo; navegar frente a tabla de registros | `../v3-node-red/docs/modelo-informacion.md` §7 | Que UaExpert navegó tu servidor sin configuración previa |
 
 Falta también **demostrar** que el OPC UA va por `eth0` con la Wi-Fi activa
 (consigna 1.4): `ip route get 192.168.10.1`, `ss -tn | grep 4840` y
 `sudo tcpdump -i wlan0 port 4840`, que no debe mostrar paquetes. Ver
-`tarea-2/PARTE-1.md` §4.
+`../v3-node-red/PARTE-1.md` §4.
 
 ## 10. Correcciones menores
 
