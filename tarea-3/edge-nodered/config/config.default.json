@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "puerto": {
+    "tipo": "serie",
+    "ruta": "/dev/ttyUSB0",
+    "tcp": "127.0.0.1:5020",
+    "baud": 9600,
+    "bitsDatos": 8,
+    "paridad": "none",
+    "bitsParada": 1,
+    "esperaReconfiguracionMs": 300
+  },
+  "esclavo": {
+    "id": 1
+  },
+  "sondeo": {
+    "periodoMs": 250,
+    "timeoutMs": 300,
+    "reintentos": 1,
+    "ausenciaMs": 2000
+  },
+  "mapa": [
+    { "nombre": "Inputs/Pulsador", "fc": 2, "direccion": 0, "tipo": "bool", "escritura": false },
+    { "nombre": "Inputs/Potenciometro", "fc": 4, "direccion": 0, "tipo": "uint16", "escritura": false, "min": 0, "max": 4095 },
+    { "nombre": "Outputs/LedDigital", "fc": 1, "direccion": 0, "tipo": "bool", "escritura": true },
+    { "nombre": "Outputs/LedPWM", "fc": 3, "direccion": 0, "tipo": "uint16", "escritura": true, "min": 0, "max": 255 }
+  ],
+  "derivadas": [
+    { "nombre": "Inputs/Potenciometro_pct", "de": "Inputs/Potenciometro", "factor": 0.0244200244, "decimales": 1 }
+  ],
+  "descubrimiento": {
+    "idDesde": 1,
+    "idHasta": 247,
+    "fc": 3,
+    "direccion": 0,
+    "timeoutMs": 60,
+    "detenerEnPrimero": true,
+    "combinaciones": [
+      { "baud": 19200, "paridad": "even" },
+      { "baud": 9600, "paridad": "none" },
+      { "baud": 9600, "paridad": "even" },
+      { "baud": 19200, "paridad": "none" },
+      { "baud": 38400, "paridad": "even" },
+      { "baud": 38400, "paridad": "none" },
+      { "baud": 115200, "paridad": "even" },
+      { "baud": 115200, "paridad": "none" },
+      { "baud": 9600, "paridad": "odd" },
+      { "baud": 19200, "paridad": "odd" },
+      { "baud": 38400, "paridad": "odd" },
+      { "baud": 115200, "paridad": "odd" }
+    ]
+  }
+}
