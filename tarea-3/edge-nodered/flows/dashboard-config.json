@@ -1,0 +1,264 @@
+[
+    {
+        "id": "65b6ad861f599193",
+        "type": "tab",
+        "label": "Dashboard · configuración",
+        "disabled": false,
+        "info": "Configuracion del maestro en vivo, sin recompilar ni reiniciar (I-04). D1 valida y combina; el maestro valida otra vez y guarda en disco."
+    },
+    {
+        "id": "6f8f5776f1c4effa",
+        "type": "ui-group",
+        "name": "Enlace serie, esclavo y sondeo",
+        "page": "56d8e6461541c477",
+        "width": 6,
+        "height": 1,
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "32a315b6a2593c87",
+        "type": "ui-group",
+        "name": "Probar conexión y trama manual",
+        "page": "56d8e6461541c477",
+        "width": 6,
+        "height": 1,
+        "order": 2,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "2c876d51bbdd5a6c",
+        "type": "ui-group",
+        "name": "Mapa de registros",
+        "page": "56d8e6461541c477",
+        "width": 12,
+        "height": 1,
+        "order": 3,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "e94baf6ef1317347",
+        "type": "ui-group",
+        "name": "Asistente de descubrimiento",
+        "page": "56d8e6461541c477",
+        "width": 12,
+        "height": 1,
+        "order": 4,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "40b44d6ab3ecf5e2",
+        "type": "comment",
+        "z": "65b6ad861f599193",
+        "name": "Configuración en vivo · I-04",
+        "x": 190,
+        "y": 40,
+        "info": "Cada panel es un ui-template (plantillas/*.vue).",
+        "wires": []
+    },
+    {
+        "id": "e935ff3ce6db83dd",
+        "type": "link in",
+        "z": "65b6ad861f599193",
+        "name": "maestro → respuestas (config)",
+        "x": 150,
+        "y": 140,
+        "links": [
+            "e3aa7423ade44b4a"
+        ],
+        "wires": [
+            [
+                "c7ffde063c825136"
+            ]
+        ]
+    },
+    {
+        "id": "c7ffde063c825136",
+        "type": "function",
+        "z": "65b6ad861f599193",
+        "name": "D2 · repartir respuestas",
+        "x": 380,
+        "y": 140,
+        "func": "// =====================================================================\n// D2 · repartir respuestas — Dashboard de configuracion\n// ---------------------------------------------------------------------\n// Descripcion: recibe las respuestas del maestro (salida 5 de M1) y manda a\n//   cada panel solo lo suyo. Guarda la configuracion vigente en el contexto\n//   del flow (la usa D1) y la adjunta en msg.config a TODOS los mensajes: los\n//   ui-template reenvian su ultimo mensaje al recargar la pagina, y asi ningun\n//   panel queda sin la configuracion aunque su ultimo mensaje sea otro.\n// Salidas: [1] enlace y sondeo  [2] mapa de registros  [3] prueba y trama\n//          manual  [4] descubrimiento y exploracion\n// =====================================================================\nif (msg.topic === 'config') flow.set('config', msg.payload);\nmsg.config = flow.get('config') || null;\nif (msg.topic === 'config') msg.origen = msg.origen || 'usuario';\n\nconst copia = () => RED.util.cloneMessage(msg);\nswitch (msg.topic) {\n    case 'config':\n        return [copia(), copia(), copia(), copia()];\n    case 'reconfiguracion':\n        return [copia(), copia(), null, copia()];\n    case 'prueba':\n    case 'trama-manual':\n        return [null, null, msg, null];\n    case 'progreso':\n    case 'descubrimiento':\n    case 'exploracion':\n        return [null, null, null, msg];\n    default:\n        return null;          // escritura, etc.: los atiende el panel de estadisticas\n}\n",
+        "outputs": 4,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "outputLabels": [
+            "enlace",
+            "mapa",
+            "prueba",
+            "descubrimiento"
+        ],
+        "wires": [
+            [
+                "091956baf20cbc3f"
+            ],
+            [
+                "4e209f1d7393cbd9"
+            ],
+            [
+                "570e8c360866c9af"
+            ],
+            [
+                "3f79a23ffc24ebcc"
+            ]
+        ]
+    },
+    {
+        "id": "091956baf20cbc3f",
+        "type": "ui-template",
+        "z": "65b6ad861f599193",
+        "name": "panel enlace",
+        "x": 640,
+        "y": 80,
+        "group": "6f8f5776f1c4effa",
+        "page": "",
+        "ui": "",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<!--\n  enlace.vue — Dashboard de configuracion: puerto, enlace serie, Unit ID y sondeo (I-04)\n  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-09 · v1.0\n  Envia {topic:'aplicar-enlace', payload:{puerto, esclavo, sondeo}} o {topic:'restaurar-fabrica'}.\n  Recibe msg.config (configuracion vigente) y {topic:'reconfiguracion', payload:{ok, errores}}.\n  La validacion definitiva es del maestro (lib/configuracion.js): esto solo ayuda a cargar.\n-->\n<template>\n  <div>\n    <v-alert v-if=\"origen\" density=\"compact\" variant=\"tonal\" class=\"mb-3\"\n             :type=\"origen === 'usuario' ? 'success' : 'warning'\">\n      {{ origen === 'usuario' ? 'Configuración guardada (sobrevive a un reinicio)' : 'Configuración de fábrica' }}\n    </v-alert>\n    <v-row dense>\n      <v-col cols=\"12\" sm=\"4\">\n        <v-select v-model=\"f.tipo\" :items=\"medios\" label=\"Medio\" density=\"compact\"></v-select>\n      </v-col>\n      <v-col cols=\"12\" sm=\"8\">\n        <v-text-field v-if=\"f.tipo === 'serie'\" v-model=\"f.ruta\" label=\"Puerto serie\"\n                      hint=\"/dev/ttyUSB0 en la Raspberry Pi · COM5 en Windows\" density=\"compact\"></v-text-field>\n        <v-text-field v-else v-model=\"f.tcp\" label=\"Simulador TCP (host:puerto)\"\n                      hint=\"solo para desarrollo sin hardware\" density=\"compact\"></v-text-field>\n      </v-col>\n      <v-col cols=\"6\" sm=\"3\">\n        <v-combobox v-model=\"f.baud\" :items=\"bauds\" label=\"Baud rate\" density=\"compact\"></v-combobox>\n      </v-col>\n      <v-col cols=\"6\" sm=\"3\">\n        <v-select v-model=\"f.bitsDatos\" :items=\"[8, 7]\" label=\"Bits de datos\" density=\"compact\"></v-select>\n      </v-col>\n      <v-col cols=\"6\" sm=\"3\">\n        <v-select v-model=\"f.paridad\" :items=\"paridades\" label=\"Paridad\" density=\"compact\"></v-select>\n      </v-col>\n      <v-col cols=\"6\" sm=\"3\">\n        <v-select v-model=\"f.bitsParada\" :items=\"[1, 2]\" label=\"Bits de parada\" density=\"compact\"></v-select>\n      </v-col>\n      <v-col cols=\"6\" sm=\"3\">\n        <v-text-field v-model=\"f.id\" type=\"number\" label=\"Unit ID (1-247)\" density=\"compact\"></v-text-field>\n      </v-col>\n      <v-col cols=\"6\" sm=\"3\">\n        <v-text-field v-model=\"f.timeoutMs\" type=\"number\" label=\"Timeout (ms)\" density=\"compact\"></v-text-field>\n      </v-col>\n      <v-col cols=\"6\" sm=\"3\">\n        <v-text-field v-model=\"f.periodoMs\" type=\"number\" label=\"Período de sondeo (ms)\" density=\"compact\"></v-text-field>\n      </v-col>\n      <v-col cols=\"6\" sm=\"3\">\n        <v-text-field v-model=\"f.reintentos\" type=\"number\" label=\"Reintentos\" density=\"compact\"></v-text-field>\n      </v-col>\n      <v-col cols=\"12\" sm=\"6\">\n        <v-text-field v-model=\"f.ausenciaMs\" type=\"number\" label=\"Ausencia para DEVICE NOT REACHED (ms)\"\n                      hint=\"ADR-014: un fallo aislado no declara al esclavo perdido\" density=\"compact\"></v-text-field>\n      </v-col>\n      <v-col cols=\"12\" sm=\"6\" class=\"d-flex align-center\">\n        <span class=\"text-caption\">t3,5 a este baud rate: <b>{{ t35 }}</b></span>\n      </v-col>\n    </v-row>\n    <div class=\"d-flex flex-wrap ga-2 mt-2\">\n      <v-btn color=\"primary\" @click=\"aplicar\">Aplicar sin reiniciar</v-btn>\n      <v-btn variant=\"outlined\" @click=\"cargar(config)\">Descartar cambios</v-btn>\n      <v-btn variant=\"text\" color=\"warning\" @click=\"send({ topic: 'restaurar-fabrica' })\">Restaurar de fábrica</v-btn>\n    </div>\n    <v-alert v-if=\"resultado\" class=\"mt-3\" density=\"compact\" variant=\"tonal\"\n             :type=\"resultado.ok ? 'success' : 'error'\">\n      <div v-if=\"resultado.ok\">Aplicado y guardado.</div>\n      <div v-for=\"mensaje in resultado.errores\" :key=\"mensaje\">{{ mensaje }}</div>\n    </v-alert>\n  </div>\n</template>\n\n<script>\nexport default {\n  data () {\n    return {\n      f: { tipo: 'serie', ruta: '', tcp: '', baud: 9600, bitsDatos: 8, paridad: 'none', bitsParada: 1,\n           id: 1, timeoutMs: 300, periodoMs: 250, reintentos: 1, ausenciaMs: 2000 },\n      config: null,\n      origen: null,\n      resultado: null,\n      medios: [{ title: 'Puerto serie (RS-485)', value: 'serie' }, { title: 'TCP (simulador)', value: 'tcp' }],\n      bauds: [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200],\n      paridades: [{ title: 'Ninguna (N)', value: 'none' }, { title: 'Par (E)', value: 'even' },\n                  { title: 'Impar (O)', value: 'odd' }]\n    }\n  },\n  computed: {\n    t35 () {\n      const b = Number(this.f.baud)\n      if (!(b > 0)) return '-'\n      return b > 19200 ? '1,75 ms (fijo por norma)' : (3.5 * 11 * 1000 / b).toFixed(3).replace('.', ',') + ' ms'\n    }\n  },\n  watch: {\n    msg: function (m) { this.procesar(m) }\n  },\n  mounted () {\n    if (this.msg) this.procesar(this.msg)\n  },\n  methods: {\n    procesar (m) {\n      if (!m) return\n      if (m.topic === 'config' && m.config) {\n        this.origen = m.origen || 'usuario'\n        this.cargar(m.config)\n      } else if (m.config && !this.config) {\n        this.cargar(m.config)\n      }\n      if (m.topic === 'reconfiguracion') this.resultado = m.payload\n    },\n    cargar (c) {\n      if (!c) return\n      this.config = c\n      this.f = { tipo: c.puerto.tipo, ruta: c.puerto.ruta, tcp: c.puerto.tcp, baud: c.puerto.baud,\n                 bitsDatos: c.puerto.bitsDatos, paridad: c.puerto.paridad, bitsParada: c.puerto.bitsParada,\n                 id: c.esclavo.id, timeoutMs: c.sondeo.timeoutMs, periodoMs: c.sondeo.periodoMs,\n                 reintentos: c.sondeo.reintentos, ausenciaMs: c.sondeo.ausenciaMs }\n    },\n    aplicar () {\n      const f = this.f\n      this.resultado = null\n      this.send({ topic: 'aplicar-enlace', payload: {\n        puerto: { tipo: f.tipo, ruta: f.ruta, tcp: f.tcp, baud: f.baud, bitsDatos: f.bitsDatos,\n                  paridad: f.paridad, bitsParada: f.bitsParada },\n        esclavo: { id: f.id },\n        sondeo: { timeoutMs: f.timeoutMs, periodoMs: f.periodoMs, reintentos: f.reintentos, ausenciaMs: f.ausenciaMs }\n      } })\n    }\n  }\n}\n</script>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "wires": [
+            [
+                "88b7a93ae4d841ca"
+            ]
+        ]
+    },
+    {
+        "id": "4e209f1d7393cbd9",
+        "type": "ui-template",
+        "z": "65b6ad861f599193",
+        "name": "panel mapa",
+        "x": 640,
+        "y": 120,
+        "group": "2c876d51bbdd5a6c",
+        "page": "",
+        "ui": "",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<!--\n  mapa.vue — Dashboard de configuracion: tabla editable del mapa de registros (I-04)\n  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-09 · v1.0\n  Por variable: nombre, codigo de funcion de lectura, direccion (offset, decimal o 0x...),\n  tipo, orden de palabras (32 bits), escritura, min y max. Se agregan y quitan filas.\n  Envia {topic:'aplicar-mapa', payload:[...filas]}. Recibe msg.config y 'reconfiguracion'.\n  NOTA: tablas con <table> nativo y NO con <v-table>: Dashboard 2.0 compila la plantilla con el\n  analizador HTML del navegador, que saca <tr> de cualquier elemento que no sea <table> y deja\n  el v-for fuera de la fila (error \"Cannot read properties of undefined\" en el render).\n-->\n<template>\n  <div>\n    <div class=\"text-caption mb-2\">\n      La dirección es el <b>offset</b> que viaja en la trama (0x0000 = Modicon 40001 para un holding register).\n      Las variables que se escriben usan FC 05 (coil) o FC 06 (holding register).\n    </div>\n    <table class=\"pdci-tabla\" style=\"width: 100%; border-collapse: collapse; font-size: 0.875rem\">\n      <thead>\n        <tr>\n          <th>Nombre</th><th>Lectura</th><th>Dirección</th><th>Modicon</th><th>Tipo</th>\n          <th>Orden</th><th>Escribe</th><th>Mín</th><th>Máx</th><th></th>\n        </tr>\n      </thead>\n      <tbody>\n        <tr v-for=\"(fila, i) in filas\" :key=\"i\">\n          <td style=\"min-width: 210px\"><v-text-field v-model=\"fila.nombre\" density=\"compact\" hide-details variant=\"plain\"></v-text-field></td>\n          <td style=\"min-width: 150px\">\n            <v-select v-model=\"fila.fc\" :items=\"funciones\" density=\"compact\" hide-details variant=\"plain\"\n                      @update:model-value=\"ajustarTipo(fila)\"></v-select>\n          </td>\n          <td style=\"max-width: 100px\"><v-text-field v-model=\"fila.direccion\" density=\"compact\" hide-details variant=\"plain\"></v-text-field></td>\n          <td class=\"text-caption\">{{ modicon(fila) }}</td>\n          <td style=\"min-width: 110px\">\n            <v-select v-model=\"fila.tipo\" :items=\"tiposPara(fila.fc)\" density=\"compact\" hide-details variant=\"plain\"></v-select>\n          </td>\n          <td style=\"min-width: 90px\">\n            <v-select v-if=\"['uint32', 'int32', 'float32'].includes(fila.tipo)\" v-model=\"fila.orden\"\n                      :items=\"['ABCD', 'CDAB']\" density=\"compact\" hide-details variant=\"plain\"></v-select>\n          </td>\n          <td>\n            <v-checkbox v-if=\"Number(fila.fc) === 1 || (Number(fila.fc) === 3 && ['uint16', 'int16'].includes(fila.tipo))\"\n                        v-model=\"fila.escritura\" density=\"compact\" hide-details></v-checkbox>\n          </td>\n          <td style=\"max-width: 70px\"><v-text-field v-model=\"fila.min\" density=\"compact\" hide-details variant=\"plain\"></v-text-field></td>\n          <td style=\"max-width: 70px\"><v-text-field v-model=\"fila.max\" density=\"compact\" hide-details variant=\"plain\"></v-text-field></td>\n          <td><v-btn icon=\"mdi-delete\" size=\"small\" variant=\"text\" @click=\"filas.splice(i, 1)\"></v-btn></td>\n        </tr>\n      </tbody>\n    </table>\n    <div class=\"d-flex flex-wrap ga-2 mt-3\">\n      <v-btn variant=\"outlined\" prepend-icon=\"mdi-plus\" @click=\"agregar\">Agregar variable</v-btn>\n      <v-btn color=\"primary\" @click=\"aplicar\">Aplicar mapa sin reiniciar</v-btn>\n      <v-btn variant=\"text\" @click=\"cargar(config)\">Descartar cambios</v-btn>\n    </div>\n    <v-alert v-if=\"resultado\" class=\"mt-3\" density=\"compact\" variant=\"tonal\" :type=\"resultado.ok ? 'success' : 'error'\">\n      <div v-if=\"resultado.ok\">Mapa aplicado y guardado.</div>\n      <div v-for=\"mensaje in resultado.errores\" :key=\"mensaje\">{{ mensaje }}</div>\n    </v-alert>\n  </div>\n</template>\n\n<script>\nexport default {\n  data () {\n    return {\n      filas: [],\n      config: null,\n      resultado: null,\n      funciones: [\n        { title: '01 Coils', value: 1 }, { title: '02 Discrete Inputs', value: 2 },\n        { title: '03 Holding Registers', value: 3 }, { title: '04 Input Registers', value: 4 }\n      ]\n    }\n  },\n  watch: {\n    msg: function (m) { this.procesar(m) }\n  },\n  mounted () {\n    if (this.msg) this.procesar(this.msg)\n  },\n  methods: {\n    procesar (m) {\n      if (!m) return\n      if ((m.topic === 'config' || !this.config) && m.config) this.cargar(m.config)\n      if (m.topic === 'reconfiguracion') this.resultado = m.payload\n    },\n    cargar (c) {\n      if (!c) return\n      this.config = c\n      this.filas = c.mapa.map((v) => ({ nombre: v.nombre, fc: v.fc, direccion: String(v.direccion), tipo: v.tipo,\n        orden: v.orden || 'ABCD', escritura: !!v.escritura,\n        min: v.min === undefined ? '' : String(v.min), max: v.max === undefined ? '' : String(v.max) }))\n    },\n    tiposPara (fc) {\n      return Number(fc) === 1 || Number(fc) === 2 ? ['bool'] : ['uint16', 'int16', 'uint32', 'int32', 'float32']\n    },\n    ajustarTipo (fila) {\n      const posibles = this.tiposPara(fila.fc)\n      if (!posibles.includes(fila.tipo)) fila.tipo = posibles[0]\n      if (!(Number(fila.fc) === 1 || Number(fila.fc) === 3)) fila.escritura = false\n    },\n    modicon (fila) {\n      // Notacion Modicon: area (0, 1, 3, 4) + offset + 1. Con offset > 9998 se usan 6 digitos.\n      const dir = Number(fila.direccion)\n      if (!Number.isInteger(dir) || dir < 0 || dir > 65535) return '?'\n      const area = { 1: 0, 2: 1, 3: 4, 4: 3 }[Number(fila.fc)]\n      return dir <= 9998 ? String(area * 10000 + dir + 1).padStart(5, '0')\n                         : String(area) + String(dir + 1).padStart(5, '0')\n    },\n    agregar () {\n      this.filas.push({ nombre: 'Nueva/Variable' + (this.filas.length + 1), fc: 3, direccion: '0', tipo: 'uint16',\n        orden: 'ABCD', escritura: false, min: '', max: '' })\n    },\n    aplicar () {\n      this.resultado = null\n      this.send({ topic: 'aplicar-mapa', payload: this.filas.map((f) => {\n        const v = { nombre: f.nombre, fc: Number(f.fc), direccion: f.direccion, tipo: f.tipo,\n          escritura: !!f.escritura, orden: f.orden }\n        if (f.min !== '') v.min = f.min\n        if (f.max !== '') v.max = f.max\n        return v\n      }) })\n    }\n  }\n}\n</script>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "wires": [
+            [
+                "88b7a93ae4d841ca"
+            ]
+        ]
+    },
+    {
+        "id": "570e8c360866c9af",
+        "type": "ui-template",
+        "z": "65b6ad861f599193",
+        "name": "panel prueba",
+        "x": 640,
+        "y": 160,
+        "group": "32a315b6a2593c87",
+        "page": "",
+        "ui": "",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<!--\n  prueba.vue — Dashboard de configuracion: \"Probar conexion\" y trama manual\n  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-09 · v1.0\n  Probar conexion: una peticion con la configuracion vigente; muestra la trama cruda de ida\n  y de vuelta y el resultado de la validacion de CRC.\n  Trama manual: ID + PDU en hexadecimal (sin CRC); el maestro agrega el CRC propio. Sirve\n  para dialogar con un esclavo desconocido con cualquier funcion (riesgo R-05).\n-->\n<template>\n  <div>\n    <div class=\"text-subtitle-2 mb-1\">Probar conexión (Unit ID {{ unitId }})</div>\n    <v-row dense>\n      <v-col cols=\"12\" sm=\"5\"><v-select v-model=\"fc\" :items=\"funciones\" label=\"Función\" density=\"compact\"></v-select></v-col>\n      <v-col cols=\"6\" sm=\"4\"><v-text-field v-model=\"direccion\" label=\"Dirección (dec o 0x…)\" density=\"compact\"></v-text-field></v-col>\n      <v-col cols=\"6\" sm=\"3\"><v-text-field v-model=\"cantidad\" type=\"number\" label=\"Cantidad\" density=\"compact\"></v-text-field></v-col>\n    </v-row>\n    <v-btn color=\"primary\" :loading=\"esperando === 'prueba'\" @click=\"probar\">Probar conexión</v-btn>\n\n    <div class=\"text-subtitle-2 mt-4 mb-1\">Trama manual (sin CRC: lo agrega el maestro)</div>\n    <v-text-field v-model=\"hex\" label=\"ID y PDU en hexadecimal\" placeholder=\"01 03 00 00 00 01\" density=\"compact\"></v-text-field>\n    <v-btn variant=\"outlined\" :loading=\"esperando === 'trama'\" @click=\"trama\">Enviar trama</v-btn>\n\n    <v-card v-if=\"r\" class=\"mt-4 pa-3\" variant=\"tonal\" :color=\"r.ok ? 'success' : 'error'\">\n      <div class=\"text-caption\">{{ titulo }}</div>\n      <div><b>TX</b> <code>{{ r.tx || '-' }}</code></div>\n      <div><b>RX</b> <code>{{ r.rx || '(sin respuesta)' }}</code></div>\n      <div>\n        CRC de la respuesta:\n        <v-chip size=\"small\" :color=\"r.crcValido ? 'success' : (r.crcValido === false ? 'error' : 'grey')\">\n          {{ r.crcValido ? 'válido' : (r.crcValido === false ? 'INVÁLIDO' : 'sin datos') }}\n        </v-chip>\n        · resultado <b>{{ r.errorType }}</b>\n        <span v-if=\"r.latenciaMs !== null && r.latenciaMs !== undefined\"> · {{ r.latenciaMs }} ms</span>\n      </div>\n      <div v-if=\"r.error\">{{ r.error }}</div>\n      <div v-if=\"r.data\">Datos: <code>{{ JSON.stringify(r.data) }}</code></div>\n    </v-card>\n  </div>\n</template>\n\n<script>\nexport default {\n  data () {\n    return {\n      fc: 3, direccion: '0', cantidad: 1, hex: '', unitId: '-',\n      r: null, titulo: '', esperando: null,\n      funciones: [\n        { title: '01 Read Coils', value: 1 }, { title: '02 Read Discrete Inputs', value: 2 },\n        { title: '03 Read Holding Registers', value: 3 }, { title: '04 Read Input Registers', value: 4 }\n      ]\n    }\n  },\n  watch: {\n    msg: function (m) { this.procesar(m) }\n  },\n  mounted () {\n    if (this.msg) this.procesar(this.msg)\n  },\n  methods: {\n    procesar (m) {\n      if (!m) return\n      if (m.config) this.unitId = m.config.esclavo.id\n      if (m.topic === 'prueba' || m.topic === 'trama-manual') {\n        this.r = m.payload\n        this.titulo = m.topic === 'prueba' ? 'Probar conexión' : 'Trama manual'\n        this.esperando = null\n      }\n    },\n    probar () {\n      this.esperando = 'prueba'\n      this.send({ topic: 'probar', payload: { fc: this.fc, direccion: Number(this.direccion), cantidad: Number(this.cantidad) } })\n    },\n    trama () {\n      this.esperando = 'trama'\n      this.send({ topic: 'trama', payload: this.hex })\n    }\n  }\n}\n</script>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "wires": [
+            [
+                "88b7a93ae4d841ca"
+            ]
+        ]
+    },
+    {
+        "id": "3f79a23ffc24ebcc",
+        "type": "ui-template",
+        "z": "65b6ad861f599193",
+        "name": "panel descubrimiento",
+        "x": 640,
+        "y": 200,
+        "group": "e94baf6ef1317347",
+        "page": "",
+        "ui": "",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<!--\n  descubrimiento.vue — Asistente de descubrimiento y exploracion de direcciones (ADR-007, I-04)\n  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-09 · v1.0\n  Descubrir: barre Unit ID x baud x paridad con FC 03 sobre la direccion 0; una respuesta,\n  normal o de EXCEPCION, demuestra que hay un esclavo con esa configuracion. Primero prueba\n  los Unit ID habituales en todas las combinaciones (lib/maestro.js, PRIORITARIOS).\n  \"Aplicar\" pasa la combinacion encontrada al maestro sin reiniciar.\n  Explorar: con el enlace vigente, que direcciones existen para una funcion de lectura;\n  \"Agregar al mapa\" las incorpora.\n  NOTA: tablas con <table> nativo y NO con <v-table>: Dashboard 2.0 compila la plantilla con el\n  analizador HTML del navegador, que saca <tr> de cualquier elemento que no sea <table> y deja\n  el v-for fuera de la fila (error \"Cannot read properties of undefined\" en el render).\n-->\n<template>\n  <div>\n    <v-row dense>\n      <v-col cols=\"6\" sm=\"2\"><v-text-field v-model=\"idDesde\" type=\"number\" label=\"Unit ID desde\" density=\"compact\"></v-text-field></v-col>\n      <v-col cols=\"6\" sm=\"2\"><v-text-field v-model=\"idHasta\" type=\"number\" label=\"hasta\" density=\"compact\"></v-text-field></v-col>\n      <v-col cols=\"6\" sm=\"2\"><v-text-field v-model=\"timeoutMs\" type=\"number\" label=\"Timeout por prueba (ms)\" density=\"compact\"></v-text-field></v-col>\n      <v-col cols=\"6\" sm=\"3\"><v-switch v-model=\"detenerEnPrimero\" label=\"Detener en el primero\" density=\"compact\" hide-details></v-switch></v-col>\n      <v-col cols=\"12\" sm=\"3\" class=\"text-caption\">IDs habituales en todas las combinaciones: <b>{{ fase1 }}</b><br>peor caso (barrido completo): <b>{{ peorCaso }}</b></v-col>\n    </v-row>\n    <div class=\"text-caption mb-1\">Combinaciones (en este orden; la primera es la de fábrica de la norma, 19200 8E1):</div>\n    <div class=\"d-flex flex-wrap ga-1 mb-2\">\n      <v-chip v-for=\"(combinacion, i) in combinaciones\" :key=\"i\" size=\"small\" filter\n              :color=\"combinacion.activa ? 'primary' : undefined\" :variant=\"combinacion.activa ? 'flat' : 'outlined'\"\n              @click=\"combinacion.activa = !combinacion.activa\">{{ combinacion.baud }} {{ combinacion.paridad[0].toUpperCase() }}</v-chip>\n    </div>\n    <div class=\"d-flex flex-wrap ga-2\">\n      <v-btn color=\"primary\" :disabled=\"corriendo\" @click=\"descubrir\">Descubrir esclavo</v-btn>\n      <v-btn variant=\"outlined\" color=\"warning\" :disabled=\"!corriendo\" @click=\"send({ topic: 'cancelar' })\">Cancelar</v-btn>\n    </div>\n    <v-progress-linear v-if=\"corriendo\" class=\"mt-3\" :model-value=\"progreso\" height=\"8\" color=\"primary\"></v-progress-linear>\n    <div v-if=\"corriendo && ultimo\" class=\"text-caption\">probando Unit ID {{ ultimo.id }} a {{ ultimo.combinacion.baud }}\n      {{ ultimo.combinacion.paridad }} · {{ ultimo.probadas }} pruebas</div>\n\n    <v-alert v-if=\"resultado\" class=\"mt-3\" density=\"compact\" variant=\"tonal\"\n             :type=\"resultado.encontrados && resultado.encontrados.length ? 'success' : 'warning'\">\n      {{ resultado.encontrados ? resultado.encontrados.length : 0 }} esclavo(s) en\n      {{ (resultado.duracionMs / 1000).toFixed(1) }} s · {{ resultado.probadas }} pruebas\n      <span v-if=\"resultado.cancelado\">(cancelado)</span>\n    </v-alert>\n    <table v-if=\"resultado && resultado.encontrados && resultado.encontrados.length\" class=\"pdci-tabla\"\n           style=\"width: 100%; border-collapse: collapse; font-size: 0.875rem\">\n      <thead><tr><th>Unit ID</th><th>Baud</th><th>Paridad</th><th>Respuesta</th><th>Segundos</th><th></th></tr></thead>\n      <tbody>\n        <tr v-for=\"hallazgo in resultado.encontrados\" :key=\"hallazgo.id + '-' + hallazgo.baud + hallazgo.paridad\">\n          <td>{{ hallazgo.id }}</td><td>{{ hallazgo.baud }}</td><td>{{ hallazgo.paridad }}</td><td>{{ hallazgo.respuesta }}</td>\n          <td>{{ hallazgo.segundos.toFixed(1) }}</td>\n          <td><v-btn size=\"small\" color=\"primary\" @click=\"aplicar(hallazgo)\">Aplicar</v-btn></td>\n        </tr>\n      </tbody>\n    </table>\n\n    <v-divider class=\"my-4\"></v-divider>\n    <div class=\"text-subtitle-2 mb-1\">Explorar direcciones (con el enlace y el Unit ID vigentes)</div>\n    <v-row dense>\n      <v-col cols=\"12\" sm=\"4\"><v-select v-model=\"xFc\" :items=\"funciones\" label=\"Función\" density=\"compact\"></v-select></v-col>\n      <v-col cols=\"6\" sm=\"3\"><v-text-field v-model=\"xDesde\" label=\"Desde (dec o 0x…)\" density=\"compact\"></v-text-field></v-col>\n      <v-col cols=\"6\" sm=\"3\"><v-text-field v-model=\"xHasta\" label=\"Hasta\" density=\"compact\"></v-text-field></v-col>\n      <v-col cols=\"12\" sm=\"2\"><v-btn variant=\"outlined\" :disabled=\"corriendo\" @click=\"explorar\">Explorar</v-btn></v-col>\n    </v-row>\n    <div v-if=\"exploracion\">\n      <div class=\"text-caption\">{{ exploracion.existentes ? exploracion.existentes.length : 0 }} direcciones existen ·\n        {{ exploracion.excepciones }} excepciones · {{ exploracion.sinRespuesta }} sin respuesta ·\n        {{ (exploracion.duracionMs / 1000).toFixed(1) }} s<span v-if=\"exploracion.error\"> · {{ exploracion.error }}</span></div>\n      <div class=\"d-flex flex-wrap ga-1 mt-1\">\n        <v-chip v-for=\"existente in exploracion.existentes\" :key=\"existente.direccion\" size=\"small\" append-icon=\"mdi-plus\"\n                @click=\"send({ topic: 'agregar-al-mapa', payload: { fc: exploracion.fc, direccion: existente.direccion } })\">\n          0x{{ existente.direccion.toString(16).toUpperCase().padStart(4, '0') }} = {{ existente.valor }}\n        </v-chip>\n      </div>\n    </div>\n  </div>\n</template>\n\n<script>\nexport default {\n  data () {\n    return {\n      idDesde: 1, idHasta: 247, timeoutMs: 60, detenerEnPrimero: true,\n      combinaciones: [], corriendo: false, progreso: 0, ultimo: null, resultado: null,\n      xFc: 3, xDesde: '0', xHasta: '31', exploracion: null, cargado: false,\n      funciones: [{ title: '01 Coils', value: 1 }, { title: '02 Discrete Inputs', value: 2 },\n                  { title: '03 Holding Registers', value: 3 }, { title: '04 Input Registers', value: 4 }]\n    }\n  },\n  computed: {\n    fase1 () {\n      // lib/maestro.js PRIORITARIOS: 1-10, 17 y 247 se prueban primero en todas las combinaciones\n      const combos = this.combinaciones.filter((c) => c.activa).length\n      return Math.round(12 * combos * Number(this.timeoutMs) / 100) / 10 + ' s'\n    },\n    peorCaso () {\n      const ids = Math.max(0, Number(this.idHasta) - Number(this.idDesde) + 1)\n      const combos = this.combinaciones.filter((c) => c.activa).length\n      return Math.round(ids * combos * Number(this.timeoutMs) / 1000) + ' s'\n    }\n  },\n  watch: {\n    msg: function (m) { this.procesar(m) }\n  },\n  mounted () {\n    if (this.msg) this.procesar(this.msg)\n  },\n  methods: {\n    procesar (m) {\n      if (!m) return\n      if (m.config && !this.cargado) {\n        const d = m.config.descubrimiento\n        this.idDesde = d.idDesde; this.idHasta = d.idHasta; this.timeoutMs = d.timeoutMs\n        this.detenerEnPrimero = d.detenerEnPrimero\n        this.combinaciones = d.combinaciones.map((c) => ({ baud: c.baud, paridad: c.paridad, activa: true }))\n        this.cargado = true\n      }\n      if (m.topic === 'progreso') {\n        this.ultimo = m.payload\n        this.progreso = 100 * m.payload.probadas / Math.max(1, m.payload.total)\n      } else if (m.topic === 'descubrimiento') {\n        this.resultado = m.payload; this.corriendo = false\n      } else if (m.topic === 'exploracion') {\n        this.exploracion = m.payload; this.corriendo = false\n      }\n    },\n    descubrir () {\n      this.corriendo = true; this.resultado = null; this.progreso = 0; this.ultimo = null\n      this.send({ topic: 'descubrir', payload: {\n        idDesde: Number(this.idDesde), idHasta: Number(this.idHasta), timeoutMs: Number(this.timeoutMs),\n        detenerEnPrimero: this.detenerEnPrimero,\n        combinaciones: this.combinaciones.filter((c) => c.activa).map((c) => ({ baud: c.baud, paridad: c.paridad }))\n      } })\n    },\n    aplicar (e) {\n      this.send({ topic: 'aplicar-descubierto', payload: { id: e.id, baud: e.baud, paridad: e.paridad } })\n    },\n    explorar () {\n      this.corriendo = true; this.exploracion = null\n      this.send({ topic: 'explorar', payload: { fc: this.xFc, desde: Number(this.xDesde), hasta: Number(this.xHasta) } })\n    }\n  }\n}\n</script>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "wires": [
+            [
+                "88b7a93ae4d841ca"
+            ]
+        ]
+    },
+    {
+        "id": "88b7a93ae4d841ca",
+        "type": "function",
+        "z": "65b6ad861f599193",
+        "name": "D1 · comandos del panel [DF-2.17]",
+        "x": 880,
+        "y": 140,
+        "func": "// =====================================================================\n// D1 · comandos del panel — I-04 (configuracion en vivo)\n// docs/diagramas/flujo-maestro.mmd, bloque [DF-2.17]\n// ---------------------------------------------------------------------\n// Descripcion: traduce lo que manda el Dashboard en comandos para el maestro.\n//   Los cambios parciales (solo el enlace, solo el mapa, el resultado del\n//   descubrimiento) se combinan con la configuracion VIGENTE y salen como una\n//   configuracion completa con topic \"reconfigurar\". La validacion definitiva\n//   la hace el maestro (lib/configuracion.js): el Dashboard es entrada no confiable.\n// Entradas (msg.topic): aplicar-enlace · aplicar-mapa · aplicar-descubierto ·\n//   agregar-al-mapa · restaurar-fabrica · y, sin cambios, probar · trama ·\n//   descubrir · explorar · cancelar · reiniciar-contadores · escribir · pedir-config\n// Salida: comando para M1 (por el link \"-> maestro (comandos)\").\n// =====================================================================\nconst pdci = global.get('pdci');\nconst vigente = flow.get('config');\nconst nueva = () => pdci.configuracion.clonar(vigente);\nconst enviar = (topic, payload) => ({ topic, payload, _origen: 'dashboard' });\n\nif (!vigente && msg.topic !== 'pedir-config' && msg.topic !== 'restaurar-fabrica') {\n    node.warn('todavia no se recibio la configuracion del maestro');\n    return enviar('pedir-config', null);\n}\n\nswitch (msg.topic) {\n    case 'aplicar-enlace': {\n        const c = nueva();\n        const p = msg.payload || {};\n        Object.assign(c.puerto, p.puerto || {});\n        Object.assign(c.esclavo, p.esclavo || {});\n        Object.assign(c.sondeo, p.sondeo || {});\n        return enviar('reconfigurar', c);\n    }\n    case 'aplicar-mapa': {\n        const c = nueva();\n        c.mapa = Array.isArray(msg.payload) ? msg.payload : [];\n        return enviar('reconfigurar', c);\n    }\n    case 'aplicar-descubierto': {\n        // Resultado del asistente: Unit ID, baud y paridad del esclavo encontrado.\n        const c = nueva();\n        const d = msg.payload || {};\n        c.esclavo.id = d.id;\n        Object.assign(c.puerto, { baud: d.baud, paridad: d.paridad });\n        return enviar('reconfigurar', c);\n    }\n    case 'agregar-al-mapa': {\n        // Una direccion hallada por la exploracion pasa al mapa con un nombre generico,\n        // que el operador puede renombrar despues en la tabla.\n        const c = nueva();\n        const { fc, direccion } = msg.payload || {};\n        const esBit = Number(fc) === 1 || Number(fc) === 2;\n        const area = { 1: 'Coil', 2: 'DI', 3: 'HR', 4: 'IR' }[Number(fc)] || 'Var';\n        c.mapa.push({ nombre: `Descubierto/${area}_${Number(direccion)}`, fc: Number(fc), direccion: Number(direccion),\n            tipo: esBit ? 'bool' : 'uint16', escritura: Number(fc) === 1 || Number(fc) === 3 });\n        return enviar('reconfigurar', c);\n    }\n    case 'restaurar-fabrica':\n        return enviar('reconfigurar', pdci.configuracion.cargar(null).config);\n    case 'probar':\n    case 'trama':\n    case 'descubrir':\n    case 'explorar':\n    case 'cancelar':\n    case 'reiniciar-contadores':\n    case 'escribir':\n    case 'pedir-config':\n        return enviar(msg.topic, msg.payload);\n    default:\n        node.warn(`comando del panel desconocido: ${msg.topic}`);\n        return null;\n}\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "outputLabels": [],
+        "wires": [
+            [
+                "5a681df0b2b8b84c"
+            ]
+        ]
+    },
+    {
+        "id": "5a681df0b2b8b84c",
+        "type": "link out",
+        "z": "65b6ad861f599193",
+        "name": "→ maestro (desde config)",
+        "x": 1090,
+        "y": 140,
+        "mode": "link",
+        "links": [
+            "0d8454420aa425af"
+        ],
+        "wires": []
+    }
+]

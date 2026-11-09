@@ -1,0 +1,113 @@
+[
+    {
+        "id": "e860f00baeeb4b76",
+        "type": "ui-base",
+        "name": "PdCI T3 · dispositivo 2",
+        "path": "/dashboard",
+        "appIcon": "",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ],
+        "showPathInSidebar": false,
+        "headerContent": "page",
+        "navigationStyle": "default",
+        "titleBarStyle": "default",
+        "showReconnectNotification": true,
+        "notificationDisplayTime": 1,
+        "showDisconnectNotification": true,
+        "allowInstall": false
+    },
+    {
+        "id": "8ac9864c63e088cf",
+        "type": "ui-theme",
+        "name": "PdCI azul marino",
+        "colors": {
+            "surface": "#1f3864",
+            "primary": "#1f3864",
+            "bgPage": "#f2f4f8",
+            "groupBg": "#ffffff",
+            "groupOutline": "#d0d5de"
+        },
+        "sizes": {
+            "density": "compact",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "4px",
+            "widgetGap": "12px"
+        }
+    },
+    {
+        "id": "f3f5121ae29f50fe",
+        "type": "ui-page",
+        "name": "Estadísticas",
+        "ui": "e860f00baeeb4b76",
+        "path": "/estadisticas",
+        "icon": "chart-box-outline",
+        "layout": "grid",
+        "theme": "8ac9864c63e088cf",
+        "breakpoints": [
+            {
+                "name": "Default",
+                "px": "0",
+                "cols": "3"
+            },
+            {
+                "name": "Tablet",
+                "px": "576",
+                "cols": "6"
+            },
+            {
+                "name": "Small Desktop",
+                "px": "768",
+                "cols": "9"
+            },
+            {
+                "name": "Desktop",
+                "px": "1024",
+                "cols": "12"
+            }
+        ],
+        "order": 1,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
+        "id": "56d8e6461541c477",
+        "type": "ui-page",
+        "name": "Configuración MODBus",
+        "ui": "e860f00baeeb4b76",
+        "path": "/configuracion",
+        "icon": "cog-outline",
+        "layout": "grid",
+        "theme": "8ac9864c63e088cf",
+        "breakpoints": [
+            {
+                "name": "Default",
+                "px": "0",
+                "cols": "3"
+            },
+            {
+                "name": "Tablet",
+                "px": "576",
+                "cols": "6"
+            },
+            {
+                "name": "Small Desktop",
+                "px": "768",
+                "cols": "9"
+            },
+            {
+                "name": "Desktop",
+                "px": "1024",
+                "cols": "12"
+            }
+        ],
+        "order": 2,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    }
+]

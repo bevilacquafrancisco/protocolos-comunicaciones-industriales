@@ -1,0 +1,257 @@
+[
+    {
+        "id": "4816887cddd0d46b",
+        "type": "tab",
+        "label": "MODBus · maestro",
+        "disabled": false,
+        "info": "Maestro MODBus RTU con stack y CRC propios (I-01). Protocolo en lib/modbus.js, maquina de estados en lib/maestro.js, diagrama docs/diagramas/flujo-maestro.mmd. NO usar node-red-contrib-modbus. Generado por generar_flujos.js: no editar a mano."
+    },
+    {
+        "id": "6e6b1fab0c926391",
+        "type": "serial-port",
+        "name": "bus RS-485",
+        "serialport": "/dev/ttyUSB0",
+        "serialbaud": "9600",
+        "databits": 8,
+        "parity": "none",
+        "stopbits": 1,
+        "waitfor": "",
+        "dtr": "none",
+        "rts": "none",
+        "cts": "none",
+        "dsr": "none",
+        "newline": "2",
+        "bin": "bin",
+        "out": "interbyte",
+        "addchar": "",
+        "responsetimeout": 10000
+    },
+    {
+        "id": "b8a23607c9258521",
+        "type": "comment",
+        "z": "4816887cddd0d46b",
+        "name": "Maestro MODBus RTU · F3",
+        "x": 210,
+        "y": 40,
+        "info": "M1 crea el maestro (On Start) y atiende comandos. M2: bytes de serial in. M3: confirmacion de serial control. M4: contadores a disco.",
+        "wires": []
+    },
+    {
+        "id": "d3f13571fe84cffb",
+        "type": "function",
+        "z": "4816887cddd0d46b",
+        "name": "M1 · maestro MODBus [DF-2.1 a DF-2.17]",
+        "x": 560,
+        "y": 180,
+        "func": "// =====================================================================\n// M1 · maestro MODBus — \"On Message\" del function node\n// docs/diagramas/flujo-maestro.mmd, bloques [DF-2.3] (comandos pendientes)\n// y [DF-2.17] (reconfiguracion en vivo, I-04)\n// ---------------------------------------------------------------------\n// Descripcion: atiende los mensajes que llegan al maestro, segun msg.topic:\n//   bytes                bloque recibido por serial in (lo envia M2)\n//   puerto-confirmado    respuesta de serial control (lo envia M3)\n//   escribir             {nombre, valor} desde el Dashboard u OPC UA (F4)\n//   reconfigurar         configuracion completa (la arma D1 desde el Dashboard)\n//   probar               {fc, direccion, cantidad}: una peticion, trama cruda de ida y vuelta\n//   trama                \"ID PDU\" en hexadecimal: el maestro agrega el CRC propio\n//   descubrir            opciones del asistente de descubrimiento\n//   explorar             {fc, desde, hasta}: que direcciones existen\n//   cancelar             corta el descubrimiento o la exploracion\n//   reiniciar-contadores pone en cero OK / CRC_ERROR / TIMEOUT / EXCEPTION\n//   pedir-config         reenvia la configuracion vigente al panel\n// Las respuestas salen por la salida 5 con el topic indicado en cada caso.\n// =====================================================================\nconst pdci = global.get('pdci');\nconst maestro = context.get('maestro');\nif (!maestro) return null;\n\nconst responder = (topic, payload, extra) =>\n    node.send([null, null, null, null, Object.assign({ topic, payload }, extra || {})]);\nconst fallar = (topic, error) => responder(topic, { ok: false, error: String(error && error.message || error) });\n\nswitch (msg.topic) {\n    case 'bytes':\n        maestro.recibir(msg.payload);\n        return null;\n\n    case 'puerto-confirmado':\n        context.get('confirmarPuerto')(msg.payload);\n        return null;\n\n    case 'escribir': {\n        const { nombre, valor } = msg.payload || {};\n        maestro.escribir(nombre, valor)\n            .then((r) => responder('escritura', Object.assign({ nombre, valor }, r), { _origen: msg._origen }))\n            .catch((e) => fallar('escritura', e));\n        return null;\n    }\n\n    case 'reconfigurar':                                         // [DF-2.17]\n        maestro.reconfigurar(msg.payload).then((r) => {\n            if (r.ok) {\n                try {\n                    pdci.configuracion.guardar(pdci.rutas.config, r.config);   // sobrevive al reinicio\n                } catch (e) {\n                    node.warn(`configuracion aplicada pero no guardada: ${e.message}`);\n                    r.errores = (r.errores || []).concat(`no se pudo guardar: ${e.message}`);\n                }\n                responder('config', r.config, { origen: 'usuario' });\n            }\n            responder('reconfiguracion', { ok: r.ok, errores: r.errores });\n        }).catch((e) => fallar('reconfiguracion', e));\n        return null;\n\n    case 'probar':\n        maestro.probar(msg.payload || {}).then((r) => responder('prueba', r)).catch((e) => fallar('prueba', e));\n        return null;\n\n    case 'trama':\n        maestro.tramaManual(String(msg.payload || '')).then((r) => responder('trama-manual', r))\n            .catch((e) => fallar('trama-manual', e));\n        return null;\n\n    case 'descubrir':\n        maestro.descubrir(msg.payload || {}, (p) => responder('progreso', p))\n            .then((r) => responder('descubrimiento', r)).catch((e) => fallar('descubrimiento', e));\n        return null;\n\n    case 'explorar':\n        maestro.explorar(msg.payload || {}).then((r) => responder('exploracion', r))\n            .catch((e) => fallar('exploracion', e));\n        return null;\n\n    case 'cancelar':\n        maestro.cancelar();\n        return null;\n\n    case 'reiniciar-contadores':\n        maestro.reiniciarContadores();\n        return null;\n\n    case 'pedir-config':\n        responder('config', maestro.config);\n        return null;\n\n    default:\n        node.warn(`comando desconocido: ${msg.topic}`);\n        return null;\n}\n",
+        "outputs": 5,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "// =====================================================================\n// M1 · maestro MODBus — \"On Start\" del function node\n// docs/diagramas/flujo-maestro.mmd, bloque [DF-2.1] (inicio)\n// ---------------------------------------------------------------------\n// Descripcion: carga la configuracion persistida (o la de fabrica), crea el\n//   maestro (lib/maestro.js) con un transporte compuesto -puerto serie de\n//   node-red-node-serialport o TCP de desarrollo- y lo arranca.\n//   El protocolo NO lo hace ningun nodo de la paleta: lo hace lib/modbus.js (I-01).\n// Salidas: [1] serial out      Buffer con la trama a transmitir\n//          [2] serial control  {serialport, serialbaud, databits, parity, stopbits, enabled}\n//          [3] estado          instantanea del maestro (max. 2 por segundo) y eventos\n//          [4] valores         una variable que cambio: topic = nombre, payload = valor\n//          [5] respuestas      resultado de cada comando del panel (topic = tipo)\n// Firma de la biblioteca (consigna: \"parametros con tipo\"):\n//   new MaestroModbus({config: object, transporte: {enviar(Buffer): void,\n//       reconfigurar(puerto: object): Promise<void>}}) : MaestroModbus\n// =====================================================================\nconst pdci = global.get('pdci');\nconst { configuracion, MaestroModbus, transportes } = pdci;\n\nconst carga = configuracion.cargar(pdci.rutas.config);\ncarga.avisos.forEach((aviso) => node.warn(aviso));\nconst config = carga.config;\n\n// --- Adaptador del puerto serie de Node-RED ------------------------------\n// serial control responde ANTES de que el puerto termine de reabrir (changePort\n// cierra y la reapertura es asincrona): la espera de asentamiento la hace el\n// maestro con config.puerto.esperaReconfiguracionMs.\nlet confirmarPuerto = null;\nconst serie = {\n    enviar: (trama) => node.send([{ payload: trama }, null, null, null, null]),\n    reconfigurar: (puerto) => new Promise((resolver) => {\n        confirmarPuerto = resolver;\n        node.send([null, { payload: Object.assign(configuracion.paraSerialControl(puerto), { enabled: true }) },\n            null, null, null]);\n        // Si serial control no confirma (puerto inexistente), se sigue: el maestro contara TIMEOUT.\n        setTimeout(() => { if (confirmarPuerto === resolver) { confirmarPuerto = null; resolver(); } }, 2000);\n    }),\n    deshabilitar: () => node.send([null, { payload: { enabled: false } }, null, null, null]),\n};\ncontext.set('confirmarPuerto', (estadoPuerto) => {\n    if (confirmarPuerto) { const r = confirmarPuerto; confirmarPuerto = null; r(estadoPuerto); }\n});\n\nconst transporte = new transportes.TransporteCompuesto(serie);\nconst maestro = new MaestroModbus({ config, transporte });\ntransporte.on('datos', (bloque) => maestro.recibir(bloque));\ntransporte.on('evento', (e) => pdci.historial.agregar(Object.assign({ capa: 'MODBUS' }, e)));\n\n// Contadores persistidos (contexto \"archivo\"): sobreviven a un reinicio.\nmaestro.restaurarContadores(global.get('pdci_contadores', 'archivo'));\n\n// --- Eventos del maestro ---------------------------------------------------\nlet ultimoEstado = null;\nmaestro.on('estado', (s) => {\n    ultimoEstado = s;\n    global.set('pdci_modbus', s);\n    pdci.capas.actualizar('MODBUS', { estado: s.estado, contadores: {\n        OK: s.contadores.OK, CRC_ERROR: s.contadores.CRC_ERROR, TIMEOUT: s.contadores.TIMEOUT,\n        EXCEPTION: s.contadores.EXCEPTION }, detalle: { ultimaTx: s.ultimaTx, ultimaRx: s.ultimaRx,\n        latenciaMs: s.latenciaMs, esclavo: s.esclavo, puerto: s.puerto, ...s.contadores.detalle } });\n});\nmaestro.on('valor', (v) => node.send([null, null, null,\n    { topic: v.nombre, payload: v.valor, calidad: v.calidad, ts: v.ts }, null]));\nmaestro.on('evento', (e) => {\n    pdci.historial.agregar(e);\n    node.status({ fill: e.nivel === 'info' ? 'green' : 'yellow', shape: 'dot', text: e.texto.slice(0, 60) });\n});\n\n// Estado hacia el panel y OPC UA a 2 por segundo como maximo: el maestro emite uno por\n// peticion (16/s con 4 variables cada 250 ms) y no hace falta redibujar tanto.\nconst intervalo = setInterval(() => {\n    if (ultimoEstado) node.send([null, null, { topic: 'estado', payload: ultimoEstado }, null, null]);\n    ultimoEstado = null;\n}, 500);\n\ncontext.set('maestro', maestro);\ncontext.set('transporte', transporte);\ncontext.set('intervalo', intervalo);\n\n// Arranque diferido: los nodos serie tienen que estar levantados antes de reconfigurarlos.\nsetTimeout(() => {\n    transporte.reconfigurar(config.puerto).then(() => {\n        maestro.iniciar();\n        node.send([null, null, null, null, { topic: 'config', payload: config, origen: carga.origen }]);\n        node.status({ fill: 'green', shape: 'dot', text: `sondeando: ${maestro.instantanea().puerto}` });\n    });\n}, 1000);\nnode.status({ fill: 'yellow', shape: 'ring', text: `iniciando (${carga.origen})` });\n",
+        "finalize": "// =====================================================================\n// M1 · maestro MODBus — \"On Stop\" del function node\n// ---------------------------------------------------------------------\n// Descripcion: detiene el sondeo, libera temporizadores y el socket TCP de\n//   desarrollo. Sin esto, cada Deploy dejaria un maestro viejo sondeando en\n//   paralelo con el nuevo: dos maestros en un bus MODBus (leccion I-04 de la T2,\n//   \"cliente zombi\").\n// =====================================================================\nconst maestro = context.get('maestro');\nif (maestro) maestro.detener();\nconst transporte = context.get('transporte');\nif (transporte) transporte.destruir();\nclearInterval(context.get('intervalo'));\n// Contadores al archivo antes de salir.\nconst s = global.get('pdci_modbus');\nif (s) global.set('pdci_contadores', s.contadores, 'archivo');\n",
+        "libs": [],
+        "outputLabels": [
+            "serial out",
+            "serial control",
+            "estado",
+            "valores",
+            "respuestas"
+        ],
+        "wires": [
+            [
+                "71c3661845b0ff93"
+            ],
+            [
+                "4d6fa77a15bf9756"
+            ],
+            [
+                "dcf5d10360c44181"
+            ],
+            [
+                "8ac6750a554ec8ac"
+            ],
+            [
+                "e3aa7423ade44b4a"
+            ]
+        ]
+    },
+    {
+        "id": "21cd6c4b506a680d",
+        "type": "serial in",
+        "z": "4816887cddd0d46b",
+        "name": "bus RS-485 (entrada)",
+        "serial": "6e6b1fab0c926391",
+        "x": 150,
+        "y": 120,
+        "wires": [
+            [
+                "66fbdc15c2a8f5fe"
+            ]
+        ]
+    },
+    {
+        "id": "66fbdc15c2a8f5fe",
+        "type": "function",
+        "z": "4816887cddd0d46b",
+        "name": "M2 · bytes recibidos [DF-2.8]",
+        "x": 360,
+        "y": 120,
+        "func": "// =====================================================================\n// M2 · bytes recibidos — [DF-2.8]\n// ---------------------------------------------------------------------\n// Descripcion: marca cada bloque de serial in (modo binario, separacion\n//   \"interbyte\" de 2 ms) como topic \"bytes\" y lo pasa a M1. La separacion\n//   de 2 ms solo agrupa bytes: la delimitacion real de la respuesta la hace\n//   el maestro por LONGITUD ESPERADA (ADR-012), porque Node-RED no puede\n//   medir el silencio t3,5 con precision (docs/spike-nodered-opcua.md §3).\n// =====================================================================\nif (!Buffer.isBuffer(msg.payload)) return null;   // configurado en binario: llega un Buffer\nmsg.topic = 'bytes';\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "outputLabels": [],
+        "wires": [
+            [
+                "d3f13571fe84cffb"
+            ]
+        ]
+    },
+    {
+        "id": "71c3661845b0ff93",
+        "type": "serial out",
+        "z": "4816887cddd0d46b",
+        "name": "bus RS-485 (salida)",
+        "serial": "6e6b1fab0c926391",
+        "x": 880,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "4d6fa77a15bf9756",
+        "type": "serial control",
+        "z": "4816887cddd0d46b",
+        "name": "reconfigurar puerto",
+        "serial": "6e6b1fab0c926391",
+        "x": 880,
+        "y": 160,
+        "wires": [
+            [
+                "08f070be7f934b16"
+            ]
+        ]
+    },
+    {
+        "id": "08f070be7f934b16",
+        "type": "function",
+        "z": "4816887cddd0d46b",
+        "name": "M3 · puerto reconfigurado [DF-2.17]",
+        "x": 360,
+        "y": 240,
+        "func": "// =====================================================================\n// M3 · puerto reconfigurado — [DF-2.17]\n// ---------------------------------------------------------------------\n// Descripcion: serial control responde con la configuracion vigente del\n//   puerto despues de cada cambio. Se reenvia a M1 como \"puerto-confirmado\"\n//   para que el maestro continue la reconfiguracion o el descubrimiento.\n// =====================================================================\nmsg.topic = 'puerto-confirmado';\nnode.status({ fill: msg.payload.enabled === false ? 'grey' : 'green', shape: 'dot',\n    text: msg.payload.enabled === false ? 'puerto serie deshabilitado (TCP)'\n        : `${msg.payload.serialport} ${msg.payload.serialbaud} ${msg.payload.databits}${String(msg.payload.parity)[0].toUpperCase()}${msg.payload.stopbits}` });\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "outputLabels": [],
+        "wires": [
+            [
+                "d3f13571fe84cffb"
+            ]
+        ]
+    },
+    {
+        "id": "0d8454420aa425af",
+        "type": "link in",
+        "z": "4816887cddd0d46b",
+        "name": "→ maestro (comandos)",
+        "x": 150,
+        "y": 180,
+        "links": [
+            "5a681df0b2b8b84c",
+            "2cf07c45e59bc006"
+        ],
+        "wires": [
+            [
+                "d3f13571fe84cffb"
+            ]
+        ]
+    },
+    {
+        "id": "dcf5d10360c44181",
+        "type": "link out",
+        "z": "4816887cddd0d46b",
+        "name": "maestro → estado",
+        "x": 880,
+        "y": 200,
+        "mode": "link",
+        "links": [],
+        "wires": []
+    },
+    {
+        "id": "8ac6750a554ec8ac",
+        "type": "link out",
+        "z": "4816887cddd0d46b",
+        "name": "maestro → valores",
+        "x": 880,
+        "y": 240,
+        "mode": "link",
+        "links": [
+            "987bd0665b2cecd7"
+        ],
+        "wires": []
+    },
+    {
+        "id": "e3aa7423ade44b4a",
+        "type": "link out",
+        "z": "4816887cddd0d46b",
+        "name": "maestro → respuestas",
+        "x": 880,
+        "y": 280,
+        "mode": "link",
+        "links": [
+            "e935ff3ce6db83dd",
+            "721a39e859b27a8a"
+        ],
+        "wires": []
+    },
+    {
+        "id": "b843e4ad9907f6c1",
+        "type": "inject",
+        "z": "4816887cddd0d46b",
+        "name": "cada 10 s",
+        "x": 150,
+        "y": 320,
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "10",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "2",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "wires": [
+            [
+                "1f35caec5b5ceed6"
+            ]
+        ]
+    },
+    {
+        "id": "1f35caec5b5ceed6",
+        "type": "function",
+        "z": "4816887cddd0d46b",
+        "name": "M4 · persistir contadores",
+        "x": 360,
+        "y": 320,
+        "func": "// =====================================================================\n// M4 · persistir contadores — I-05\n// ---------------------------------------------------------------------\n// Descripcion: cada 10 s copia los contadores MODBus al contexto \"archivo\"\n//   (localfilesystem, settings.js), para que OK / CRC_ERROR / TIMEOUT /\n//   EXCEPTION sobrevivan a un reinicio de Node-RED. M1 los restaura al arrancar.\n// =====================================================================\nconst s = global.get('pdci_modbus');\nif (s) global.set('pdci_contadores', s.contadores, 'archivo');\nreturn null;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "outputLabels": [],
+        "wires": [
+            []
+        ]
+    }
+]

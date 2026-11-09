@@ -1,0 +1,311 @@
+[
+    {
+        "id": "17da27453ae82382",
+        "type": "tab",
+        "label": "Dashboard · estadísticas",
+        "disabled": false,
+        "info": "Estadistica de MODBUS, OPC UA, MQTT y Sparkplug B en todo momento (I-05). OPC UA (F4) y MQTT/Sparkplug (F5) publican con pdci.capas.actualizar()."
+    },
+    {
+        "id": "b2af056fcde87524",
+        "type": "ui-group",
+        "name": "Estado de las cuatro capas",
+        "page": "f3f5121ae29f50fe",
+        "width": 12,
+        "height": 1,
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "2989232efe8089b2",
+        "type": "ui-group",
+        "name": "Variables del dispositivo 1",
+        "page": "f3f5121ae29f50fe",
+        "width": 6,
+        "height": 1,
+        "order": 2,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "15532488d30cc40f",
+        "type": "ui-group",
+        "name": "Tramas MODBus en el bus",
+        "page": "f3f5121ae29f50fe",
+        "width": 6,
+        "height": 1,
+        "order": 3,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "77431f0b38c1193f",
+        "type": "ui-group",
+        "name": "Historial de eventos",
+        "page": "f3f5121ae29f50fe",
+        "width": 12,
+        "height": 1,
+        "order": 4,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "b1ab1696ba96ad33",
+        "type": "inject",
+        "z": "17da27453ae82382",
+        "name": "cada 1 s",
+        "x": 150,
+        "y": 100,
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "1",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "2",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "wires": [
+            [
+                "a899e64e6f6ebf51"
+            ]
+        ]
+    },
+    {
+        "id": "a899e64e6f6ebf51",
+        "type": "function",
+        "z": "17da27453ae82382",
+        "name": "E1 · cuatro capas",
+        "x": 360,
+        "y": 100,
+        "func": "// =====================================================================\n// E1 · cuatro capas — I-05 (estadistica de las cuatro capas en todo momento)\n// ---------------------------------------------------------------------\n// Descripcion: cada 1 s arma la instantanea de las cuatro capas (MODBUS en\n//   F3; OPC UA, MQTT y Sparkplug B se registran en F4/F5 con\n//   pdci.capas.actualizar) y el historial de eventos. Va por tiempo y no por\n//   eventos para que el panel se actualice aunque una capa este caida y no\n//   produzca mensajes: justo cuando mas importa verla.\n// Salidas: [1] tarjetas de las capas  [2] tramas y tiempos  [3] historial\n// =====================================================================\nconst pdci = global.get('pdci');\nconst capas = pdci.capas.instantanea();\nconst modbus = global.get('pdci_modbus') || null;\nreturn [\n    { topic: 'capas', payload: capas },\n    { topic: 'tramas', payload: modbus },\n    { topic: 'historial', payload: pdci.historial.ultimos(40) },\n];\n",
+        "outputs": 3,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "outputLabels": [
+            "capas",
+            "tramas",
+            "historial"
+        ],
+        "wires": [
+            [
+                "4b48ce9bd8d32fc6"
+            ],
+            [
+                "a86e15b27222ddce"
+            ],
+            [
+                "6761f5da46ce7424"
+            ]
+        ]
+    },
+    {
+        "id": "4b48ce9bd8d32fc6",
+        "type": "ui-template",
+        "z": "17da27453ae82382",
+        "name": "panel capas",
+        "x": 620,
+        "y": 60,
+        "group": "b2af056fcde87524",
+        "page": "",
+        "ui": "",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<!--\n  capas.vue — Estadistica de las cuatro capas (I-05)\n  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-09 · v1.0\n  Recibe {topic:'capas', payload:{MODBUS, OPCUA, MQTT, SPARKPLUG}} cada 1 s (E1).\n  Cada tarjeta: estado textual (DONE / CRC ERROR / DEVICE NOT REACHED / ERROR / SIN DATOS),\n  sus contadores y la antiguedad del dato. Un dato viejo se marca: una capa que dejo de\n  informar es una falla, no un estado congelado (leccion de la T1).\n-->\n<template>\n  <div>\n    <v-row dense>\n      <v-col v-for=\"capa in orden\" :key=\"capa\" cols=\"12\" sm=\"6\" md=\"3\">\n        <v-card variant=\"outlined\" class=\"pa-3 h-100\">\n          <div class=\"d-flex justify-space-between align-center\">\n            <span class=\"text-subtitle-1 font-weight-bold\">{{ titulos[capa] }}</span>\n            <v-chip size=\"small\" :color=\"color(dato(capa))\" variant=\"flat\">{{ dato(capa).estado }}</v-chip>\n          </div>\n          <div class=\"text-caption mb-2\">{{ antiguedad(dato(capa)) }}</div>\n          <div v-for=\"(valor, nombre) in dato(capa).contadores\" :key=\"nombre\" class=\"d-flex justify-space-between\">\n            <span>{{ nombre }}</span><b>{{ valor }}</b>\n          </div>\n          <div v-if=\"!Object.keys(dato(capa).contadores).length\" class=\"text-caption text-medium-emphasis\">\n            {{ capa === 'MODBUS' ? 'esperando la primera petición' : 'se integra en ' + fase[capa] }}\n          </div>\n          <v-btn v-if=\"capa === 'MODBUS'\" class=\"mt-2\" size=\"small\" variant=\"text\"\n                 @click=\"send({ topic: 'reiniciar-contadores' })\">Poner en cero</v-btn>\n        </v-card>\n      </v-col>\n    </v-row>\n  </div>\n</template>\n\n<script>\nexport default {\n  data () {\n    return {\n      orden: ['MODBUS', 'OPCUA', 'MQTT', 'SPARKPLUG'],\n      titulos: { MODBUS: 'MODBus RTU', OPCUA: 'OPC UA', MQTT: 'MQTT', SPARKPLUG: 'Sparkplug B' },\n      fase: { OPCUA: 'F4', MQTT: 'F5', SPARKPLUG: 'F5' },\n      capas: {},\n      ahora: Date.now()\n    }\n  },\n  watch: {\n    msg: function (m) { this.procesar(m) }\n  },\n  mounted () {\n    if (this.msg) this.procesar(this.msg)\n  },\n  methods: {\n    procesar (m) {\n      if (m && m.topic === 'capas') { this.capas = m.payload || {}; this.ahora = Date.now() }\n    },\n    dato (capa) {\n      return this.capas[capa] || { estado: 'SIN DATOS', contadores: {}, ts: null }\n    },\n    color (d) {\n      if (d.ts && this.ahora - d.ts > 10000) return 'grey'\n      if (d.estado === 'DONE' || d.estado === 'ONLINE') return 'success'\n      if (d.estado === 'CRC ERROR') return 'warning'\n      if (d.estado === 'SIN DATOS') return 'grey'\n      return 'error'\n    },\n    antiguedad (d) {\n      if (!d.ts) return 'sin datos todavía'\n      const s = Math.round((this.ahora - d.ts) / 1000)\n      return s <= 1 ? 'actualizado ahora' : (s > 10 ? '¡sin novedades hace ' + s + ' s!' : 'hace ' + s + ' s')\n    }\n  }\n}\n</script>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "wires": [
+            [
+                "2cf07c45e59bc006"
+            ]
+        ]
+    },
+    {
+        "id": "a86e15b27222ddce",
+        "type": "ui-template",
+        "z": "17da27453ae82382",
+        "name": "panel tramas",
+        "x": 620,
+        "y": 100,
+        "group": "15532488d30cc40f",
+        "page": "",
+        "ui": "",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<!--\n  tramas.vue — Ultima trama transmitida y recibida, latencia y detalle de errores\n  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-09 · v1.0\n  Muestra la trama REAL que esta en el bus, en hexadecimal: sirve para la defensa y para el\n  analisis byte a byte del informe sin sonda ni osciloscopio. Recibe {topic:'tramas'} (E1).\n-->\n<template>\n  <div v-if=\"s\">\n    <div><b>Esclavo</b> Unit ID {{ s.esclavo }} · {{ s.puerto }}</div>\n    <div class=\"mt-2\"><b>TX</b> <code>{{ s.ultimaTx || '-' }}</code></div>\n    <div><b>RX</b> <code>{{ s.ultimaRx || '-' }}</code></div>\n    <div class=\"mt-2\">Latencia petición → respuesta completa: <b>{{ s.latenciaMs === null ? '-' : s.latenciaMs + ' ms' }}</b>\n      <span class=\"text-caption\">(incluye la transmisión de ambas tramas y la latencia del conversor USB)</span></div>\n    <div>Ciclos completos: <b>{{ s.ciclos }}</b> · duración del último: <b>{{ s.duracionCicloMs === null ? '-' : s.duracionCicloMs + ' ms' }}</b></div>\n    <div class=\"text-caption mt-2\">\n      Detalle de CRC_ERROR: CRC inválido {{ s.contadores.detalle.CRC_ERROR }} · trama mal formada\n      {{ s.contadores.detalle.MALFORMED }} · otro Unit ID {{ s.contadores.detalle.WRONG_SLAVE }} ·\n      bytes fuera de transacción {{ s.contadores.detalle.BYTES_ESPURIOS }}\n      <span v-if=\"s.ultimaExcepcion\"> · última excepción {{ s.ultimaExcepcion }}</span>\n    </div>\n  </div>\n  <div v-else class=\"text-caption\">Esperando al maestro…</div>\n</template>\n\n<script>\nexport default {\n  data () { return { s: null } },\n  watch: { msg: function (m) { if (m && m.topic === 'tramas') this.s = m.payload } },\n  mounted () { if (this.msg && this.msg.topic === 'tramas') this.s = this.msg.payload }\n}\n</script>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "6761f5da46ce7424",
+        "type": "ui-template",
+        "z": "17da27453ae82382",
+        "name": "panel historial",
+        "x": 620,
+        "y": 140,
+        "group": "77431f0b38c1193f",
+        "page": "",
+        "ui": "",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<!--\n  historial.vue — Historico breve de eventos de las cuatro capas\n  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-09 · v1.0\n  Recibe {topic:'historial', payload:[{ts, nivel, capa, texto}]} (E1), del mas nuevo al mas viejo.\n  Solo se registran transiciones y acciones, no cada peticion: un historial que se llena de\n  ruido no sirve para diagnosticar.\n  NOTA: tablas con <table> nativo y NO con <v-table>: Dashboard 2.0 compila la plantilla con el\n  analizador HTML del navegador, que saca <tr> de cualquier elemento que no sea <table> y deja\n  el v-for fuera de la fila (error \"Cannot read properties of undefined\" en el render).\n-->\n<template>\n  <div style=\"max-height: 320px; overflow-y: auto\"><table class=\"pdci-tabla\" style=\"width: 100%; border-collapse: collapse; font-size: 0.875rem\">\n    <thead><tr><th style=\"width: 90px\">Hora</th><th style=\"width: 100px\">Capa</th><th style=\"width: 70px\">Nivel</th><th>Evento</th></tr></thead>\n    <tbody>\n      <tr v-for=\"(evento, i) in eventos\" :key=\"i\">\n        <td>{{ hora(evento.ts) }}</td>\n        <td>{{ evento.capa }}</td>\n        <td><v-chip size=\"x-small\" :color=\"evento.nivel === 'info' ? 'primary' : (evento.nivel === 'aviso' ? 'warning' : 'error')\">{{ evento.nivel }}</v-chip></td>\n        <td>{{ evento.texto }}</td>\n      </tr>\n      <tr v-if=\"!eventos.length\"><td colspan=\"4\" class=\"text-caption\">Sin eventos todavía.</td></tr>\n    </tbody>\n  </table></div>\n</template>\n\n<script>\nexport default {\n  data () { return { eventos: [] } },\n  watch: { msg: function (m) { if (m && m.topic === 'historial') this.eventos = m.payload || [] } },\n  mounted () { if (this.msg && this.msg.topic === 'historial') this.eventos = this.msg.payload || [] },\n  methods: {\n    hora (ts) {\n      const d = new Date(ts)\n      return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':')\n    }\n  }\n}\n</script>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "987bd0665b2cecd7",
+        "type": "link in",
+        "z": "17da27453ae82382",
+        "name": "maestro → valores (estadísticas)",
+        "x": 150,
+        "y": 220,
+        "links": [
+            "8ac6750a554ec8ac"
+        ],
+        "wires": [
+            [
+                "321fc02fc6540553"
+            ]
+        ]
+    },
+    {
+        "id": "721a39e859b27a8a",
+        "type": "link in",
+        "z": "17da27453ae82382",
+        "name": "maestro → respuestas (estadísticas)",
+        "x": 150,
+        "y": 260,
+        "links": [
+            "e3aa7423ade44b4a"
+        ],
+        "wires": [
+            [
+                "321fc02fc6540553"
+            ]
+        ]
+    },
+    {
+        "id": "321fc02fc6540553",
+        "type": "function",
+        "z": "17da27453ae82382",
+        "name": "E2 · variables",
+        "x": 380,
+        "y": 240,
+        "func": "// =====================================================================\n// E2 · variables en vivo\n// ---------------------------------------------------------------------\n// Descripcion: lleva la tabla de variables del panel. Recibe:\n//   - de M1 salida 4: un valor que cambio (topic = nombre, payload = valor, calidad);\n//   - de M1 salida 5: la configuracion (para saber que variables se escriben)\n//     y el resultado de cada escritura.\n//   Arma una sola instantanea para el ui-template, que la reenvia completa al\n//   recargar la pagina.\n// Salida: {topic: 'variables', payload: {variables: [...], ultimaEscritura}}\n// =====================================================================\nconst variables = flow.get('variables') || {};\nlet config = flow.get('config');\nlet ultimaEscritura = flow.get('ultimaEscritura') || null;\n\nif (msg.topic === 'config') {\n    config = msg.payload;\n    flow.set('config', config);\n    // Las variables que ya no estan en el mapa se quitan de la tabla.\n    const vigentes = new Set(config.mapa.map((v) => v.nombre).concat(config.derivadas.map((d) => d.nombre)));\n    Object.keys(variables).forEach((n) => { if (!vigentes.has(n)) delete variables[n]; });\n} else if (msg.topic === 'escritura') {\n    ultimaEscritura = Object.assign({ ts: Date.now() }, msg.payload);\n    flow.set('ultimaEscritura', ultimaEscritura);\n} else if (typeof msg.topic === 'string' && msg.topic !== 'reconfiguracion' && 'calidad' in msg) {\n    variables[msg.topic] = { valor: msg.payload, calidad: msg.calidad, ts: msg.ts };\n} else {\n    return null;\n}\nflow.set('variables', variables);\n\nconst mapa = config ? config.mapa : [];\nconst filas = mapa.map((v) => Object.assign({ nombre: v.nombre, tipo: v.tipo, escritura: v.escritura,\n    min: v.min, max: v.max, fc: v.fc, direccion: v.direccion }, variables[v.nombre] || {}))\n    .concat((config ? config.derivadas : []).map((d) => Object.assign({ nombre: d.nombre, tipo: 'derivada',\n        escritura: false }, variables[d.nombre] || {})));\nreturn { topic: 'variables', payload: { variables: filas, ultimaEscritura } };\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "outputLabels": [],
+        "wires": [
+            [
+                "31c873b757d002bc"
+            ]
+        ]
+    },
+    {
+        "id": "31c873b757d002bc",
+        "type": "ui-template",
+        "z": "17da27453ae82382",
+        "name": "panel variables",
+        "x": 620,
+        "y": 240,
+        "group": "2989232efe8089b2",
+        "page": "",
+        "ui": "",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<!--\n  variables.vue — Variables del dispositivo 1 en vivo, con escritura de las salidas\n  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-09 · v1.0\n  Recibe {topic:'variables', payload:{variables:[...], ultimaEscritura}} (E2).\n  Envia {topic:'escribir', payload:{nombre, valor}}: el maestro lo traduce a FC 05 o FC 06 y la\n  tabla cambia recien con la LECTURA posterior (ADR-015: se muestra lo confirmado, no lo pedido).\n  NOTA: tablas con <table> nativo y NO con <v-table>: Dashboard 2.0 compila la plantilla con el\n  analizador HTML del navegador, que saca <tr> de cualquier elemento que no sea <table> y deja\n  el v-for fuera de la fila (error \"Cannot read properties of undefined\" en el render).\n-->\n<template>\n  <div>\n    <table class=\"pdci-tabla\" style=\"width: 100%; border-collapse: collapse; font-size: 0.875rem\">\n      <thead><tr><th>Variable</th><th>Valor</th><th>Calidad</th><th>Escribir</th></tr></thead>\n      <tbody>\n        <tr v-for=\"variable in variables\" :key=\"variable.nombre\">\n          <td>{{ variable.nombre }}<div class=\"text-caption\">{{ variable.tipo }}<span v-if=\"variable.fc\"> · FC 0{{ variable.fc }} · 0x{{ hex(variable.direccion) }}</span></div></td>\n          <td><b>{{ variable.valor === undefined ? '-' : String(variable.valor) }}</b></td>\n          <td><v-chip size=\"x-small\" :color=\"variable.calidad === 'good' ? 'success' : (variable.calidad === 'bad' ? 'error' : 'grey')\">{{ variable.calidad || 'sin dato' }}</v-chip></td>\n          <td>\n            <template v-if=\"variable.escritura && variable.tipo === 'bool'\">\n              <v-btn size=\"small\" variant=\"outlined\" class=\"mr-1\" @click=\"escribir(variable.nombre, true)\">ON</v-btn>\n              <v-btn size=\"small\" variant=\"outlined\" @click=\"escribir(variable.nombre, false)\">OFF</v-btn>\n            </template>\n            <div v-else-if=\"variable.escritura\" class=\"d-flex align-center ga-1\">\n              <v-text-field v-model=\"pedidos[variable.nombre]\" type=\"number\" density=\"compact\" hide-details style=\"max-width: 110px\"\n                            :placeholder=\"(variable.min !== undefined ? variable.min : 0) + '-' + (variable.max !== undefined ? variable.max : 65535)\"></v-text-field>\n              <v-btn size=\"small\" color=\"primary\" @click=\"escribir(variable.nombre, Number(pedidos[variable.nombre]))\">Escribir</v-btn>\n            </div>\n          </td>\n        </tr>\n      </tbody>\n    </table>\n    <v-alert v-if=\"ultima\" class=\"mt-2\" density=\"compact\" variant=\"tonal\" :type=\"ultima.ok ? 'success' : 'error'\">\n      {{ ultima.nombre }} = {{ ultima.valor }}: {{ ultima.ok ? 'confirmada por el esclavo (eco)' : ultima.errorType + ' · ' + ultima.error }}\n    </v-alert>\n  </div>\n</template>\n\n<script>\nexport default {\n  data () { return { variables: [], ultima: null, pedidos: {} } },\n  watch: { msg: function (m) { this.procesar(m) } },\n  mounted () { if (this.msg) this.procesar(this.msg) },\n  methods: {\n    procesar (m) {\n      if (!m || m.topic !== 'variables') return\n      this.variables = m.payload.variables || []\n      this.ultima = m.payload.ultimaEscritura\n    },\n    escribir (nombre, valor) { this.send({ topic: 'escribir', payload: { nombre, valor } }) },\n    hex (n) { return Number(n).toString(16).toUpperCase().padStart(4, '0') }\n  }\n}\n</script>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "wires": [
+            [
+                "2cf07c45e59bc006"
+            ]
+        ]
+    },
+    {
+        "id": "2cf07c45e59bc006",
+        "type": "link out",
+        "z": "17da27453ae82382",
+        "name": "→ maestro (desde estadísticas)",
+        "x": 880,
+        "y": 240,
+        "mode": "link",
+        "links": [
+            "0d8454420aa425af"
+        ],
+        "wires": []
+    },
+    {
+        "id": "31602e75b366830f",
+        "type": "ui-template",
+        "z": "17da27453ae82382",
+        "name": "estilo de las tablas",
+        "x": 620,
+        "y": 320,
+        "group": "",
+        "page": "",
+        "ui": "e860f00baeeb4b76",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "/*\n * estilo.css — estilo comun de los paneles del Dashboard (ui-template de alcance \"site:style\")\n * Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-09 · v1.0\n * Sobrio, azul marino y gris (estilo de documentos del grupo).\n */\n.pdci-tabla th {\n  background: #1f3864;\n  color: #ffffff;\n  font-weight: 600;\n  text-align: left;\n  padding: 4px 8px;\n  position: sticky;\n  top: 0;\n  z-index: 1;\n}\n.pdci-tabla td {\n  padding: 2px 8px;\n  border-bottom: 1px solid #d9d9d9;\n  vertical-align: middle;\n}\n.pdci-tabla tbody tr:nth-child(even) td {\n  background: #f2f4f8;\n}\ncode {\n  font-family: Consolas, \"Courier New\", monospace;\n  font-size: 0.85rem;\n}\n",
+        "storeOutMessages": true,
+        "passthru": true,
+        "resendOnRefresh": true,
+        "templateScope": "site:style",
+        "className": "",
+        "wires": [
+            []
+        ]
+    }
+]
