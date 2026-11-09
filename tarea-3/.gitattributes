@@ -1,0 +1,4 @@
+# Tarea 3: los scripts que corren en Linux o en la Raspberry Pi conservan LF aunque el
+# repositorio se clone en Windows (un "" al final de "set -euo pipefail" rompe bash).
+*.sh text eol=lf
+*.py text eol=lf
