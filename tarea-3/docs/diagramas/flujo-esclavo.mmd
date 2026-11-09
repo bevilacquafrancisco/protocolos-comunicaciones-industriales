@@ -1,0 +1,47 @@
+%% flujo-esclavo.mmd — Dispositivo 1 · esclavo MODBus RTU (MicroPython, stack propio)
+%% Cada bloque [DF-1.x] se cita en el comentario de la función que lo implementa (requisito T.2).
+%% Equivalencia con la T1: DF-1.1 ~ E1/E2 · DF-1.3 ~ E3 · DF-1.4 a DF-1.16 reemplazan a E4 (umodbus) · DF-1.17 ~ E5
+%% Se dibuja en tres columnas unidas por conectores (círculos V, A, B, C) para que entre legible en
+%% una página: Mermaid ubica lado a lado los componentes que no comparten flechas.
+flowchart TD
+    %% ---------------- Columna 1: recepción de la trama ----------------
+    A(["[DF-1.1] Inicio<br/>verificar config y versión de módulos<br/>leer jumper GPIO13 → Unit ID<br/>configurar periféricos y UART2<br/>comprobar que existe UART.flush<br/>DE/RE = 0 (escuchar)"])
+    A --> B["[DF-1.2] Calcular tiempos del enlace<br/>t_car = 11 / baud · t1,5 y t3,5<br/>(fijos 0,75 / 1,75 ms si baud > 19200)"]
+    CC((C)) --> C
+    B --> C["[DF-1.3] Publicar entradas<br/>DI 10001 ← pulsador (antirrebote)<br/>IR 30001 ← ADC, promedio de 8 muestras"]
+    C --> D{"[DF-1.4] ¿Hay bytes<br/>en el UART?"}
+    D -- No --> B1((B))
+    D -- Sí --> E["[DF-1.5] Acumular bytes en el buffer<br/>marcar ticks_us del último byte"]
+    E --> F{"[DF-1.6] ¿Silencio ≥ t3,5<br/>desde el último byte?"}
+    F -- "No, llegan más bytes" --> E
+    F -- "Sí: fin de trama" --> V1((V))
+
+    %% ---------------- Columna 2: validación de la trama ----------------
+    V2((V)) --> G{"[DF-1.7] ¿Longitud ≥ 4 y<br/>sin hueco > t1,5 dentro?"}
+    G -- No --> X["[DF-1.18] Descartar en silencio<br/>tramas_invalidas++"]
+    G -- Sí --> H{"[DF-1.8] ¿Unit ID = propio<br/>o 0 (difusión)?"}
+    H -- "No: es para otro nodo" --> X2["[DF-1.19] Ignorar sin responder<br/>tramas_ajenas++"]
+    H -- Sí --> I{"[DF-1.9] CRC propio sobre n−2 bytes<br/>¿coincide con los 2 últimos<br/>(byte bajo primero)?"}
+    I -- No --> X3["[DF-1.20] Descartar sin responder<br/>crc_error++<br/>(el maestro verá un timeout)"]
+    I -- Sí --> A1((A))
+    X --> B2((B))
+    X2 --> B2
+    X3 --> B2
+
+    %% ---------------- Columna 3: despacho, respuesta y salidas ----------------
+    A2((A)) --> J{"[DF-1.10] Despacho por<br/>código de función"}
+    J -- "01 · 02 · 03 · 04 · 05 · 06" --> K{"[DF-1.11] ¿Dirección, cantidad<br/>y valor válidos según<br/>el mapa de config.py?"}
+    J -- "Otro" --> EX["[DF-1.13] Respuesta de excepción<br/>01 ILLEGAL FUNCTION<br/>02 ILLEGAL DATA ADDRESS<br/>03 ILLEGAL DATA VALUE<br/>(FC | 0x80 + código)"]
+    K -- "No" --> EX
+    K -- "Sí" --> L["[DF-1.12] Ejecutar<br/>lectura: empaquetar bits o words big-endian<br/>escritura: actualizar Coil / HR (respuesta = eco)"]
+    L --> Q{"[DF-1.14] ¿Unit ID = 0<br/>(difusión)?"}
+    EX --> Q
+    Q -- No --> M["[DF-1.15] Armar respuesta<br/>ID · FC · datos<br/>+ CRC propio: byte bajo, byte alto"]
+    M --> N["[DF-1.16] Transmitir<br/>DE/RE = 1 · esperar 200 µs<br/>uart.write · uart.flush · esperar 1 t_car<br/>DE/RE = 0"]
+    Q -- "Sí: no se responde" --> P
+    B3((B)) --> P
+    N --> P["[DF-1.17] Aplicar salidas<br/>Coil 00001 → LED GPIO19<br/>HR 40001 → PWM GPIO21 (satura en 255)"]
+    P --> C2((C))
+
+    classDef conector fill:#1f3864,stroke:#1f3864,color:#ffffff
+    class A1,A2,B1,B2,B3,CC,C2,V1,V2 conector

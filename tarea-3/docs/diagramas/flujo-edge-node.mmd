@@ -1,0 +1,37 @@
+%% flujo-edge-node.mmd — Dispositivo 3 · cliente OPC UA (T2 v2) + Edge Node Sparkplug B
+%% Cada bloque [DF-3.x] se cita en el comentario de la función Python que lo implementa.
+%% Ciclo de vida según Sparkplug 3.0 (I-07, I-10) · estados de comunicación en el nodo (ADR-006)
+flowchart TD
+    A(["[DF-3.1] Inicio<br/>leer .env · leer bdSeq persistido en disco<br/>Status/OPCUA/Estado = ERROR"])
+    A --> B["[DF-3.2] Lanzar cliente OPC UA en segundo plano<br/>(bloques C1, C3 y C7 de la T2 v2)<br/>suscripción a los NodeIds del diccionario"]
+    A --> C["[DF-3.3] Armar NDEATH con bdSeq actual<br/>y registrarlo como Last Will<br/>(QoS 1, no retenido)"]
+    C --> D["[DF-3.4] Conectar al broker en la nube<br/>TLS 8883 · usuario edge_node · clean start"]
+    D -- "Falla" --> RC
+    D -- "CONNACK" --> E["[DF-3.5] Suscribir NCMD, DCMD<br/>y spBv1.0/STATE/+"]
+    E --> F["[DF-3.6] Publicar NBIRTH<br/>seq = 0 · bdSeq · Node Control/Rebirth = false<br/>Status/MODBUS/* · Status/OPCUA/Estado<br/>Status/MQTT/Reconexiones · Status/Sparkplug/Rebirths"]
+    F --> G{"[DF-3.7] ¿Dispositivo 1 disponible?<br/>sesión OPC UA activa y<br/>Status.MODBUS.Estado ≠ DEVICE NOT REACHED"}
+    G -- Sí --> H["[DF-3.8] Publicar DBIRTH<br/>Inputs/* y Outputs/* con valor actual<br/>seq = seq + 1 (módulo 256)"]
+    G -- No --> L
+    H --> L
+
+    L(["[DF-3.9] Bucle de eventos"]) --> EV{"¿Qué evento<br/>llegó?"}
+    EV -- "Δ métrica<br/>de nodo" --> N1["[DF-3.10] NDATA solo con lo que cambió<br/>seq = (seq + 1) mod 256"]
+    EV -- "Δ Inputs/*<br/>u Outputs/*" --> N2["[DF-3.11] DDATA solo con lo que cambió<br/>seq = (seq + 1) mod 256"]
+    EV -- "Cambia la<br/>disponibilidad" --> N3{"[DF-3.12] ¿Pasó a<br/>no disponible?"}
+    N3 -- Sí --> DD["Publicar DDEATH<br/>(seq + 1)"]
+    N3 -- "No: se recuperó" --> DB["Publicar DBIRTH nuevo<br/>(seq + 1)"]
+    EV -- "NCMD<br/>Rebirth" --> RB["[DF-3.13] Rebirths++<br/>republicar NBIRTH (seq = 0, mismo bdSeq)<br/>y DBIRTH si corresponde"]
+    EV -- "DCMD" --> CM{"[DF-3.14] ¿Métrica conocida,<br/>tipo y rango válidos?"}
+    CM -- No --> CMX["Ignorar y registrar<br/>(no se escribe nada)"]
+    CM -- Sí --> CMW["[DF-3.15] OPC UA Write (Escritor C5 de la T2)<br/>el estado real vuelve por la suscripción<br/>→ DDATA de confirmación"]
+    EV -- "Cae<br/>OPC UA" --> OU["[DF-3.16] Status/OPCUA/Estado = ERROR → NDATA<br/>DDEATH · reconexión C7 cada 2 s<br/>al volver: DONE → NDATA y DBIRTH"]
+    EV -- "Cae<br/>MQTT" --> RC["[DF-3.17] Reconexiones++<br/>bdSeq = (bdSeq + 1) mod 256 y persistir<br/>espera con backoff"]
+    RC --> C
+    N1 --> L
+    N2 --> L
+    DD --> L
+    DB --> L
+    RB --> L
+    CMX --> L
+    CMW --> L
+    OU --> L

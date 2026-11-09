@@ -1,0 +1,50 @@
+%% flujo-maestro.mmd — Dispositivo 2 · maestro MODBus RTU en Node-RED (máquina de estados)
+%% Cada bloque [DF-2.x] se cita en el nombre o en el comentario del function node que lo implementa.
+%% Delimitación por longitud esperada (ADR-012) · reintento y ausencia sostenida (ADR-014)
+%% Se dibuja en dos columnas unidas por conectores (círculos A, R, Z) para que entre legible en
+%% una página: Mermaid ubica lado a lado los componentes que no comparten flechas.
+flowchart TD
+    %% ---------------- Columna 1: preparar y transmitir una transacción ----------------
+    A(["[DF-2.1] Inicio<br/>cargar config: preajuste y mapa de registros<br/>abrir puerto con serial control (bin)<br/>OK, CRC_ERROR, TIMEOUT, EXCEPTION = 0<br/>Estado = DEVICE NOT REACHED hasta el primer OK"])
+    A --> R
+    Z1((Z)) --> R
+    R(["[DF-2.2] REPOSO<br/>esperar tick de sondeo,<br/>comando pendiente o reconfiguración"])
+    R -- "Reconfiguración<br/>desde el Dashboard" --> RC["[DF-2.17] Validar baud, paridad, ID y mapa<br/>vaciar cola · serial control con los nuevos valores<br/>recalcular t3,5 · conservar contadores"]
+    RC --> R
+    R -- "Tick o comando" --> S{"[DF-2.3] ¿Hay un comando<br/>pendiente (Write OPC UA<br/>o Dashboard)?"}
+    S -- "Sí: tiene prioridad" --> W["[DF-2.4a] Escritura<br/>FC 05 (coil) o FC 06 (registro)<br/>un comando pendiente por variable"]
+    S -- No --> T["[DF-2.4b] Próxima lectura del ciclo<br/>según el mapa: FC 02 · 04 · 01 · 03"]
+    W --> U
+    T --> U["[DF-2.5] Armar ADU<br/>ID · FC · dirección y cantidad/valor (big-endian)<br/>+ CRC propio (byte bajo primero)"]
+    U --> V
+    R1((R)) --> V
+    V["[DF-2.6] Esperar silencio ≥ t3,5<br/>desde la última actividad del bus<br/>(cota inferior: setTimeout solo se atrasa)"]
+    V --> X["[DF-2.7] Transmitir<br/>UltimaTramaTx = hex · arrancar timeout"]
+    X --> Y(["[DF-2.8] ESPERANDO_RESPUESTA<br/>acumular bloques del puerto · longitud esperada:<br/>5+N (FC 01-04) · 8 (FC 05/06) · 5 (excepción)"])
+    Y --> A1((A))
+
+    %% ---------------- Columna 2: clasificar la respuesta y actualizar el estado ----------------
+    A2((A)) --> Y2{"¿Qué ocurrió primero?"}
+    Y2 -- "Vence el timeout" --> TO["[DF-2.9] TIMEOUT++"]
+    Y2 -- "Longitud completa" --> ZZ{"[DF-2.10] ¿Unit ID y FC coinciden,<br/>no sobran bytes y el<br/>CRC propio es correcto?"}
+    ZZ -- No --> CE["[DF-2.11] Trama no recomponible<br/>o CRC inválido · CRC_ERROR++"]
+    ZZ -- Sí --> E{"[DF-2.12] ¿FC con<br/>bit 7 en 1?"}
+    E -- "Sí: el esclavo rechazó" --> EXC["[DF-2.12b] EXCEPTION++ · código 01-04<br/>(no se reintenta: el esclavo está vivo)"]
+    E -- No --> OK["[DF-2.13] OK++ · UltimaTramaRx · LatenciaMs<br/>decodificar big-endian · escalado (ADR-003)<br/>actualizar variables OPC UA · último_éxito = ahora<br/>si era escritura: Write OPC UA = Good (ADR-015)"]
+    TO --> RT{"[DF-2.14] ¿Quedan reintentos?<br/>(1 por defecto)"}
+    CE --> RT
+    RT -- Sí --> R2((R))
+    RT -- "No: transacción perdida" --> F["[DF-2.14b] Si era escritura:<br/>Write OPC UA = BadCommunicationError"]
+    F --> AU
+    EXC --> AU
+    OK --> AU{"[DF-2.15] ¿ahora − último_éxito ≥<br/>ausencia sostenida (2000 ms)?"}
+    AU -- Sí --> NR["Estado = DEVICE NOT REACHED"]
+    AU -- "No · última falló por CRC" --> CR["Estado = CRC ERROR"]
+    AU -- "No · última OK o excepción" --> DN["Estado = DONE"]
+    NR --> PUB
+    CR --> PUB
+    DN --> PUB["[DF-2.16] Publicar en el servidor OPC UA<br/>Status.MODBUS.* (Estado y contadores)<br/>y en el Dashboard"]
+    PUB --> Z2((Z))
+
+    classDef conector fill:#1f3864,stroke:#1f3864,color:#ffffff
+    class A1,A2,R1,R2,Z1,Z2 conector

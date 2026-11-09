@@ -1,0 +1,46 @@
+%% arquitectura-general.mmd — Tarea 3 · cuatro capas, cuatro dispositivos, protocolos y medios
+%% Fuente única: docs/diccionario-de-datos.md · Decisiones: docs/decisiones-adr.md
+%% Niveles según el modelo Purdue / ISA-95 (IEC 62264-1).
+%% Trazado en dos filas: arriba la red OT (niveles 0 a 3), abajo el tramo IT (internet y usuario).
+%% La flecha entre filas une los subgrafos y no los nodos: así Mermaid respeta la dirección LR
+%% de cada fila (si un nodo interno se enlaza afuera, la dirección del subgrafo se ignora).
+flowchart TB
+    subgraph OT["Red de planta (OT)"]
+        direction LR
+        subgraph N1["Nivel 0/1 · Campo"]
+            direction TB
+            D1["Dispositivo 1<br/>ESP32 + MAX485<br/>Esclavo MODBus RTU<br/>MicroPython · CRC propio<br/>Unit ID 1<br/>E/S: GPIO 18, 34, 19, 21"]
+            D1P["Esclavo de prueba<br/>ESP32 #2 (ADR-007)"]
+        end
+        subgraph N2["Nivel 2 · Borde"]
+            D2["Dispositivo 2<br/>Raspberry Pi · Node-RED<br/>Maestro MODBus RTU<br/>(CRC propio)<br/>Servidor OPC UA<br/>(node-opcua 2.160.0)"]
+        end
+        subgraph N3["Nivel 3 / 3.5 · Frontera OT-IT"]
+            D3["Dispositivo 3<br/>PC / VM<br/>Cliente OPC UA (asyncua)<br/>Edge Node Sparkplug B<br/>EN01_Gateway"]
+        end
+        D1 <-->|"MODBus RTU<br/>RS-485 half-duplex<br/>9600 8N1"| D2
+        D1P -.-> D2
+        D2 <-->|"OPC UA binario<br/>opc.tcp :4840<br/>Ethernet punto a punto<br/>SignAndEncrypt"| D3
+    end
+
+    subgraph IT["Internet y usuario (IT)"]
+        direction LR
+        subgraph NUBE["Nube · servicio gestionado"]
+            BR[("Broker MQTT<br/>3.1.1 / 5.0<br/>usuarios por tópico")]
+        end
+        subgraph N4["Nivel 4 · Usuario"]
+            HA["Host Application<br/>navegador (PC o celular)<br/>mqtt.js · protobuf.js<br/>HA01_WebDashboard"]
+        end
+        BR <-->|"MQTT sobre WSS 8884<br/>STATE · NCMD · DCMD"| HA
+    end
+
+    OT <-->|"Dispositivo 3 ↔ broker: MQTT + Sparkplug B (spBv1.0, Protobuf) · TLS 8883 · publicación por excepción"| IT
+
+    classDef campo fill:#e8eef6,stroke:#1f3864,color:#1f3864
+    classDef borde fill:#d6e0ee,stroke:#1f3864,color:#1f3864
+    classDef ops fill:#c3d1e6,stroke:#1f3864,color:#1f3864
+    classDef nube fill:#f2f2f2,stroke:#595959,color:#262626
+    class D1,D1P campo
+    class D2 borde
+    class D3 ops
+    class BR,HA nube

@@ -1,0 +1,172 @@
+% referencias.bib — Tarea Nº3, Protocolos de Comunicaciones Industriales (UNRaf)
+% Estilo de salida: APA 7.ª edición (CSL apa.csl, pandoc --citeproc).
+%
+% Regla del proyecto (CLAUDE.md §7): no se cita nada que no exista ni que no se haya consultado.
+% Campo "keywords" de control interno (no se imprime):
+%   verificada   = existencia comprobada en el sitio del organismo emisor el 2026-11-09
+%   consultada   = el texto fue leído por el grupo (copia local en el repositorio)
+%   libre        = acceso libre en el enlace; LEER la sección citada antes de la entrega final
+%   paga         = norma de pago; CONFIRMAR que el grupo accedió a ella (biblioteca) antes de la
+%                  entrega final, o citar la versión libre equivalente (OPC 10000-x, Sparkplug 3.0.0)
+
+% ---------------------------------------------------------------- MODBus
+@manual{modbus2012,
+  author       = {{Modbus Organization}},
+  title        = {{MODBUS} application protocol specification {V1.1b3}},
+  year         = {2012},
+  date         = {2012-04-26},
+  url          = {https://modbus.org/modbus-specifications},
+  keywords     = {verificada, consultada},
+  note         = {Copia local: tarea-1/docs/modbusprotocolspecification.pdf}
+}
+
+@manual{modbus2006,
+  author       = {{Modbus Organization}},
+  title        = {{MODBUS} over serial line: Specification and implementation guide {V1.02}},
+  year         = {2006},
+  date         = {2006-12-20},
+  url          = {https://modbus.org/modbus-specifications},
+  keywords     = {verificada, consultada}
+}
+
+% ---------------------------------------------------------------- RS-485
+@manual{tia1998,
+  author       = {{Telecommunications Industry Association}},
+  title        = {Electrical characteristics of generators and receivers for use in balanced digital multipoint systems (TIA-485-A)},
+  year         = {1998},
+  keywords     = {verificada, paga},
+  note         = {Reafirmada en 2012. Conocida como RS-485 o EIA-485}
+}
+
+@manual{maxim2003,
+  author       = {{Maxim Integrated Products}},
+  title        = {{MAX481/MAX483/MAX485/MAX487--MAX491/MAX1487}: Low-power, slew-rate-limited {RS-485/RS-422} transceivers (Rev. 8)},
+  year         = {2003},
+  type         = {Hoja de datos},
+  number       = {19-0122},
+  keywords     = {verificada, consultada},
+  note         = {Copia local: tarea-1/docs/MAX481.PDF}
+}
+
+% ---------------------------------------------------------------- OPC UA
+@manual{iec62541-4,
+  author       = {{International Electrotechnical Commission}},
+  title        = {{OPC} unified architecture -- Part 4: Services (IEC 62541-4:2020)},
+  year         = {2020},
+  url          = {https://webstore.iec.ch/publication/61113},
+  keywords     = {verificada, paga}
+}
+
+@manual{iec62541-6,
+  author       = {{International Electrotechnical Commission}},
+  title        = {{OPC} unified architecture -- Part 6: Mappings (IEC 62541-6:2020)},
+  year         = {2020},
+  url          = {https://webstore.iec.ch/publication/61115},
+  keywords     = {verificada, paga}
+}
+
+@manual{opc10000-4,
+  author       = {{OPC Foundation}},
+  title        = {{OPC} 10000-4: {OPC} unified architecture -- Part 4: Services (versión 1.05.07)},
+  year         = {2026},
+  url          = {https://reference.opcfoundation.org/specs/OPC-10000-4/v1.05.07},
+  keywords     = {verificada, libre}
+}
+
+@manual{opc10000-6,
+  author       = {{OPC Foundation}},
+  title        = {{OPC} 10000-6: {OPC} unified architecture -- Part 6: Mappings (versión 1.05.07)},
+  year         = {2026},
+  url          = {https://reference.opcfoundation.org/specs/OPC-10000-6},
+  keywords     = {verificada, libre}
+}
+
+% ---------------------------------------------------------------- MQTT y Sparkplug B
+@manual{oasis2019,
+  author       = {Banks, Andrew and Briggs, Ed and Borgendale, Ken and Gupta, Rahul},
+  title        = {{MQTT} version 5.0 ({OASIS} Standard)},
+  organization = {OASIS},
+  year         = {2019},
+  date         = {2019-03-07},
+  url          = {https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html},
+  keywords     = {verificada, libre}
+}
+
+@manual{oasis2014,
+  author       = {Banks, Andrew and Gupta, Rahul},
+  title        = {{MQTT} version 3.1.1 ({OASIS} Standard)},
+  organization = {OASIS},
+  year         = {2014},
+  date         = {2014-10-29},
+  url          = {https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html},
+  keywords     = {verificada, libre}
+}
+
+@manual{eclipse2022,
+  author       = {{Eclipse Sparkplug Contributors}},
+  title        = {Sparkplug specification, version 3.0.0},
+  organization = {Eclipse Foundation},
+  year         = {2022},
+  date         = {2022-11-16},
+  url          = {https://www.eclipse.org/tahu/spec/sparkplug_spec.pdf},
+  keywords     = {verificada, libre}
+}
+
+@manual{iso20237,
+  author       = {{International Organization for Standardization} and {International Electrotechnical Commission}},
+  title        = {Information technology -- Sparkplug version 3.0 (ISO/IEC 20237:2023)},
+  year         = {2023},
+  url          = {https://www.iso.org/standard/86204.html},
+  keywords     = {verificada, paga}
+}
+
+@software{tahu2022proto,
+  author       = {{Eclipse Tahu Contributors}},
+  title        = {sparkplug\_b.proto [Definición Protobuf del payload Sparkplug B]},
+  year         = {2022},
+  version      = {commit 46f25e79},
+  url          = {https://github.com/eclipse-tahu/tahu/blob/master/sparkplug_b/sparkplug_b.proto},
+  keywords     = {verificada, consultada},
+  note         = {Copia en gateway-sparkplug/proto/sparkplug_b.proto}
+}
+
+% ---------------------------------------------------------------- Arquitectura industrial
+@manual{iec62264,
+  author       = {{International Electrotechnical Commission}},
+  title        = {Enterprise-control system integration -- Part 1: Models and terminology (IEC 62264-1:2013)},
+  year         = {2013},
+  url          = {https://webstore.iec.ch/publication/6675},
+  keywords     = {verificada, paga},
+  note         = {Adopción internacional de ANSI/ISA-95}
+}
+
+@article{williams1994,
+  author       = {Williams, Theodore J.},
+  title        = {The {Purdue} enterprise reference architecture},
+  journaltitle = {Computers in Industry},
+  volume       = {24},
+  number       = {2--3},
+  pages        = {141--158},
+  year         = {1994},
+  doi          = {10.1016/0166-3615(94)90017-5},
+  keywords     = {verificada, paga}
+}
+
+% ---------------------------------------------------------------- Trabajos previos del grupo
+@report{bevilacqua2026t1,
+  author       = {Bevilacqua, Francisco and Peralta, Agustina},
+  title        = {Tarea {Nº1}: Red de comunicación industrial {MODBus RTU} sobre {RS-485}},
+  institution  = {Universidad Nacional de Rafaela},
+  type         = {Informe técnico},
+  year         = {2026},
+  keywords     = {consultada}
+}
+
+@report{bevilacqua2026t2,
+  author       = {Bevilacqua, Francisco and Peralta, Agustina},
+  title        = {Tarea {Nº2}: {OPC UA} cliente-servidor sobre {Raspberry Pi}},
+  institution  = {Universidad Nacional de Rafaela},
+  type         = {Informe técnico},
+  year         = {2026},
+  keywords     = {consultada}
+}

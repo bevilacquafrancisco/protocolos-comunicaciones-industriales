@@ -1,0 +1,27 @@
+%% flujo-host-app.mmd — Host Application Sparkplug B (página web)
+%% Cada bloque [DF-4.x] se cita en el comentario JSDoc de la función que lo implementa.
+%% Requisitos I-08 (STATE, Rebirth) e I-05 (estadística de las cuatro capas)
+flowchart TD
+    A(["[DF-4.1] Inicio<br/>cargar sparkplug_b.proto con protobuf.js<br/>todas las métricas en estado 'sin datos'"])
+    A --> B["[DF-4.2] Conectar por WSS 8884 · usuario host_app<br/>Will: spBv1.0/STATE/HA01_WebDashboard<br/>{online: false, timestamp} · retenido · QoS 1"]
+    B -- "Falla o se corta" --> RX["[DF-4.13] Mostrar 'broker inaccesible'<br/>en el semáforo de la capa MQTT<br/>reconexión automática con backoff"]
+    RX --> B
+    B -- "Conectado" --> C["[DF-4.3] Suscribir spBv1.0/UNRaf_PdCI_2026/#<br/>publicar STATE {online: true, timestamp}<br/>retenido · QoS 1"]
+    C --> M(["[DF-4.4] Esperar mensaje"])
+    M --> P["[DF-4.5] Partir el tópico<br/>namespace / group / tipo / nodo / dispositivo<br/>decodificar el payload Protobuf"]
+    P --> T{"[DF-4.6] Tipo de mensaje"}
+    T -- NBIRTH --> NB["[DF-4.7] Registrar bdSeq de la sesión<br/>seq esperado = 1 · nodo en línea<br/>métricas del nodo desde el BIRTH"]
+    T -- NDEATH --> ND{"[DF-4.8] ¿bdSeq = el del<br/>NBIRTH vigente?"}
+    ND -- Sí --> ND1["Nodo fuera de línea<br/>todas sus métricas y las del dispositivo: obsoletas"]
+    ND -- "No: Will de una sesión vieja" --> M
+    T -- "NDATA · DBIRTH · DDATA · DDEATH" --> V{"[DF-4.9] ¿Hubo NBIRTH<br/>de esta sesión?"}
+    V -- No --> RB
+    V -- Sí --> S{"[DF-4.10] ¿seq = esperado?"}
+    S -- "No: se perdieron mensajes" --> RB["[DF-4.11] saltos_seq++<br/>publicar NCMD Node Control/Rebirth = true<br/>(como máximo 1 cada 5 s)"]
+    S -- Sí --> U["[DF-4.12] Actualizar el modelo y la vista<br/>DBIRTH: dispositivo en línea · DDEATH: obsoleto<br/>semáforo por capa: MODBus, OPC UA, MQTT, Sparkplug"]
+    NB --> U
+    ND1 --> U
+    RB --> M
+    U --> M
+    M -- "El usuario acciona una salida" --> CMD["[DF-4.14] Codificar DCMD<br/>Outputs/LedDigital (Boolean) u Outputs/LedPWM (UInt16, 0-255)<br/>publicar en .../DCMD/EN01_Gateway/DEV01_ESP32_Slave<br/>la vista cambia recién con el DDATA de confirmación"]
+    CMD --> M
