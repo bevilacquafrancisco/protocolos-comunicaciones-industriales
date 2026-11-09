@@ -1,4 +1,5 @@
 # Tarea 3: los scripts que corren en Linux o en la Raspberry Pi conservan LF aunque el
-# repositorio se clone en Windows (un "" al final de "set -euo pipefail" rompe bash).
+# repositorio se clone en Windows: un retorno de carro (CR) al final de "set -euo pipefail"
+# hace fallar a bash en la primera linea del script.
 *.sh text eol=lf
 *.py text eol=lf
