@@ -46,7 +46,7 @@ Decisión pendiente que bloquea F2: lenguaje del firmware del esclavo
 | `gateway-sparkplug/` | Dispositivo 3: cliente OPC UA, Edge Node, `proto/sparkplug_b.proto` | vacío |
 | `hmi-web/` | Host Application | vacío |
 | `simuladores/` | Esclavo MODBus sobre pty virtual, esclavo "desconocido" | vacío |
-| `informe/` | Fuente del informe; el PDF se genera en `informe/build/` (no se versiona) | vacío |
+| `informe/` | **Solo los PDF entregables** (hoy: `Bevilacqua_Peralta_PdCI_T3_26_preliminar.pdf`) | ✅ preliminar |
 | `defensa/` | Guion de 12 min y diapositivas | vacío |
 
 ## Reutilización de las tareas anteriores
@@ -66,18 +66,15 @@ Plantilla de variables: [.env.example](.env.example). El `.env` real se crea con
 
 ## Comandos
 
-### Informe (PDF con verificación de formato)
+### Informe
+
+`informe/` contiene solo los PDF entregables. Las fuentes del preliminar (Markdown, bibliografía
+APA 7, hoja de estilos y `construir_pdf.py`, que genera el PDF y verifica Arial 11, interlineado
+1,5 y márgenes 3 / 2,5 cm) se retiraron de la carpeta y quedan en el commit `658fa3a`:
 
 ```bash
-pip install pypandoc_binary pdfplumber        # trae pandoc; o instalar pandoc ≥ 3.1 aparte
-python tarea-3/informe/construir_pdf.py tarea-3/informe/preliminar.md \
-       --salida tarea-3/informe/build/Bevilacqua_Peralta_PdCI_T3_26_preliminar.pdf
+git restore --source=658fa3a -- tarea-3/informe/      # recuperarlas para editar y regenerar
 ```
-
-Markdown → pandoc + citeproc (APA 7, `informe/apa.csl`) → HTML → Chrome/Edge sin interfaz → PDF.
-El script verifica sobre el PDF real Arial 11, interlineado 1,5, márgenes 3 / 2,5 cm y justificado,
-y devuelve código 1 si algo falla. Si no encuentra el navegador: variable `CHROME`.
-`informe/build/` no se versiona: el PDF se regenera.
 
 ### Diagramas (Mermaid → PNG)
 

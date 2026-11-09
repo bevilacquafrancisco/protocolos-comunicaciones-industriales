@@ -52,8 +52,6 @@ venv/
 
 # --- Artefactos de build -------------------------------------------------------
 dist/
-informe/build/*
-!informe/build/.gitkeep
 hmi-web/dist/
 *.log
 

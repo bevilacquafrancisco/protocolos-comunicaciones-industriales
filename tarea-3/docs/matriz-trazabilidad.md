@@ -77,7 +77,7 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ cumplido y con evidencia
 | T.6 | Formato: PDF, Arial 11, interlineado 1,5, márgenes 3/2,5, justificado, APA 7 | `informe/` | ⬜ |
 | T.7 | Nombre `Apellido1_Apellido2_Apellido3_PdCI_T3_26.pdf` | Entrega | ⬜ |
 | T.8 | Se adjuntan códigos, simulaciones y diagramas | Paquete de entrega | ⬜ |
-| T.9 | Informe preliminar: explicación de la solución + diagrama de flujo + tipo de comunicación y orden de los datos en las tramas | `informe/preliminar.md` → `informe/build/..._preliminar.pdf` (formato verificado) | 🟨 generado, falta subirlo |
+| T.9 | Informe preliminar: explicación de la solución + diagrama de flujo + tipo de comunicación y orden de los datos en las tramas | `informe/Bevilacqua_Peralta_PdCI_T3_26_preliminar.pdf` (fuentes en el commit 658fa3a) | 🟨 generado, falta subirlo |
 | T.10 | Defensa de 12 minutos con los tres integrantes hablando | `defensa/guion-12min.md` | ⬜ |
 
 ---
