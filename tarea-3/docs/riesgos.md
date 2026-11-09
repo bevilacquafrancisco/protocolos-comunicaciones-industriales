@@ -30,6 +30,7 @@ Sin disparador medible, un riesgo no está gestionado.
 | R-08 | Credenciales MQTT expuestas en el navegador | 3 | 1 | 3 | F6 |
 | R-12 | Restaurar mal la microSD del laboratorio | 1 | 3 | 3 | F3-F4 |
 | R-15 | Erratas de la consigna mal interpretadas (nombre de archivo, criterios) | 2 | 1 | 2 | Entrega |
+| R-16 | `serial in` deja de recibir tras reabrir el puerto con `serial control` | 2 | 3 | **6** | F3-banco |
 
 ---
 
@@ -81,7 +82,7 @@ Sin disparador medible, un riesgo no está gestionado.
 |---|---|
 | **Causa** | Se desconoce todo: Unit ID, baud, paridad, mapa, FC soportadas, tipos (32 bits, float, word swap), si es RTU o ASCII |
 | **Efecto** | Falla I-04 frente al tribunal, en vivo |
-| **Mitigación** | (1) Mapa de registros como **tabla de datos** editable, nunca código. (2) Preajustes 9600 8N1 y 19200 8E1, y barrido de baud × paridad × ID (ADR-007). (3) Soportar FC 01-06 y 0F/10, tipos UInt16/Int16/UInt32/Float32 con orden de palabras configurable. (4) Ensayo cronometrado con el ESP32 #2 configurado por un tercero, objetivo < 3 min. (5) **Preguntar en el foro** qué tipo de esclavo traerán (marca, FC, si hay datasheet) |
+| **Mitigación** | **Avance F3 (2026-11-09):** implementados tabla editable, preajustes, descubrimiento en dos fases (0,8 s y 8,6 s contra el simulador), exploración de direcciones y trama manual; falta el ensayo cronometrado con el ESP32 #2. (1) Mapa de registros como **tabla de datos** editable, nunca código. (2) Preajustes 9600 8N1 y 19200 8E1, y barrido de baud × paridad × ID (ADR-007). (3) Soportar FC 01-06 y 0F/10, tipos UInt16/Int16/UInt32/Float32 con orden de palabras configurable. (4) Ensayo cronometrado con el ESP32 #2 configurado por un tercero, objetivo < 3 min. (5) **Preguntar en el foro** qué tipo de esclavo traerán (marca, FC, si hay datasheet) |
 | **Disparador** | En el ensayo, más de 3 minutos para establecer comunicación, **o** un parámetro del esclavo de prueba que el Dashboard no pueda expresar |
 | **Contingencia** | Pantalla "trama manual" en el Dashboard: escribir la PDU en hexadecimal, el maestro agrega el CRC propio y muestra la respuesta decodificada. Sirve para cualquier FC sin escribir código |
 
@@ -166,6 +167,16 @@ Sin disparador medible, un riesgo no está gestionado.
 | **Mitigación** | ADR-014: `DDEATH` solo tras ausencia sostenida (2000 ms) |
 | **Disparador** | Más de un par DDEATH/DBIRTH por minuto con el esclavo conectado |
 | **Contingencia** | Subir la ausencia sostenida y revisar la capa física (R-07) |
+
+### R-16 — `serial in` deja de recibir tras reabrir el puerto
+
+| | |
+|---|---|
+| **Causa** | `serial control` cierra y reabre el puerto compartido (`changePort` en `25-serial.js`) y responde antes de terminar; no se verificó que `serial in` siga recibiendo tras cada reapertura. El descubrimiento reabre el puerto hasta 24 veces |
+| **Efecto** | Tras reconfigurar, el maestro cuenta TIMEOUT aunque el esclavo responda |
+| **Mitigación** | Espera de asentamiento configurable (`esperaReconfiguracionMs`); prueba de banco B-2 de `edge-nodered/README.md` |
+| **Disparador** | TIMEOUT sostenido después de "Aplicar" con el esclavo verificado por el sniffer de la T1 |
+| **Contingencia** | Que el maestro abra el puerto con el paquete `serialport` directamente desde `lib/` (el mismo que usa el nodo) y prescindir de `serial control`; el transporte ya está aislado en `lib/transportes.js` |
 
 ### R-08 — Credenciales MQTT en el navegador
 

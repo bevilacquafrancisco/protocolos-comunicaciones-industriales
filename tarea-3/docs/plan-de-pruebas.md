@@ -63,7 +63,11 @@ Intercambio de bytes MSB/LSB en ambos sentidos.
 
 ## N2 · Pruebas de integración por enlace
 
-### N2.1 Enlace Modbus con puertos serie virtuales (sin hardware)
+### N2.1 Enlace Modbus sin hardware
+
+**Implementado en F3:** `edge-nodered/test/integracion_simulador.test.js` corre el maestro real contra `simuladores/esclavo_modbus_sim.py` (stack del firmware) por TCP, con emulación del desajuste de línea (ADR-017): lee, escribe, inyecta cada falla y descubre al esclavo desconocido. El camino serie real se prueba en Linux con `scripts/dev-serial.sh` (los pty ignoran baud y paridad).
+
+#### Con puertos serie virtuales (Linux)
 
 ```bash
 socat -d -d pty,raw,echo=0 pty,raw,echo=0     # devuelve /dev/pts/N y /dev/pts/M

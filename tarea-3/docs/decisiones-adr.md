@@ -21,10 +21,13 @@ Revisión contra el código de las Tareas 1 y 2 ([analisis-t1.md](analisis-t1.md
 | 009 | **Aceptado con corrección** | La T2 **no** tiene capturas de banco en Sign/SignAndEncrypt: hay que medirlas |
 | 010 | **Aceptado (2026-11-09)** | MicroPython con Thonny |
 | 011 | Propuesto | Servidor OPC UA del dispositivo 2 con `node-opcua` desde function nodes |
-| 012 | Propuesto | Delimitación de respuestas en el maestro por longitud esperada |
+| 012 | **Aceptado (F3)** | Delimitación de respuestas en el maestro por longitud esperada |
 | 013 | Propuesto | Cliente OPC UA del dispositivo 3 = v2 de la T2, adaptado |
-| 014 | Propuesto | Reintento y ausencia sostenida heredados de la T1 como disparador de `DDEATH` |
+| 014 | **Aceptado (F3)** | Reintento y ausencia sostenida heredados de la T1 como disparador de `DDEATH` |
 | 015 | Propuesto (F1) | El Write OPC UA se responde con el eco MODBus, no al encolar |
+| 016 | Aceptado (F3) | Dashboard 2.0: el Dashboard original está sin mantenimiento |
+| 017 | Aceptado (F3) | Transporte TCP de desarrollo que emula el desajuste de línea |
+| 018 | Aceptado (F3) | Descubrimiento en dos fases (menos de 60 s en el caso típico) |
 
 ---
 
@@ -399,6 +402,64 @@ curso (≤ 300 ms) + 2 intentos × 300 ms ≈ 0,9 s.
 **Consecuencias.** La web no muestra el valor pedido sino el confirmado: el `DDATA` posterior al
 sondeo de lectura (FC 01/03) es la confirmación visible. Se mide la latencia del camino de comando
 (plan de pruebas E2E-03/04).
+
+---
+
+## ADR-016 — Dashboard 2.0 (`@flowfuse/node-red-dashboard`) y no el Dashboard original *(Aceptado, F3)*
+
+**Contexto.** ADR-001 y ADR-008 suponen "Node-RED Dashboard" para la configuración en vivo (I-04).
+
+**Opciones.** 1. `node-red-dashboard` 3.6.6 (AngularJS). 2. **`@flowfuse/node-red-dashboard` 1.33.0**
+(Vue 3 + Vuetify). 3. `node-red-contrib-uibuilder`.
+
+**Decisión.** Opción 2.
+
+**Fundamento.** npm marca a `node-red-dashboard` como *"No longer maintained - please look at alternatives
+such as @flowfuse/node-red-dashboard"* (consultado 2026-11-09), y AngularJS no recibe correcciones de
+seguridad. La opción 2 es la sucesora recomendada por el proyecto Node-RED; uibuilder obliga a escribir
+el front-end completo. Se fija la 1.33.0 (2026-10-06) y no la última (1.36.0, de hace 3 días).
+
+**Consecuencias.** Los paneles complejos son `ui-template` en Vue. Se encontraron tres trampas del
+parseo con el HTML del navegador (`<v-table>` con filas, etiquetas autocerradas y atributos camelCase),
+que quedaron como regresión en `edge-nodered/test/flujos.test.js`.
+
+---
+
+## ADR-017 — Transporte TCP de desarrollo que emula el desajuste de línea *(Aceptado, F3)*
+
+**Contexto.** El maestro debe probarse sin hardware (CLAUDE.md §6), pero en Windows no hay `socat`, y en
+Linux un par de pty **ignora baud y paridad**: el asistente de descubrimiento "encontraría" al esclavo
+en cualquier combinación y la prueba del criterio de salida no probaría nada.
+
+**Decisión.** El maestro tiene un transporte compuesto: el puerto serie de `node-red-node-serialport`
+(producción) o TCP contra el simulador (desarrollo), conmutables en vivo. Por TCP, al conectar se envía
+`PDCI-LINEA <baud> <paridad> <bits> <parada>` y el simulador, si no coincide con la suya, se comporta
+como un UART desajustado: recibe basura y no responde.
+
+**Fundamento.** Hace reproducible y automatizable el ensayo de I-04 (ADR-007) en cualquier PC. El
+simulador ejecuta el stack REAL del firmware, así que cada prueba es además cruzada maestro JS y
+esclavo MicroPython.
+
+**Consecuencias.** El camino serie de Node-RED (`serial in`/`out`/`control`) queda probado solo en banco
+(R-16). `scripts/dev-serial.sh` cubre el camino serie en Linux, con la limitación de los pty documentada.
+
+---
+
+## ADR-018 — Descubrimiento en dos fases *(Aceptado, F3)*
+
+**Contexto.** El barrido completo cuesta combinaciones x IDs x timeout = 12 x 247 x 60 ms = **178 s**:
+no entra en la defensa, y el criterio de salida pide menos de 60 s.
+
+**Decisión.** Fase 1: los Unit ID habituales (1-10, 17, 247) en **todas** las combinaciones
+(12 x 12 x 60 ms = 8,6 s). Fase 2: el resto. Las combinaciones empiezan por 19200 8E1, el valor por
+defecto que fija la norma (MODBus over Serial Line §2.5.1). Una respuesta de excepción también cuenta
+como hallazgo: demuestra que hay un esclavo escuchando en esa configuración.
+
+**Fundamento.** Medido contra el simulador: ID 17 a 19200 8E1 en **0,8 s**; ID 5 a 38400 8O1 (combinación
+tardía) en **8,6 s**. El peor caso sigue siendo 178 s y el panel lo informa.
+
+**Consecuencias.** Un esclavo con un ID atípico en una combinación tardía puede tardar más de 60 s;
+mitigación: el panel permite acotar el rango de IDs y desmarcar combinaciones.
 
 ---
 

@@ -16,13 +16,13 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ cumplido y con evidencia
 | # | Requisito literal | Artefacto que lo cumple | Evidencia | Sección del informe | Estado |
 |---|---|---|---|---|---|
 | 1.0 | Dispositivo 1 = el esclavo de la Tarea Nº1 | `firmware/esclavo-modbus/` (HAL y mapa de la T1, protocolo propio) | Código + foto del montaje | 4.1 Dispositivo de campo | 🟨 código y pruebas en PC; falta banco |
-| 1.1 | Dispositivo 2 intercambia datos con las E/S del dispositivo 1 | Flow `modbus-master` | Captura del Dashboard con valores vivos | 4.2 Maestro de borde | ⬜ |
+| 1.1 | Dispositivo 2 intercambia datos con las E/S del dispositivo 1 | Flow `modbus-master` + `lib/maestro.js` | Captura del Dashboard con valores vivos | 4.2 Maestro de borde | 🟨 PC ✅ (simulador con el stack del firmware) · banco ⬜ |
 | 1.2 | Usar el esquema de la trama Modbus para ubicar los datos | `docs/diccionario-de-datos.md` §1 | Tabla de direcciones | 5.1 Mapa de registros | ⬜ |
 | 1.3 | Definir nombre, tipo y dirección Modbus de cada E/S, reutilizables como métricas Sparkplug | `docs/diccionario-de-datos.md` | Tabla única de las tres capas | 5.1 | ⬜ |
-| 1.a | Conexión física RS-485 **con CRC generado y verificado en maestro y esclavo** | `firmware/esclavo-modbus/lib/modbus_slave/crc16.py` + `edge-nodered/lib/crc16.js` | Tests *golden* en CPython y JS; captura del sniffer | 6.1 CRC-16 y su implementación | 🟨 esclavo: 35 verificaciones contra `tests/fixtures/crc_vectors.json`; falta maestro (F3) |
+| 1.a | Conexión física RS-485 **con CRC generado y verificado en maestro y esclavo** | `firmware/esclavo-modbus/lib/modbus_slave/crc16.py` + `edge-nodered/lib/modbus.js` | Tests *golden* en CPython y JS; captura del sniffer | 6.1 CRC-16 y su implementación | 🟨 los mismos 23 vectores pasan en el esclavo y en el maestro; falta el sniffer en banco |
 | 1.b | Explicar intercambio de mensajes, rutinas comentadas y **todos** los campos de la trama | `docs/diagramas/secuencia-modbus.mmd` + informe | Decodificación byte a byte de una trama real | 6.2 Análisis de trama Modbus | ⬜ |
-| 1.c | Contador de peticiones aceptadas y con error en el maestro, **visible en todas las capas** | Métricas `Status/MODBUS/*` | Captura de la web con los cuatro contadores | 7.3 Observabilidad | ⬜ |
-| 1.d | Maestro configurable en vivo para un esclavo que trae la cátedra | Dashboard de configuración + asistente de descubrimiento | Video o captura del ensayo contra el ESP32 #2 | 4.2.3 Configuración en runtime | ⬜ |
+| 1.c | Contador de peticiones aceptadas y con error en el maestro, **visible en todas las capas** | Contadores de `lib/maestro.js`, persistidos; panel de las cuatro capas | Captura de la web con los cuatro contadores | 7.3 Observabilidad | 🟨 MODBus y Dashboard ✅ · OPC UA/MQTT/Sparkplug ⬜ |
+| 1.d | Maestro configurable en vivo para un esclavo que trae la cátedra | Dashboard de configuración + asistente de descubrimiento | Video o captura del ensayo contra el ESP32 #2 | 4.2.3 Configuración en runtime | 🟨 PC ✅ (descubrimiento y Aplicar desde el panel) · banco ⬜ |
 
 ## Consigna 2 — OPC UA entre dispositivo 2 y dispositivo 3
 

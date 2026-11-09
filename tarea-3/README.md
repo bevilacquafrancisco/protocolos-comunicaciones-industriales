@@ -15,9 +15,9 @@ Nivel 3    PC / VM (dispositivo 3) ── cliente OPC UA de la T2 (asyncua) + Ed
 Nivel 4    Navegador ── Host Application (MQTT sobre WSS + protobuf.js)
 ```
 
-**Estado:** F0 y F1 cerradas (análisis, diseño, informe preliminar entregable). **F2 en código:**
-esclavo MODBus RTU con stack propio en MicroPython, probado en la PC; falta la verificación en
-banco ([firmware/README.md](firmware/README.md)).
+**Estado:** F0 y F1 cerradas (análisis, diseño, informe preliminar entregable). **F2 y F3 en código:**
+esclavo MODBus RTU en MicroPython y maestro en Node-RED con Dashboard, probados en la PC; falta la
+verificación en banco ([firmware/README.md](firmware/README.md), [edge-nodered/README.md](edge-nodered/README.md)).
 
 ## Empezar acá
 
@@ -39,15 +39,16 @@ banco ([firmware/README.md](firmware/README.md)).
 |---|---|---|
 | `consigna/` | Enunciado de la T3 | ✅ |
 | `docs/` | Diccionario, ADR, riesgos, análisis, matriz, plan de pruebas | ✅ F0 |
-| `docs/diagramas/` | Fuentes Mermaid (`.mmd`) y PNG renderizados | vacío |
+| `docs/diagramas/` | Fuentes Mermaid (`.mmd`) y PNG renderizados: arquitectura, flujos DF-1 a DF-4 y secuencia | ✅ F1 |
 | `docs/capturas/` | Wireshark, MQTT Explorer, sniffer RS-485, fotos | vacío |
 | `firmware/esclavo-modbus/` | Dispositivo 1: esclavo MODBus RTU en MicroPython, stack propio ([README](firmware/README.md)) | 🟨 PC ✅ · banco ⬜ |
+| `edge-nodered/` | Dispositivo 2: maestro MODBus en Node-RED, Dashboard de configuración en vivo y estadísticas ([README](edge-nodered/README.md)) | 🟨 PC ✅ · banco ⬜ |
+| `simuladores/` | Esclavo simulado con el stack del firmware y fallas inyectables; esclavo desconocido | ✅ |
+| `scripts/` | `dev-serial.sh`: par de pty con socat y simulador (Linux) | ✅ |
 | `tests/fixtures/` | Vectores golden del CRC, compartidos por el esclavo y el maestro | ✅ |
 | `tools/` | Generador de vectores (pymodbus como oráculo) y dependencias de desarrollo | ✅ |
-| `edge-nodered/` | Dispositivo 2: flows por función, `lib/` (CRC, PDU), `settings.js`, `config/` | vacío |
 | `gateway-sparkplug/` | Dispositivo 3: cliente OPC UA, Edge Node, `proto/sparkplug_b.proto` | vacío |
 | `hmi-web/` | Host Application | vacío |
-| `simuladores/` | Esclavo MODBus sobre pty virtual, esclavo "desconocido" | vacío |
 | `informe/` | **Solo los PDF entregables** (hoy: `Bevilacqua_Peralta_PdCI_T3_26_preliminar.pdf`) | ✅ preliminar |
 | `defensa/` | Guion de 12 min y diapositivas | vacío |
 
