@@ -41,7 +41,7 @@ Sin disparador medible, un riesgo no está gestionado.
 |---|---|
 | **Causa** | I-01 obliga a reescribir lo que hacía `umodbus`. La librería resolvía detalles que se pierden fácil: `uart.flush()` + 1 carácter antes de bajar DE/RE, 200 µs tras subirlo, delimitación por silencio con `ticks_us` |
 | **Efecto** | Tramas truncadas, timeouts, o tasa de error > 0 % donde la T1 midió 0,0 % |
-| **Mitigación** | (1) Tests en PC del parser y del CRC con vectores *golden* de dos oráculos. (2) Replicar el `_send()` de `umodbus` 2.3.7 y citarlo. (3) Comprobar al arrancar que `UART.flush` existe (MicroPython ≥ 1.20). (4) Criterio de aceptación de banco: ≥ 750 ciclos con 0 % a 9600 bps, igual que la T1 |
+| **Mitigación** | **Avance F2 (2026-11-09):** 169 verificaciones en PC, compilación con mpy-cross para ESP32 y secuencia de `_send()` replicada; falta el criterio de banco. (1) Tests en PC del parser y del CRC con vectores *golden* de dos oráculos. (2) Replicar el `_send()` de `umodbus` 2.3.7 y citarlo. (3) Comprobar al arrancar que `UART.flush` existe (MicroPython ≥ 1.20). (4) Criterio de aceptación de banco: ≥ 750 ciclos con 0 % a 9600 bps, igual que la T1 |
 | **Disparador** | Tasa de error > 0,5 % en 750 ciclos a 9600 bps con un solo esclavo, **o** cualquier trama truncada en el sniffer |
 | **Contingencia** | Pasar el esclavo a C++/Arduino (ADR-010, opción 2), con el mismo mapa y los mismos vectores |
 

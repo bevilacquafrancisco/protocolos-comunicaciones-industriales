@@ -28,7 +28,7 @@ completo está en [analisis-t1.md](analisis-t1.md) y [analisis-t2.md](analisis-t
 | Pulsador | **GPIO 18**, pull-up interno, activo en bajo (el firmware entrega 1 = presionado) | Discrete Input `10001` → offset `0x0000` | FC 02 / — | bit | `s=Dispositivo1.Inputs.Pulsador` | `Inputs/Pulsador` | `Boolean` |
 | Potenciómetro | **GPIO 34** (ADC1_CH6), atenuación 11 dB, promedio de 8 muestras | Input Register `30001` → offset `0x0000` | FC 04 / — | word 16 bits, 0–4095 | `s=Dispositivo1.Inputs.Potenciometro` | `Inputs/Potenciometro` | `UInt16` |
 | LED digital | **GPIO 19**, 330 Ω a GND | Coil `00001` → offset `0x0000` | FC 01 / FC 05 | bit | `s=Dispositivo1.Outputs.LedDigital` | `Outputs/LedDigital` | `Boolean` |
-| LED PWM | **GPIO 21**, 330 Ω a GND, 1000 Hz (`machine.PWM.duty_u16`) | Holding Register `40001` → offset `0x0000` | FC 03 / FC 06 | word 16 bits, rango útil 0–255 (el esclavo satura) | `s=Dispositivo1.Outputs.LedPWM` | `Outputs/LedPWM` | `UInt16` |
+| LED PWM | **GPIO 21**, 330 Ω a GND, 1000 Hz (`machine.PWM.duty_u16`) | Holding Register `40001` → offset `0x0000` | FC 03 / FC 06 | word 16 bits, 0–255; una escritura > 255 se rechaza con **excepción 03** (en la T1 saturaba; cambio de F2) | `s=Dispositivo1.Outputs.LedPWM` | `Outputs/LedPWM` | `UInt16` |
 | *(derivada, ADR-003)* | — | — (no viaja por MODBus) | — | — | `s=Dispositivo1.Inputs.Potenciometro_pct` | `Inputs/Potenciometro_pct` | `Float` |
 
 Interfaz RS-485 del dispositivo 1 (no son métricas, se documentan para el conexionado):

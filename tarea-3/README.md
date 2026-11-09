@@ -15,9 +15,9 @@ Nivel 3    PC / VM (dispositivo 3) ── cliente OPC UA de la T2 (asyncua) + Ed
 Nivel 4    Navegador ── Host Application (MQTT sobre WSS + protobuf.js)
 ```
 
-**Estado: Fase F0 cerrada (análisis y documentación).** Todavía no hay código de producción.
-Decisión pendiente que bloquea F2: lenguaje del firmware del esclavo
-([ADR-010](docs/decisiones-adr.md)).
+**Estado:** F0 y F1 cerradas (análisis, diseño, informe preliminar entregable). **F2 en código:**
+esclavo MODBus RTU con stack propio en MicroPython, probado en la PC; falta la verificación en
+banco ([firmware/README.md](firmware/README.md)).
 
 ## Empezar acá
 
@@ -41,7 +41,9 @@ Decisión pendiente que bloquea F2: lenguaje del firmware del esclavo
 | `docs/` | Diccionario, ADR, riesgos, análisis, matriz, plan de pruebas | ✅ F0 |
 | `docs/diagramas/` | Fuentes Mermaid (`.mmd`) y PNG renderizados | vacío |
 | `docs/capturas/` | Wireshark, MQTT Explorer, sniffer RS-485, fotos | vacío |
-| `firmware/esclavo-modbus/` | Dispositivo 1. Lenguaje según ADR-010 | vacío |
+| `firmware/esclavo-modbus/` | Dispositivo 1: esclavo MODBus RTU en MicroPython, stack propio ([README](firmware/README.md)) | 🟨 PC ✅ · banco ⬜ |
+| `tests/fixtures/` | Vectores golden del CRC, compartidos por el esclavo y el maestro | ✅ |
+| `tools/` | Generador de vectores (pymodbus como oráculo) y dependencias de desarrollo | ✅ |
 | `edge-nodered/` | Dispositivo 2: flows por función, `lib/` (CRC, PDU), `settings.js`, `config/` | vacío |
 | `gateway-sparkplug/` | Dispositivo 3: cliente OPC UA, Edge Node, `proto/sparkplug_b.proto` | vacío |
 | `hmi-web/` | Host Application | vacío |
@@ -88,8 +90,9 @@ de sentencia).
 
 ### Tareas anteriores
 
-Todavía no hay código de producción de la T3. Las verificaciones de las tareas anteriores que la
-T3 reutiliza se corren desde la raíz del repositorio (ver `CLAUDE.md` raíz):
+Esclavo de la T3 (sin placa): `python tarea-3/firmware/esclavo-modbus/test/correr_todo.py`.
+Las verificaciones de las tareas anteriores que la T3 reutiliza se corren desde la raíz del
+repositorio (ver `CLAUDE.md` raíz):
 
 ```bash
 python tarea-1/herramientas/modbus_tramas.py     # CRC-16/MODBUS contra el vector 123456789 -> 0x4B37

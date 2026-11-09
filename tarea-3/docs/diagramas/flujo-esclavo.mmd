@@ -31,7 +31,7 @@ flowchart TD
     %% ---------------- Columna 3: despacho, respuesta y salidas ----------------
     A2((A)) --> J{"[DF-1.10] Despacho por<br/>código de función"}
     J -- "01 · 02 · 03 · 04 · 05 · 06" --> K{"[DF-1.11] ¿Dirección, cantidad<br/>y valor válidos según<br/>el mapa de config.py?"}
-    J -- "Otro" --> EX["[DF-1.13] Respuesta de excepción<br/>01 ILLEGAL FUNCTION<br/>02 ILLEGAL DATA ADDRESS<br/>03 ILLEGAL DATA VALUE<br/>(FC | 0x80 + código)"]
+    J -- "Otro" --> EX["[DF-1.13] Respuesta de excepción<br/>01 ILLEGAL FUNCTION<br/>02 ILLEGAL DATA ADDRESS<br/>03 ILLEGAL DATA VALUE<br/>04 SLAVE DEVICE FAILURE (error al ejecutar)<br/>(FC | 0x80 + código)"]
     K -- "No" --> EX
     K -- "Sí" --> L["[DF-1.12] Ejecutar<br/>lectura: empaquetar bits o words big-endian<br/>escritura: actualizar Coil / HR (respuesta = eco)"]
     L --> Q{"[DF-1.14] ¿Unit ID = 0<br/>(difusión)?"}
