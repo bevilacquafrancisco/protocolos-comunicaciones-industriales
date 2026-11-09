@@ -1,0 +1,72 @@
+# Tarea 3 - archivos que NUNCA van al repositorio
+# Regla del proyecto: ningun secreto, certificado ni clave en git (CLAUDE.md §5).
+
+# --- Secretos y configuracion local ------------------------------------------
+.env
+.env.*
+!.env.example
+*.env
+!*.env.example
+flows_cred.json
+**/users.json
+
+# --- Certificados, claves y PKI (OPC UA y MQTT/TLS) --------------------------
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.p12
+*.pfx
+*.csr
+pki/
+**/pki/
+ServerPKI/
+UserPKI/
+certificados/
+
+# --- Node-RED ------------------------------------------------------------------
+node_modules/
+.node-red/
+.config.*.json
+.config.*.json.backup
+*.backup
+.flows*.json.backup
+.sessions.json
+
+# --- Python --------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# --- PlatformIO / C++ (si ADR-010 elige esa opcion) --------------------------
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/.browse.c_cpp.db*
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+
+# --- Artefactos de build -------------------------------------------------------
+dist/
+informe/build/*
+!informe/build/.gitkeep
+hmi-web/dist/
+*.log
+
+# --- Codigo Protobuf generado (se regenera desde proto/sparkplug_b.proto) ------
+# Si se decide versionarlo para no depender de protoc, quitar estas lineas.
+*_pb2.py
+*_pb2.pyi
+
+# --- Capturas crudas pesadas: se versionan solo las que cita el informe --------
+# (las .pcapng de OPC UA en modo None muestran el nombre de usuario: revisar antes de agregar)
+*.pcap
+
+# --- Sistema operativo ---------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
