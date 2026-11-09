@@ -1,0 +1,7 @@
+# Dependencias de desarrollo de la Tarea 3 (solo en la PC; ninguna va al firmware ni a Node-RED).
+#
+# pymodbus: UNICAMENTE oraculo para generar tests/fixtures/crc_vectors.json (I-01, ADR-002).
+pymodbus==3.8.6
+# mpy-cross: compilador oficial de MicroPython. prueba_config.py lo usa para comprobar que el
+# firmware compila para el ESP32 (xtensawin); sin el, esa verificacion se omite.
+mpy-cross==1.24.1.post3
