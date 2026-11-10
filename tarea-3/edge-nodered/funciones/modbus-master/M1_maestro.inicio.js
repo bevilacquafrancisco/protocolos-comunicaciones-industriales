@@ -75,6 +75,8 @@ const intervalo = setInterval(() => {
 }, 500);
 
 context.set('maestro', maestro);
+// O1 (servidor OPC UA) encola sus escrituras FC 05/06 en este mismo maestro [DF-5.4].
+global.set('pdci_maestro', maestro);
 context.set('transporte', transporte);
 context.set('intervalo', intervalo);
 

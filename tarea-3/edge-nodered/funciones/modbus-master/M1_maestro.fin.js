@@ -8,6 +8,7 @@
 // =====================================================================
 const maestro = context.get('maestro');
 if (maestro) maestro.detener();
+if (global.get('pdci_maestro') === maestro) global.set('pdci_maestro', undefined);
 const transporte = context.get('transporte');
 if (transporte) transporte.destruir();
 clearInterval(context.get('intervalo'));

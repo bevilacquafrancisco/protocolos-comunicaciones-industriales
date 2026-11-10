@@ -86,8 +86,8 @@ describe('codigo de los function nodes', () => {
             expect(() => vm.compileFunction(`return (async () => {\n${codigo}\n})();`, params)).not.toThrow();
         }
     });
-    test('cada function node nombra su bloque (M, D o E) para la trazabilidad (I-09)', () => {
-        for (const f of funciones) expect(f.name).toMatch(/^[MDE]\d · /);
+    test('cada function node nombra su bloque (M, D, E u O) para la trazabilidad (I-09)', () => {
+        for (const f of funciones) expect(f.name).toMatch(/^[MDEO]\d · /);
     });
 });
 
@@ -101,5 +101,29 @@ describe('plantillas Vue: trampas de Dashboard 2.0 (regresion)', () => {
         const conMayusculas = [...html.matchAll(/\s([@:]?[\w:.-]*[A-Z][\w:.-]*)=/g)].map((m) => m[1]);
         expect(conMayusculas).toEqual([]);                                // (3) atributos camelCase
         expect(t.format).toMatch(/<script>[\s\S]*export default/);
+    });
+});
+
+describe('servidor OPC UA (F4)', () => {
+    const { ID } = require('../generar_flujos');
+    const o1 = TODOS.find((n) => n.type === 'function' && n.name.startsWith('O1 '));
+
+    test('el estado y los valores del maestro llegan a O1 por links', () => {
+        expect(porId.get(ID.deMaestroEstado).links).toContain(ID.opcuaEstado);
+        expect(porId.get(ID.deMaestroValores).links).toContain(ID.opcuaValores);
+        for (const l of [ID.opcuaEstado, ID.opcuaValores]) expect(porId.get(l).wires[0]).toEqual([o1.id]);
+    });
+
+    test('O1 cierra el servidor en On Stop y el tick de salud lleva topic', () => {
+        expect(o1.finalize).toMatch(/detener\(/);
+        const tick = TODOS.find((n) => n.type === 'inject' && n.wires[0].includes(o1.id));
+        expect(tick.topic).toBe('salud');
+        expect(tick.props.map((p) => p.p)).toContain('topic');
+    });
+
+    test('M1 publica el maestro para las escrituras OPC UA y lo retira al detenerse', () => {
+        const m1 = TODOS.find((n) => n.type === 'function' && n.name.startsWith('M1 '));
+        expect(m1.initialize).toMatch(/global\.set\('pdci_maestro', maestro\)/);
+        expect(m1.finalize).toMatch(/global\.set\('pdci_maestro', undefined\)/);
     });
 });

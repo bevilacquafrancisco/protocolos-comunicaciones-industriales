@@ -12,6 +12,7 @@
  *   modbus-master.json     maestro MODBus RTU: puerto serie, M1-M4
  *   dashboard-config.json  pagina de configuracion en vivo (I-04): D1, D2 y 4 paneles
  *   estadisticas.json      pagina de estadistica de las cuatro capas (I-05): E1, E2 y 4 paneles
+ *   opcua-server.json      servidor OPC UA (F4): O1 y el panel de la lista de confianza
  *
  * y el archivo combinado que carga Node-RED (<userDir>/flows.json, no versionado).
  *
@@ -62,6 +63,8 @@ const ID = {
     estadValores: id('link/estad-valores'),
     estadRespuestas: id('link/estad-respuestas'),
     estadAMaestro: id('link/estad-a-maestro'),
+    opcuaEstado: id('link/opcua-estado'),
+    opcuaValores: id('link/opcua-valores'),
 };
 
 /** Fabrica de nodos de una pestana. */
@@ -73,9 +76,9 @@ function fabrica(prefijo, tab) {
         nid,
         tab: (etiqueta, info) => ({ id: tab, type: 'tab', label: etiqueta, disabled: false, info }),
         comentario: (nombre, info, x, y) => base('comment', nombre, x, y, { info, wires: [] }),
-        inject: (nombre, x, y, { repetirS, destinos }) => base('inject', nombre, x, y, {
-            props: [{ p: 'payload' }], repeat: String(repetirS), crontab: '', once: true, onceDelay: '2',
-            topic: '', payload: '', payloadType: 'date', wires: cables([destinos]) }),
+        inject: (nombre, x, y, { repetirS, destinos, topic = '' }) => base('inject', nombre, x, y, {
+            props: [{ p: 'payload' }, { p: 'topic', vt: 'str' }], repeat: String(repetirS), crontab: '', once: true, onceDelay: '2',
+            topic, payload: '', payloadType: 'date', wires: cables([destinos]) }),
         funcion: (nombre, x, y, { archivo, inicio = '', fin = '', salidas = 1, etiquetas = [], destinos = [[]] }) =>
             base('function', nombre, x, y, {
                 func: leer(archivo), outputs: salidas, timeout: 0, noerr: 0,
@@ -152,8 +155,8 @@ function flujoMaestro() {
             destinos: [['M1 · maestro MODBus [DF-2.1 a DF-2.17]']] }),
         f.linkIn('→ maestro (comandos)', ID.aMaestro, 150, 180, { desde: [ID.configAMaestro, ID.estadAMaestro],
             destinos: ['M1 · maestro MODBus [DF-2.1 a DF-2.17]'] }),
-        f.linkOut('maestro → estado', ID.deMaestroEstado, 880, 200, { hacia: [] }),
-        f.linkOut('maestro → valores', ID.deMaestroValores, 880, 240, { hacia: [ID.estadValores] }),
+        f.linkOut('maestro → estado', ID.deMaestroEstado, 880, 200, { hacia: [ID.opcuaEstado] }),
+        f.linkOut('maestro → valores', ID.deMaestroValores, 880, 240, { hacia: [ID.estadValores, ID.opcuaValores] }),
         f.linkOut('maestro → respuestas', ID.deMaestroRespuestas, 880, 280,
             { hacia: [ID.configDesdeMaestro, ID.estadRespuestas] }),
         f.inject('cada 10 s', 150, 320, { repetirS: 10, destinos: ['M4 · persistir contadores'] }),
@@ -234,6 +237,32 @@ function flujoEstadisticas() {
 }
 
 // =============================================================================
+// opcua-server.json — servidor OPC UA (F4, ADR-011 / ADR-019)
+// =============================================================================
+function flujoOpcua() {
+    const tab = id('tab/opcua');
+    const f = fabrica('opcua', tab);
+    const O1 = 'O1 · servidor OPC UA [DF-5.1 a DF-5.7]';
+    const grupo = f.grupo('Servidor OPC UA · lista de confianza', ID.paginaConfig, 12, 5);
+    return [
+        f.tab('OPC UA · servidor', 'Servidor OPC UA con node-opcua 2.160.0 desde un function node (ADR-011, ADR-019). '
+            + 'Espacio de direcciones: docs/diccionario-de-datos.md §3. Seguridad: docs/seguridad-opcua.md. '
+            + 'Generado por generar_flujos.js: no editar a mano.'),
+        grupo,
+        f.comentario('Servidor OPC UA · F4', 'O1 publica lo que lee el maestro y le delega las escrituras '
+            + '(FC 05/06; el WriteResponse espera el eco). Un cambio en lib/ exige reiniciar Node-RED.', 200, 40),
+        f.linkIn('maestro → estado (OPC UA)', ID.opcuaEstado, 150, 100, { desde: [ID.deMaestroEstado], destinos: [O1] }),
+        f.linkIn('maestro → valores (OPC UA)', ID.opcuaValores, 150, 140, { desde: [ID.deMaestroValores], destinos: [O1] }),
+        f.inject('salud cada 1 s', 150, 180, { repetirS: 1, topic: 'salud', destinos: [O1] }),
+        f.funcion(O1, 420, 140, { archivo: 'funciones/opcua-server/O1_servidor.js',
+            inicio: 'funciones/opcua-server/O1_servidor.inicio.js', fin: 'funciones/opcua-server/O1_servidor.fin.js',
+            etiquetas: ['certificados'], destinos: [['panel certificados']] }),
+        f.plantilla('panel certificados', 680, 140, { archivo: 'plantillas/certificados.vue', grupo: grupo.id, orden: 1,
+            destinos: [O1] }),
+    ];
+}
+
+// =============================================================================
 // Escritura
 // =============================================================================
 
@@ -244,6 +273,7 @@ function generar() {
         'modbus-master.json': flujoMaestro(),
         'dashboard-config.json': flujoDashboardConfig(),
         'estadisticas.json': flujoEstadisticas(),
+        'opcua-server.json': flujoOpcua(),
     };
 }
 

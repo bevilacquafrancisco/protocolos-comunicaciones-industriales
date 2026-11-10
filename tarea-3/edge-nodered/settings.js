@@ -23,12 +23,17 @@
  *   PDCI_T3_ADMIN_USUARIO / PDCI_T3_ADMIN_HASH  usuario del editor y su hash bcrypt
  *                            (node-red admin hash-pw). [SEC] Nunca la contrasena en claro.
  *   PDCI_T3_UI_USUARIO / PDCI_T3_UI_HASH        idem para el Dashboard (httpNodeAuth)
+ *   PDCI_T3_OPCUA_PUERTO     puerto del servidor OPC UA (por defecto 4840)
+ *   PDCI_T3_OPCUA_PKI        PKI del servidor OPC UA (por defecto <userDir>/opcua-pki). FUERA del repo.
+ *   PDCI_T3_OPCUA_USUARIO / PDCI_T3_OPCUA_HASH  usuario OPC UA con permiso de escritura y su hash
+ *                            scrypt (node tools/generar_hash_opcua.js). Sin ellos solo hay anonimo
+ *                            (lectura): nadie puede escribir Outputs.
  *
  * Uso
  *   desarrollo:  npm start                     (en tarea-3/edge-nodered)
  *   Raspberry:   node-red --settings /ruta/a/tarea-3/edge-nodered/settings.js
  *
- * Dependencias externas: node-red 4.1, @flowfuse/node-red-dashboard 1.33, node-red-node-serialport 2.0.
+ * Dependencias externas: node-red 4.1, @flowfuse/node-red-dashboard 1.33, node-red-node-serialport 2.0, node-opcua 2.160.
  */
 'use strict';
 
@@ -49,6 +54,7 @@ function credencial(prefijo) {
 }
 const admin = credencial('PDCI_T3_ADMIN');
 const ui = credencial('PDCI_T3_UI');
+const opcuaUsuario = credencial('PDCI_T3_OPCUA');
 
 // [SEC] Fuera de 127.0.0.1, sin credenciales no se arranca: un maestro MODBus accesible en la
 // red sin autenticacion permitiria escribir salidas de campo a cualquiera (IEC 62443, SR 1.1).
@@ -80,6 +86,15 @@ module.exports = {
             ESTADO,
             capas: new RegistroCapas(),
             historial: new Historial(200),
+            // Servidor OPC UA (F4, ADR-011/ADR-019): node-opcua usado desde el function node O1.
+            servidorOpcua: require('./lib/servidor_opcua'),
+            nodeOpcua: require('node-opcua'),
+            opcua: Object.freeze({
+                puerto: Number(process.env.PDCI_T3_OPCUA_PUERTO) || 4840,
+                namespaceUri: 'urn:unraf:pdci:t3',
+                directorioPki: process.env.PDCI_T3_OPCUA_PKI || path.join(USER_DIR, 'opcua-pki'),
+                credenciales: opcuaUsuario ? { usuario: opcuaUsuario.usuario, hashClave: opcuaUsuario.hash } : null,
+            }),
             rutas: {
                 config: process.env.PDCI_T3_CONFIG || path.join(USER_DIR, 'pdci-t3-config.json'),
             },

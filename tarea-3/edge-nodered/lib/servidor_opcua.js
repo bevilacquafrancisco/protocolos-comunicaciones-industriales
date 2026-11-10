@@ -39,6 +39,8 @@
 'use strict';
 
 const os = require('node:os');
+const fs = require('node:fs');
+const path = require('node:path');
 const { verificarClave } = require('./credenciales');
 
 /** Antiguedad maxima de los datos del maestro para declarar la capa sana. */
@@ -224,13 +226,33 @@ async function iniciarServidor({ opcua, puerto, namespaceUri, directorioPki, cre
     });
     await gestorCertificados.initialize();
 
+    // [DF-5.1] Certificado X.509 de aplicacion propio. Sin esto node-opcua genera uno con su
+    // sujeto de ejemplo (C=FR, L=Orleans, O=Sterfive), el CN truncado a 64 caracteres y 10 anos
+    // de validez (observado en la PC). Se genera UNA vez; si existe, se reutiliza (los clientes
+    // ya confiaron en esa huella). Validez 730 dias: NIST SP 800-57 Parte 1, tabla 1, sugiere
+    // 1-3 anos para claves privadas de firma; cubre la cursada y la defensa.
+    const applicationUri = `urn:${os.hostname()}:unraf:pdci:t3:servidor`;
+    const archivoCertificado = path.join(gestorCertificados.rootDir, 'own', 'certs', 'servidor_pdci_t3.pem');
+    const archivoClave = path.join(gestorCertificados.rootDir, 'own', 'private', 'private_key.pem');
+    if (!fs.existsSync(archivoCertificado)) {
+        await gestorCertificados.createSelfSignedCertificate({
+            outputFile: archivoCertificado, applicationUri,
+            subject: { commonName: 'PdCI-T3 Dispositivo 2', organization: 'UNRaf', organizationalUnit: 'PdCI T3',
+                locality: 'Rafaela', state: 'Santa Fe', country: 'AR' },
+            dns: [os.hostname()], ip: direccionesIPv4(), startDate: new Date(), validity: 730,
+        });
+        registrar(`certificado de aplicacion creado: ${archivoCertificado}`);
+    }
+
     const servidor = new opcua.OPCUAServer({
+        certificateFile: archivoCertificado,
+        privateKeyFile: archivoClave,
         port: puerto,
         resourcePath: '',
         alternateHostname: direccionesIPv4(),
         skipOwnNamespace: true,   // ns=1 = urn:unraf:pdci:t3, no la applicationUri
         serverInfo: {
-            applicationUri: `urn:${os.hostname()}:unraf:pdci:t3:servidor`,
+            applicationUri,
             productUri: 'urn:unraf:pdci:t3',
             applicationName: { text: 'UNRaf PdCI T3 - Dispositivo 2 (maestro MODBus + servidor OPC UA)', locale: 'es' },
         },
@@ -394,8 +416,6 @@ async function iniciarServidor({ opcua, puerto, namespaceUri, directorioPki, cre
     // corriendo NO alcanza (medido: sigue rechazando). Dos caminos validos: mover el archivo y
     // reiniciar Node-RED, o estas funciones, que usan la API del gestor y aplican en vivo.
     const crypto = require('node-opcua-crypto');
-    const fs = require('node:fs');
-    const path = require('node:path');
     const carpeta = (sub) => path.join(gestorCertificados.rootDir, sub);
 
     /** Certificados de clientes en rejected/ y trusted/certs/, con huella SHA-1 y sujeto. */
@@ -410,7 +430,12 @@ async function iniciarServidor({ opcua, puerto, namespaceUri, directorioPki, cre
                         && (info.tbsCertificate.extensions.subjectAltName.uniformResourceIdentifier || [])[0]) || '',
                     venceEl: info.tbsCertificate.validity.notAfter };
             });
-        return { rechazados: leerCarpeta(carpeta('rejected')), confiables: leerCarpeta(carpeta(path.join('trusted', 'certs'))) };
+        // El propio certificado del servidor tambien vive en trusted/: se excluye para que el
+        // panel no ofrezca revocarlo (dejaria al servidor sin poder validarse a si mismo).
+        const propia = crypto.makeSHA1Thumbprint(servidor.getCertificate()).toString('hex');
+        const ajenos = (lista) => lista.filter((c) => c.huella !== propia);
+        return { rechazados: ajenos(leerCarpeta(carpeta('rejected'))),
+            confiables: ajenos(leerCarpeta(carpeta(path.join('trusted', 'certs')))) };
     }
 
     /**

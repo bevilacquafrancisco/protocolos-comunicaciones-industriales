@@ -1,0 +1,143 @@
+[
+    {
+        "id": "4c24867db84dd995",
+        "type": "tab",
+        "label": "OPC UA · servidor",
+        "disabled": false,
+        "info": "Servidor OPC UA con node-opcua 2.160.0 desde un function node (ADR-011, ADR-019). Espacio de direcciones: docs/diccionario-de-datos.md §3. Seguridad: docs/seguridad-opcua.md. Generado por generar_flujos.js: no editar a mano."
+    },
+    {
+        "id": "3115d371358551dd",
+        "type": "ui-group",
+        "name": "Servidor OPC UA · lista de confianza",
+        "page": "56d8e6461541c477",
+        "width": 12,
+        "height": 1,
+        "order": 5,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "c57880a942b62067",
+        "type": "comment",
+        "z": "4c24867db84dd995",
+        "name": "Servidor OPC UA · F4",
+        "x": 200,
+        "y": 40,
+        "info": "O1 publica lo que lee el maestro y le delega las escrituras (FC 05/06; el WriteResponse espera el eco). Un cambio en lib/ exige reiniciar Node-RED.",
+        "wires": []
+    },
+    {
+        "id": "be9c1133e6dcf89f",
+        "type": "link in",
+        "z": "4c24867db84dd995",
+        "name": "maestro → estado (OPC UA)",
+        "x": 150,
+        "y": 100,
+        "links": [
+            "dcf5d10360c44181"
+        ],
+        "wires": [
+            [
+                "9d08face3a1714cc"
+            ]
+        ]
+    },
+    {
+        "id": "824a50c84a175135",
+        "type": "link in",
+        "z": "4c24867db84dd995",
+        "name": "maestro → valores (OPC UA)",
+        "x": 150,
+        "y": 140,
+        "links": [
+            "8ac6750a554ec8ac"
+        ],
+        "wires": [
+            [
+                "9d08face3a1714cc"
+            ]
+        ]
+    },
+    {
+        "id": "8990db7b4806a9a8",
+        "type": "inject",
+        "z": "4c24867db84dd995",
+        "name": "salud cada 1 s",
+        "x": 150,
+        "y": 180,
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "1",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "2",
+        "topic": "salud",
+        "payload": "",
+        "payloadType": "date",
+        "wires": [
+            [
+                "9d08face3a1714cc"
+            ]
+        ]
+    },
+    {
+        "id": "9d08face3a1714cc",
+        "type": "function",
+        "z": "4c24867db84dd995",
+        "name": "O1 · servidor OPC UA [DF-5.1 a DF-5.7]",
+        "x": 420,
+        "y": 140,
+        "func": "// =====================================================================\n// O1 · servidor OPC UA — \"On Message\" del function node\n// docs/diagramas/flujo-servidor-opcua.mmd, bloques [DF-5.3], [DF-5.6] y [DF-5.7]\n// ---------------------------------------------------------------------\n// Descripcion: segun msg.topic:\n//   estado          instantanea del maestro (link de M1)  -> Status.MODBUS.*      [DF-5.3]\n//   <nombre>        valor de una variable (link de M1)    -> Inputs/Outputs/Mapa  [DF-5.3]\n//   salud           tick de 1 s -> Status.OPCUA.Estado y capa OPCUA del panel   [DF-5.6]\n//   certificados    pide la lista de confianza                                   [DF-5.7]\n//   confiar/revocar huella SHA-1 desde el panel                                  [DF-5.7]\n// Salida 1: lista de certificados para el panel.\n// =====================================================================\nconst servidor = context.get('servidor');\nif (!servidor) return null;   // todavia arrancando (o no arranco: ver el estado del nodo)\nconst pdci = global.get('pdci');\n\nconst enviarCertificados = (aviso) => node.send({ topic: 'certificados',\n    payload: Object.assign(servidor.listarCertificados(), { huellaPropia: servidor.huellaPropia(), aviso: aviso || null }) });\n\nswitch (msg.topic) {\n    case 'estado':\n        servidor.publicarEstadoModbus(msg.payload);\n        return null;\n    case 'salud':\n        pdci.capas.actualizar('OPCUA', servidor.estadisticas());\n        return null;\n    case 'certificados':\n        enviarCertificados();\n        return null;\n    case 'confiar':\n    case 'revocar': {\n        const accion = msg.topic === 'confiar' ? servidor.confiarCertificado : servidor.revocarCertificado;\n        accion(String(msg.payload || ''))\n            .then((r) => enviarCertificados(r.ok ? `${msg.topic}: hecho` : r.error))\n            .catch((e) => enviarCertificados(e.message));\n        return null;\n    }\n    default:\n        // Valor de una variable del mapa: topic = nombre (Inputs/Pulsador, ...).\n        if (typeof msg.topic === 'string' && msg.payload !== undefined) {\n            servidor.publicarValor(msg.topic, msg.payload, msg.calidad || 'good', msg.ts);\n        }\n        return null;\n}\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "// =====================================================================\n// O1 · servidor OPC UA — \"On Start\" del function node\n// docs/diagramas/flujo-servidor-opcua.mmd, bloques [DF-5.1] y [DF-5.2]\n// ---------------------------------------------------------------------\n// Descripcion: arranca el servidor OPC UA (lib/servidor_opcua.js, node-opcua 2.160.0,\n//   ADR-011 / ADR-019) con el espacio de direcciones de docs/diccionario-de-datos.md §3.\n//   Las escrituras sobre Outputs se delegan en el maestro MODBus que publico M1\n//   (global \"pdci_maestro\"): el WriteResponse espera el eco FC 05/06 (ADR-015).\n// Salida 1: panel de certificados {topic: 'certificados', payload: {rechazados, confiables, huellaPropia}}\n// Firma de la biblioteca (consigna: \"parametros con tipo\"):\n//   iniciarServidor({opcua: object, puerto: number, namespaceUri: string,\n//       directorioPki: string, credenciales: {usuario: string, hashClave: string}|null,\n//       escribir: (nombre: string, valor: any) => Promise<{ok: boolean, errorType: string, error: string|null}>,\n//       registrar: (texto: string) => void}) : Promise<Controlador>\n// =====================================================================\nconst pdci = global.get('pdci');\nconst cfg = pdci.opcua;\n\n// [DF-5.4] Sin maestro (todavia arrancando o detenido) la escritura se rechaza con un\n// error de comunicacion: nunca se confirma un valor que el esclavo no recibio.\nconst escribir = (nombre, valor) => {\n    const maestro = global.get('pdci_maestro');\n    if (!maestro) return Promise.resolve({ ok: false, errorType: 'TIMEOUT', error: 'maestro MODBus no disponible' });\n    return maestro.escribir(nombre, valor);\n};\nconst registrar = (texto) => {\n    node.log(texto);\n    pdci.historial.agregar({ capa: 'OPCUA', nivel: /rechaz|Bad|ERROR/.test(texto) ? 'aviso' : 'info', texto });\n};\n\nif (!cfg.credenciales) node.warn('sin PDCI_T3_OPCUA_USUARIO/HASH: solo acceso anonimo (lectura); las Outputs no se pueden escribir');\n\nnode.status({ fill: 'yellow', shape: 'ring', text: 'iniciando servidor OPC UA' });\nconst listo = pdci.servidorOpcua.iniciarServidor({ opcua: pdci.nodeOpcua, puerto: cfg.puerto, namespaceUri: cfg.namespaceUri,\n    directorioPki: cfg.directorioPki, credenciales: cfg.credenciales, escribir, registrar })\n    .then((servidor) => {\n        context.set('servidor', servidor);\n        node.status({ fill: 'green', shape: 'dot', text: `opc.tcp://:${cfg.puerto} · ${servidor.endpoints().length} endpoints` });\n        return servidor;\n    })\n    .catch((e) => {\n        // Puerto ocupado o PKI ilegible: la capa queda en ERROR y se ve en el panel (I-05).\n        node.error(`servidor OPC UA no arranco: ${e.message}`);\n        node.status({ fill: 'red', shape: 'dot', text: e.message.slice(0, 60) });\n        pdci.capas.actualizar('OPCUA', { estado: 'ERROR', contadores: {}, detalle: { error: e.message } });\n        return null;\n    });\ncontext.set('listo', listo);\n",
+        "finalize": "// =====================================================================\n// O1 · servidor OPC UA — \"On Stop\" del function node\n// ---------------------------------------------------------------------\n// Descripcion: cierra el servidor (libera el puerto 4840) antes de que un Deploy cree\n//   otro. Sin esto el nuevo fallaria con EADDRINUSE y quedaria el viejo publicando.\n// =====================================================================\nconst listo = context.get('listo');\nif (listo) {\n    return listo.then((servidor) => servidor && servidor.detener(500));\n}\n",
+        "libs": [],
+        "outputLabels": [
+            "certificados"
+        ],
+        "wires": [
+            [
+                "9d31336e4509b648"
+            ]
+        ]
+    },
+    {
+        "id": "9d31336e4509b648",
+        "type": "ui-template",
+        "z": "4c24867db84dd995",
+        "name": "panel certificados",
+        "x": 680,
+        "y": 140,
+        "group": "3115d371358551dd",
+        "page": "",
+        "ui": "",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<!--\n  certificados.vue — Lista de confianza del servidor OPC UA [DF-5.7]\n  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-10 · v1.0\n  Muestra los certificados de cliente rechazados y confiados con su huella SHA-1. Antes de\n  confiar, el operador COMPARA la huella con la que muestra el cliente (UaExpert: Settings >\n  Manage Certificates). Confiar aplica en vivo, sin reiniciar Node-RED (docs/seguridad-opcua.md §4).\n-->\n<template>\n  <div>\n    <div class=\"text-caption mb-2\">Huella del servidor: <code>{{ huellaPropia || '-' }}</code></div>\n    <v-btn size=\"small\" variant=\"outlined\" @click=\"pedir\">Actualizar</v-btn>\n    <span v-if=\"aviso\" class=\"ml-2 text-caption\">{{ aviso }}</span>\n    <table class=\"pdci-tabla mt-2\">\n      <thead><tr><th>Estado</th><th>Sujeto</th><th>Huella SHA-1</th><th>Vence</th><th></th></tr></thead>\n      <tbody>\n        <tr v-for=\"c in filas\" :key=\"c.estado + c.huella\">\n          <td>{{ c.estado }}</td><td>{{ c.sujeto }}</td><td><code>{{ c.huella }}</code></td><td>{{ c.vence }}</td>\n          <td>\n            <v-btn v-if=\"c.estado === 'rechazado'\" size=\"small\" color=\"primary\" @click=\"accion('confiar', c.huella)\">Confiar</v-btn>\n            <v-btn v-else size=\"small\" color=\"error\" variant=\"outlined\" @click=\"accion('revocar', c.huella)\">Revocar</v-btn>\n          </td>\n        </tr>\n        <tr v-if=\"!filas.length\"><td colspan=\"5\">Sin certificados de cliente.</td></tr>\n      </tbody>\n    </table>\n  </div>\n</template>\n\n<script>\nexport default {\n  data () { return { rechazados: [], confiables: [], huellaPropia: '', aviso: '' } },\n  computed: {\n    filas () {\n      const f = (estado) => (c) => ({ estado, sujeto: c.sujeto, huella: c.huella, vence: String(c.venceEl || '').slice(0, 10) })\n      return this.rechazados.map(f('rechazado')).concat(this.confiables.map(f('confiado')))\n    }\n  },\n  watch: {\n    msg (m) {\n      if (!m || m.topic !== 'certificados') return\n      Object.assign(this, { rechazados: m.payload.rechazados || [], confiables: m.payload.confiables || [],\n        huellaPropia: m.payload.huellaPropia, aviso: m.payload.aviso || '' })\n    }\n  },\n  mounted () { this.pedir() },\n  methods: {\n    pedir () { this.send({ topic: 'certificados' }) },\n    accion (topic, huella) {\n      if (topic === 'confiar' && !window.confirm('¿La huella coincide con la del cliente?\\n' + huella)) return\n      this.send({ topic, payload: huella })\n    }\n  }\n}\n</script>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "wires": [
+            [
+                "9d08face3a1714cc"
+            ]
+        ]
+    }
+]

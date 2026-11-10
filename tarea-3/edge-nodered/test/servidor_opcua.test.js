@@ -282,6 +282,8 @@ describe('F4 · seguridad (ADR-009)', () => {
         expect(await servidor.confiarCertificado('0'.repeat(40))).toMatchObject({ ok: false });
         expect(await servidor.confiarCertificado(c.huella)).toEqual({ ok: true });
         expect(servidor.listarCertificados().confiables.map((x) => x.huella)).toContain(c.huella);
+        // El certificado propio del servidor no se lista (no se puede revocar desde el panel).
+        expect(servidor.listarCertificados().confiables.map((x) => x.huella)).not.toContain(servidor.huellaPropia());
     });
 
     test.each(['Sign', 'SignAndEncrypt'])('paso 3, %s: con el cliente confiado la sesion se acepta', async (modo) => {
@@ -312,5 +314,16 @@ describe('F4 · Status.OPCUA.Estado', () => {
         } finally {
             await s2.detener(0);
         }
+    });
+});
+
+describe('F4 · certificado X.509 de aplicacion', () => {
+    test('sujeto propio (no el de ejemplo de node-opcua), applicationUri y 730 dias', () => {
+        const { exploreCertificate } = require('node-opcua-crypto');
+        const tbs = exploreCertificate(servidor.servidor.getCertificate()).tbsCertificate;
+        expect(tbs.subject).toMatchObject({ commonName: 'PdCI-T3 Dispositivo 2', organizationName: 'UNRaf', countryName: 'AR' });
+        expect(tbs.extensions.subjectAltName.uniformResourceIdentifier[0]).toMatch(/^urn:.+:unraf:pdci:t3:servidor$/);
+        const dias = (tbs.validity.notAfter - tbs.validity.notBefore) / 86400000;
+        expect(Math.round(dias)).toBe(730);
     });
 });
