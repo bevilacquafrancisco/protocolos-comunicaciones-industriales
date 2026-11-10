@@ -65,6 +65,7 @@ Sin disparador medible, un riesgo no está gestionado.
 | **Mitigación** | Verificación V-1 del spike en la primera sesión de laboratorio |
 | **Disparador** | `npm i node-opcua@2.160.0` falla en la placa, **o** la prueba de integración del servidor no pasa en F4 tras un día de trabajo |
 | **Contingencia** | Plan B del spike: servidor `asyncua` 2.1.0 (de `servidor.py` de la T2 v2) con puente TCP en `127.0.0.1` a Node-RED. Costo 2,5-3,5 días |
+| **Estado (F4, 2026-11-10)** | Mitigado **en la PC**: el servidor corre dentro de Node-RED 4.1.16 con node-opcua 2.160.0 (37 pruebas, verificación y capturas en los tres modos). Sigue **abierto** hasta instalar en la placa del laboratorio (ADR-019) |
 
 ### R-04 — Adaptador USB-RS485 sin conmutación automática o con latencia alta
 

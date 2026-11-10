@@ -20,14 +20,15 @@ Revisión contra el código de las Tareas 1 y 2 ([analisis-t1.md](analisis-t1.md
 | 008 | Aceptado | Sin cambios |
 | 009 | **Aceptado con corrección** | La T2 **no** tiene capturas de banco en Sign/SignAndEncrypt: hay que medirlas |
 | 010 | **Aceptado (2026-11-09)** | MicroPython con Thonny |
-| 011 | Propuesto | Servidor OPC UA del dispositivo 2 con `node-opcua` desde function nodes |
+| 011 | **Aceptado (F4)** | Servidor OPC UA del dispositivo 2 con `node-opcua` desde function nodes → ADR-019 |
 | 012 | **Aceptado (F3)** | Delimitación de respuestas en el maestro por longitud esperada |
 | 013 | Propuesto | Cliente OPC UA del dispositivo 3 = v2 de la T2, adaptado |
 | 014 | **Aceptado (F3)** | Reintento y ausencia sostenida heredados de la T1 como disparador de `DDEATH` |
-| 015 | Propuesto (F1) | El Write OPC UA se responde con el eco MODBus, no al encolar |
+| 015 | **Aceptado (F4)** | El Write OPC UA se responde con el eco MODBus, no al encolar (medido: 20-62 ms en la PC) |
 | 016 | Aceptado (F3) | Dashboard 2.0: el Dashboard original está sin mantenimiento |
 | 017 | Aceptado (F3) | Transporte TCP de desarrollo que emula el desajuste de línea |
 | 018 | Aceptado (F3) | Descubrimiento en dos fases (menos de 60 s en el caso típico) |
+| 019 | Aceptado (F4) | Plan A′ ejecutado (`node-opcua` 2.160.0); el plan B queda como contingencia de R-03 |
 
 ---
 
@@ -384,7 +385,7 @@ Se documenta como latencia de detección en el plan de pruebas F-01.
 
 ---
 
-## ADR-015 — El Write OPC UA se responde recién con el eco MODBus *(Propuesto, F1)*
+## ADR-015 — El Write OPC UA se responde recién con el eco MODBus *(Aceptado, F4)*
 
 **Contexto.** Un `DCMD` de la web termina en un `WriteRequest` OPC UA sobre `Outputs/*`, que el
 dispositivo 2 traduce a FC 05/06. Hay que decidir cuándo responder el `WriteResponse`.
@@ -460,6 +461,43 @@ tardía) en **8,6 s**. El peor caso sigue siendo 178 s y el panel lo informa.
 
 **Consecuencias.** Un esclavo con un ID atípico en una combinación tardía puede tardar más de 60 s;
 mitigación: el panel permite acotar el rango de IDs y desmarcar combinaciones.
+
+---
+
+## ADR-019 — Plan A′ ejecutado: `node-opcua` 2.160.0 desde un function node, sin plan B *(Aceptado, F4)*
+
+**Contexto.** La consigna de F4 pedía ejecutar el plan B (servidor `asyncua`, R-03) **si** el spike de
+F0 concluía que `node-red-contrib-opcua` no alcanzaba. El spike concluyó eso (no hay `Sign` ni
+`SignAndEncrypt` reales, AccessLevel fijo, sin EURange), pero recomendó el plan **A′** (ADR-011), no el B.
+Este ADR deja constancia de qué se ejecutó y por qué el B quedó como contingencia.
+
+**Opciones.** 1. Nodo OpcUa-Server de `node-red-contrib-opcua` (descartado en el spike).
+2. **A′: `node-opcua` 2.160.0 usado desde el function node `O1` a través de `lib/servidor_opcua.js`.**
+3. B: servidor `asyncua` 2.1.0 en Python, con un puente TCP a Node-RED en `127.0.0.1`.
+
+**Decisión.** Opción 2, con la versión fijada en `package.json` (`"node-opcua": "2.160.0"`, sin `^`),
+la misma que la Tarea Nº2 midió.
+
+**Fundamento.**
+- *Requisitos cumplidos, medidos* (`test/servidor_opcua.test.js`, 37 casos, y
+  [opcua-espacio-direcciones.md](opcua-espacio-direcciones.md)): tres endpoints, AccessLevel por
+  variable, EURange, roles anónimo/usuario, y el Write que espera el eco MODBus (ADR-015) con
+  `timestamped_set` asíncrono. Ninguno de los cinco era posible con la opción 1.
+- *Un solo proceso* frente a la opción 3: el Write llama a `maestro.escribir()` en memoria, sin un
+  segundo protocolo (puente TCP) que pueda fallar entre el WriteRequest y la trama FC 05/06.
+  Menos componentes = menos modos de falla (Sommerville, cap. 11, confiabilidad).
+- *Costo:* la opción 3 estaba estimada en 2,5-3,5 días (R-03); la 2 reutiliza `servidor_opcua.js`
+  de la T2 v3.
+
+**Consecuencias.**
+- La pila OPC UA se carga en `functionGlobalContext`: un cambio en `lib/` exige **reiniciar
+  Node-RED**; un Deploy no alcanza (igual que en la T2).
+- El gestor de certificados de node-opcua indexa la PKI al arrancar: mover un archivo a
+  `trusted/` en caliente **no surte efecto** (medido). Se agregó la confianza en vivo por huella
+  (panel *lista de confianza*, `confiarCertificado`), y el camino archivo + reinicio quedó
+  verificado en la PC ([seguridad-opcua.md](seguridad-opcua.md) §4).
+- R-03 sigue abierto hasta instalar en la Raspberry Pi del laboratorio; su contingencia (opción 3)
+  no cambia.
 
 ---
 

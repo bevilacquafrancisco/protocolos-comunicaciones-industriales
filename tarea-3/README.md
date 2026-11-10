@@ -40,13 +40,13 @@ verificación en banco ([firmware/README.md](firmware/README.md), [edge-nodered/
 | `consigna/` | Enunciado de la T3 | ✅ |
 | `docs/` | Diccionario, ADR, riesgos, análisis, matriz, plan de pruebas | ✅ F0 |
 | `docs/diagramas/` | Fuentes Mermaid (`.mmd`) y PNG renderizados: arquitectura, flujos DF-1 a DF-4 y secuencia | ✅ F1 |
-| `docs/capturas/` | Wireshark, MQTT Explorer, sniffer RS-485, fotos | vacío |
+| `docs/capturas/` | Wireshark, MQTT Explorer, sniffer RS-485, fotos | 🟨 OPC UA en la PC (tres modos) |
 | `firmware/esclavo-modbus/` | Dispositivo 1: esclavo MODBus RTU en MicroPython, stack propio ([README](firmware/README.md)) | 🟨 PC ✅ · banco ⬜ |
-| `edge-nodered/` | Dispositivo 2: maestro MODBus en Node-RED, Dashboard de configuración en vivo y estadísticas ([README](edge-nodered/README.md)) | 🟨 PC ✅ · banco ⬜ |
+| `edge-nodered/` | Dispositivo 2: maestro MODBus y servidor OPC UA en Node-RED, Dashboard de configuración en vivo y estadísticas ([README](edge-nodered/README.md), [seguridad OPC UA](docs/seguridad-opcua.md)) | 🟨 PC ✅ · banco ⬜ |
 | `simuladores/` | Esclavo simulado con el stack del firmware y fallas inyectables; esclavo desconocido | ✅ |
 | `scripts/` | `dev-serial.sh`: par de pty con socat y simulador (Linux) | ✅ |
 | `tests/fixtures/` | Vectores golden del CRC, compartidos por el esclavo y el maestro | ✅ |
-| `tools/` | Generador de vectores (pymodbus como oráculo) y dependencias de desarrollo | ✅ |
+| `tools/` | Generador de vectores (pymodbus como oráculo), hash de la contraseña OPC UA, verificador del servidor OPC UA | ✅ |
 | `gateway-sparkplug/` | Dispositivo 3: cliente OPC UA, Edge Node, `proto/sparkplug_b.proto` | vacío |
 | `hmi-web/` | Host Application | vacío |
 | `informe/` | **Solo los PDF entregables** (hoy: `Bevilacqua_Peralta_PdCI_T3_26_preliminar.pdf`) | ✅ preliminar |
