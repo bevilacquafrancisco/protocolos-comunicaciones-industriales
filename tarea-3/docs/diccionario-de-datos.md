@@ -23,13 +23,13 @@ completo está en [analisis-t1.md](analisis-t1.md) y [analisis-t2.md](analisis-t
 
 ## 1. Dispositivo 1 — mapa de E/S y cadena completa de nombres
 
-| Señal física | Pin ESP32 (verificado) | Modbus: tabla y dirección | FC lectura / escritura | Tipo Modbus | NodeId OPC UA (`ns=1`) | Métrica Sparkplug B | Tipo Sparkplug |
-|---|---|---|---|---|---|---|---|
-| Pulsador | **GPIO 18**, pull-up interno, activo en bajo (el firmware entrega 1 = presionado) | Discrete Input `10001` → offset `0x0000` | FC 02 / — | bit | `s=Dispositivo1.Inputs.Pulsador` | `Inputs/Pulsador` | `Boolean` |
-| Potenciómetro | **GPIO 34** (ADC1_CH6), atenuación 11 dB, promedio de 8 muestras | Input Register `30001` → offset `0x0000` | FC 04 / — | word 16 bits, 0–4095 | `s=Dispositivo1.Inputs.Potenciometro` | `Inputs/Potenciometro` | `UInt16` |
-| LED digital | **GPIO 19**, 330 Ω a GND | Coil `00001` → offset `0x0000` | FC 01 / FC 05 | bit | `s=Dispositivo1.Outputs.LedDigital` | `Outputs/LedDigital` | `Boolean` |
-| LED PWM | **GPIO 21**, 330 Ω a GND, 1000 Hz (`machine.PWM.duty_u16`) | Holding Register `40001` → offset `0x0000` | FC 03 / FC 06 | word 16 bits, 0–255; una escritura > 255 se rechaza con **excepción 03** (en la T1 saturaba; cambio de F2) | `s=Dispositivo1.Outputs.LedPWM` | `Outputs/LedPWM` | `UInt16` |
-| *(derivada, ADR-003)* | — | — (no viaja por MODBus) | — | — | `s=Dispositivo1.Inputs.Potenciometro_pct` | `Inputs/Potenciometro_pct` | `Float` |
+| Señal física | Pin ESP32 (verificado) | Modbus: tabla y dirección | FC lectura / escritura | Tipo Modbus | NodeId OPC UA (`ns=1`) | Métrica Sparkplug B | Tipo Sparkplug | Alias |
+|---|---|---|---|---|---|---|---|---|
+| Pulsador | **GPIO 18**, pull-up interno, activo en bajo (el firmware entrega 1 = presionado) | Discrete Input `10001` → offset `0x0000` | FC 02 / — | bit | `s=Dispositivo1.Inputs.Pulsador` | `Inputs/Pulsador` | `Boolean` | 101 |
+| Potenciómetro | **GPIO 34** (ADC1_CH6), atenuación 11 dB, promedio de 8 muestras | Input Register `30001` → offset `0x0000` | FC 04 / — | word 16 bits, 0–4095 | `s=Dispositivo1.Inputs.Potenciometro` | `Inputs/Potenciometro` | `UInt16` | 102 |
+| LED digital | **GPIO 19**, 330 Ω a GND | Coil `00001` → offset `0x0000` | FC 01 / FC 05 | bit | `s=Dispositivo1.Outputs.LedDigital` | `Outputs/LedDigital` | `Boolean` | 103 |
+| LED PWM | **GPIO 21**, 330 Ω a GND, 1000 Hz (`machine.PWM.duty_u16`) | Holding Register `40001` → offset `0x0000` | FC 03 / FC 06 | word 16 bits, 0–255; una escritura > 255 se rechaza con **excepción 03** (en la T1 saturaba; cambio de F2) | `s=Dispositivo1.Outputs.LedPWM` | `Outputs/LedPWM` | `UInt16` | 104 |
+| *(derivada, ADR-003)* | — | — (no viaja por MODBus) | — | — | `s=Dispositivo1.Inputs.Potenciometro_pct` | `Inputs/Potenciometro_pct` | `Float` | 105 |
 
 Interfaz RS-485 del dispositivo 1 (no son métricas, se documentan para el conexionado):
 UART2 **TX = GPIO 17** → DI · **RX = GPIO 16** ← RO (vía divisor + pull-up) · **DE+RE = GPIO 4** ·
@@ -68,18 +68,25 @@ responda** — si estuvieran en el Device, un `DDEATH` las dejaría obsoletas ju
 necesitan. Es un requisito literal de la consigna (T3, Requisitos Sparkplug B, "Estados de
 comunicación").
 
-| Métrica Sparkplug | Tipo | NodeId OPC UA (`ns=1`) | Valores / semántica |
-|---|---|---|---|
-| `bdSeq` | `Int64` | — (sólo capa Sparkplug) | Número de sesión; idéntico en `NBIRTH` y en el `NDEATH` registrado como Will |
-| `Node Control/Rebirth` | `Boolean` | — | En `true` el nodo republica sus BIRTH |
-| `Status/MODBUS/Estado` | `String` | `s=Status.MODBUS.Estado` | `DONE` \| `CRC ERROR` \| `DEVICE NOT REACHED` |
-| `Status/MODBUS/OK` | `UInt32` | `s=Status.MODBUS.OK` | Peticiones respondidas y validadas |
-| `Status/MODBUS/CRC_ERROR` | `UInt32` | `s=Status.MODBUS.CRC_ERROR` | Respuestas con CRC inválido **o trama no recomponible** (longitud, Unit ID o FC inesperados; consigna §1.c) |
-| `Status/MODBUS/TIMEOUT` | `UInt32` | `s=Status.MODBUS.TIMEOUT` | Peticiones sin respuesta dentro del tiempo de espera |
-| `Status/MODBUS/EXCEPTION` | `UInt32` | `s=Status.MODBUS.EXCEPTION` | Respuestas de excepción (FC con bit 7, códigos 01–04) — *añadido propio*: la T1 distingue timeout, excepción y CRC (`protocolo-comunicacion.md` §10.1) |
-| `Status/OPCUA/Estado` | `String` | `s=Status.OPCUA.Estado` | `DONE` \| `ERROR` — lo **calcula el dispositivo 3** según el estado de su sesión y suscripción; el nodo del servidor solo informa que el servidor vive |
-| `Status/MQTT/Reconexiones` | `UInt32` | — | Reconexiones del cliente MQTT del Edge Node |
-| `Status/Sparkplug/Rebirths` | `UInt32` | — | Rebirths solicitados por la Host Application |
+| Métrica Sparkplug | Tipo | NodeId OPC UA (`ns=1`) | Alias | Origen en el dispositivo 3 | Valores / semántica |
+|---|---|---|---|---|---|
+| `bdSeq` | `Int64` | — (sólo capa Sparkplug) | — | interno | Número de sesión; idéntico en `NBIRTH` y en el `NDEATH` registrado como Will |
+| `Node Control/Rebirth` | `Boolean` | — | — | interno | En `true` el nodo republica sus BIRTH |
+| `Status/MODBUS/Estado` | `String` | `s=Status.MODBUS.Estado` | 10 | OPC UA | `DONE` \| `CRC ERROR` \| `DEVICE NOT REACHED` |
+| `Status/MODBUS/OK` | `UInt32` | `s=Status.MODBUS.OK` | 11 | OPC UA | Peticiones respondidas y validadas |
+| `Status/MODBUS/CRC_ERROR` | `UInt32` | `s=Status.MODBUS.CRC_ERROR` | 12 | OPC UA | Respuestas con CRC inválido **o trama no recomponible** (longitud, Unit ID o FC inesperados; consigna §1.c) |
+| `Status/MODBUS/TIMEOUT` | `UInt32` | `s=Status.MODBUS.TIMEOUT` | 13 | OPC UA | Peticiones sin respuesta dentro del tiempo de espera |
+| `Status/MODBUS/EXCEPTION` | `UInt32` | `s=Status.MODBUS.EXCEPTION` | 14 | OPC UA | Respuestas de excepción (FC con bit 7, códigos 01–04) — *añadido propio*: la T1 distingue timeout, excepción y CRC (`protocolo-comunicacion.md` §10.1) |
+| `Status/OPCUA/Estado` | `String` | `s=Status.OPCUA.Estado` | 20 | interno | `DONE` \| `ERROR` — lo **calcula el dispositivo 3** según el estado de su sesión y suscripción; el nodo del servidor solo informa que el servidor vive |
+| `Status/MQTT/Reconexiones` | `UInt32` | — | 30 | interno | Reconexiones del cliente MQTT del Edge Node |
+| `Status/Sparkplug/Rebirths` | `UInt32` | — | 40 | interno | Rebirths solicitados por la Host Application |
+
+**Columnas que lee el Edge Node** (`gateway-sparkplug/src/metrics.py`, F5): *Métrica*, *Tipo*,
+*NodeId*, *Alias* y *Origen*. `OPC UA` = se suscribe al NodeId; `interno` = lo calcula el
+dispositivo 3 aunque el NodeId exista. Los alias son únicos en todo el Edge Node (Sparkplug 3.0,
+`payloads-alias-uniqueness`); `Node Control/Rebirth` **no lleva alias** porque la especificación lo
+prohíbe (`data-commands-rebirth-name-aliases`), y `bdSeq` tampoco, porque nunca viaja en un DATA.
+Nodo: 10-49; dispositivo: 101-199.
 
 > Nota sobre `Status/OPCUA/Estado`: un servidor OPC UA caído no puede publicar su propia caída. El
 > valor que ve la web es el que deduce el **cliente** (dispositivo 3): `ERROR` si el *watchdog* o la

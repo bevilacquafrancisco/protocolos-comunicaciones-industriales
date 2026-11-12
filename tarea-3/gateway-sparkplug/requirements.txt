@@ -1,0 +1,7 @@
+# Dispositivo 3 - dependencias de EJECUCION (Python 3.11+). Versiones exactas: la T2 fijo
+# asyncua 2.1.0 y se conserva (ADR-013). Ninguna version tiene menos de dos semanas al fijarla
+# (2026-11-12): paho-mqtt 2.2.0 salio el 2026-11-04 y se descarto por eso.
+asyncua==2.1.0          # cliente OPC UA (T2 v2)
+paho-mqtt==2.1.0        # cliente MQTT 3.1.1 con TLS y Last Will
+protobuf==7.36.2        # runtime de sparkplug_b_pb2.py (generado con protoc de grpcio-tools 1.84.0)
+cryptography==50.0.2    # la usa asyncua para Basic256Sha256; se fija porque es la que firma y cifra
