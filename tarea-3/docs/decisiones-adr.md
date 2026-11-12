@@ -33,6 +33,8 @@ Revisión contra el código de las Tareas 1 y 2 ([analisis-t1.md](analisis-t1.md
 | 021 | Aceptado (F5) | NDATA de contadores a 1 Hz y un DDATA por PublishResponse (medido: 9,3 → 4,9 msg/s) |
 | 022 | Aceptado (F5) | `bdSeq` persistido; alias y origen de cada métrica en el diccionario |
 | 023 | Aceptado (F5) | Reconexión OPC UA y MQTT con retroceso exponencial 1-30 s |
+| 024 | Aceptado (F6) | Host Application: núcleo puro, cliente MQTT por conexión, bibliotecas en `vendor/` |
+| 025 | Aceptado (F6) | CSP con `'unsafe-eval'` (protobuf.js) y `worker-src blob:` (mqtt.js), medido |
 
 ---
 
@@ -592,6 +594,65 @@ servidor rechazaba el certificado.
 
 **Consecuencias.** Tras una caída larga, la recuperación puede tardar hasta 30 s más que con un
 reintento fijo corto.
+
+---
+
+## ADR-024 — Host Application con núcleo puro, cliente MQTT por conexión y bibliotecas locales *(Aceptado, F6)*
+
+**Contexto.** La web tiene que aplicar las mismas reglas finas que el Edge Node pero del lado del
+consumidor: vigencia de cada métrica, `seq`, `bdSeq` del NDEATH, Rebirth y estados de comando. Y
+tiene que funcionar en la red del aula y en un celular.
+
+**Decisión.**
+1. `sparkplug.js` es un núcleo sin DOM ni MQTT, con el mismo criterio que ADR-020. Se prueba en
+   Node y corre igual en el navegador.
+2. Cada conexión usa un **cliente mqtt.js nuevo**, con `reconnectPeriod: 0` y retroceso propio de
+   1-30 s (ADR-023). El STATE online tiene que llevar el mismo timestamp que el Will de ese CONNECT
+   (`state-publish-payload-timestamp`), y la reconexión de mqtt.js reusaría el Will viejo.
+3. Al conectarse, la web **pide un Rebirth**: los BIRTH no se retienen, así que una página nueva
+   no tiene BIRTH vigente.
+4. mqtt.js 5.16.1 y protobuf.js 8.8.1 se sirven desde `vendor/`, no desde un CDN.
+
+**Fundamento.**
+- (1) La interoperabilidad con el Edge Node en Python se prueba en los dos sentidos, en 0,4 s.
+- (4) La red del aula puede bloquear CDNs (R-06), y el código que corre es exactamente el fijado:
+  `entrega.test.js` compara su SHA-256 con `node_modules`.
+- Se descartó React o Vue: una sola pantalla no justifica una dependencia y un paso de build (KISS).
+
+**Consecuencias.** Hay que regenerar `vendor/` al actualizar una versión (`npm run vendor`).
+
+---
+
+## ADR-025 — CSP con `'unsafe-eval'` y `worker-src blob:` *(Aceptado, F6)*
+
+**Contexto.** La CSP inicial (`script-src 'self'`) rompió la página. **Medido** en Chrome:
+
+- protobuf.js genera sus codificadores con `new Function` al cargar `sparkplug_b.proto`;
+- mqtt.js crea un Worker desde `blob:` para sus temporizadores, porque una pestaña en segundo plano
+  frena los temporizadores comunes y vencería el keepalive.
+
+**Opciones.**
+
+| Opción | Se gana | Se pierde |
+|---|---|---|
+| **A. `'unsafe-eval'` + `worker-src blob:`** | Cumple "protobuf.js cargando sparkplug_b.proto" al pie de la letra | La CSP deja de bloquear `eval` |
+| B. Código estático con `pbjs` en tiempo de build | CSP sin `unsafe-eval` | El `.proto` ya no se carga en el navegador (incumple la consigna literal), y hace falta una herramienta y un paso de build más |
+| C. `timerVariant: 'native'` en mqtt.js en lugar del Worker | Un permiso menos | Desconexiones con la pestaña en segundo plano (celular) |
+
+**Decisión.** A.
+
+**Fundamento.** `'unsafe-eval'` agrava una inyección de script, pero esa vía está cerrada por otros
+lados:
+
+- la CSP sigue sin `'unsafe-inline'`;
+- todo lo que llega del broker se escribe con `textContent`;
+- no se carga código de terceros en tiempo de ejecución.
+
+El riesgo residual es bajo para una página sin datos personales (Sommerville: seguridad
+proporcional al riesgo). `ui.test.js` verifica que la consola no tenga errores, de CSP incluidos.
+
+**Consecuencias.** Si la consigna permitiera generar el código en build, B es la mejora: elimina
+`'unsafe-eval'` sin cambiar el núcleo.
 
 ---
 

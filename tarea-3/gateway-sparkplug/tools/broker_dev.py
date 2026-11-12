@@ -97,16 +97,31 @@ def escribir_usuarios(ruta: Path, credenciales: dict[str, str]) -> None:
     ruta.write_text("".join(f"{u}:{hasher.hash(c)}\n" for u, c in credenciales.items()), encoding="utf-8")
 
 
-def configuracion(puerto: int, pki: dict[str, Path], usuarios: Path) -> dict:
-    """Configuracion de amqtt: un listener TLS, sin anonimo, con archivo de usuarios."""
-    return {
+def configuracion(puerto: int, pki: dict[str, Path], usuarios: Path, puerto_ws: int | None = None):
+    """
+    Configuracion de amqtt: un listener TLS (Edge Node) y, si se pide, uno WebSocket para la
+    Host Application web. El WebSocket va SIN TLS y SOLO en 127.0.0.1: el navegador no confia
+    en la CA de desarrollo, y sobre loopback el cifrado no protege nada (mismo criterio que
+    --sin-tls-local del Edge Node). La web rechaza ws:// fuera de localhost (hmi-web/app.js).
+
+    Defecto de amqtt 0.12.1 que obliga a armarlo asi: BrokerConfig copia, del listener 'default'
+    a los demas, todo campo que este en su valor por defecto, y ssl=False y type='tcp' SON los
+    valores por defecto. Medido: un WebSocket secundario heredaba ssl=True ("socket hang up"), y
+    con los roles invertidos el TLS heredaba type='ws'. Por eso el WebSocket se agrega DESPUES de
+    construir la configuracion, cuando esa copia ya se hizo.
+    """
+    from amqtt.contexts import BrokerConfig, ListenerConfig, ListenerType   # solo desarrollo
+    cfg = BrokerConfig.from_dict({
         "listeners": {"default": {"type": "tcp", "bind": f"127.0.0.1:{puerto}", "ssl": True,
                                   "certfile": str(pki["cert"]), "keyfile": str(pki["clave"])}},
         "plugins": {
             "amqtt.plugins.authentication.AnonymousAuthPlugin": {"allow_anonymous": False},
             "amqtt.plugins.authentication.FileAuthPlugin": {"password_file": str(usuarios)},
         },
-    }
+    })
+    if puerto_ws:
+        cfg.listeners["ws"] = ListenerConfig(type=ListenerType.WS, bind=f"127.0.0.1:{puerto_ws}", ssl=False)
+    return cfg
 
 
 class BrokerDesarrollo:
@@ -119,8 +134,9 @@ class BrokerDesarrollo:
         credenciales (dict[str, str]): usuario -> clave en claro (solo desarrollo).
     """
 
-    def __init__(self, carpeta: Path, puerto: int, credenciales: dict[str, str]):
+    def __init__(self, carpeta: Path, puerto: int, credenciales: dict[str, str], puerto_ws: int | None = None):
         self.puerto = puerto
+        self.puerto_ws = puerto_ws
         self.credenciales = credenciales
         self._pki = generar_pki(carpeta)
         self.ca = self._pki["ca"]
@@ -136,7 +152,7 @@ class BrokerDesarrollo:
         self._hilo.start()
 
         async def _arrancar():
-            self._broker = Broker(configuracion(self.puerto, self._pki, self._usuarios))
+            self._broker = Broker(configuracion(self.puerto, self._pki, self._usuarios, self.puerto_ws))
             await self._broker.start()
 
         asyncio.run_coroutine_threadsafe(_arrancar(), self._loop).result(timeout=15)
@@ -149,7 +165,7 @@ class BrokerDesarrollo:
         async def _ciclo():
             await self._broker.shutdown()
             await asyncio.sleep(pausa_s)
-            self._broker = Broker(configuracion(self.puerto, self._pki, self._usuarios))
+            self._broker = Broker(configuracion(self.puerto, self._pki, self._usuarios, self.puerto_ws))
             await self._broker.start()
 
         asyncio.run_coroutine_threadsafe(_ciclo(), self._loop).result(timeout=30 + pausa_s)
@@ -167,13 +183,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Broker MQTT de desarrollo (TLS + usuarios). NO para la demo (I-03).")
     parser.add_argument("--carpeta", type=Path, default=Path(".dev-broker"))
     parser.add_argument("--puerto", type=int, default=8883)
+    parser.add_argument("--puerto-ws", type=int, default=None, help="WebSocket sin TLS en 127.0.0.1 (para la web)")
     args = parser.parse_args()
     credenciales = {}
     for usuario in USUARIOS_POR_DEFECTO:
         variable = f"DEV_MQTT_CLAVE_{usuario.split('_')[0].upper()}"
         credenciales[usuario] = os.environ.get(variable) or secrets.token_urlsafe(12)
-    broker = BrokerDesarrollo(args.carpeta, args.puerto, credenciales).iniciar()
+    broker = BrokerDesarrollo(args.carpeta, args.puerto, credenciales, args.puerto_ws).iniciar()
     print(f"broker de desarrollo en mqtts://127.0.0.1:{args.puerto}  CA: {broker.ca.resolve()}")
+    if args.puerto_ws:
+        print(f"WebSocket para la web: ws://127.0.0.1:{args.puerto_ws}/mqtt")
     for usuario, clave in credenciales.items():
         print(f"  usuario {usuario:10s} clave {clave}")
     print("Ctrl+C para detener.", flush=True)

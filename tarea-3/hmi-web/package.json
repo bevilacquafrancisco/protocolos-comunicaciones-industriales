@@ -1,0 +1,19 @@
+{
+  "name": "pdci-t3-hmi-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tarea 3 - Host Application Sparkplug B (pagina web estatica)",
+  "author": "Bevilacqua Francisco, Peralta Agustina",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=18.5" },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "vendor": "node tools/copiar_vendor.js",
+    "servir": "node tools/servir.js"
+  },
+  "devDependencies": {
+    "mqtt": "5.16.1",
+    "protobufjs": "8.8.1",
+    "puppeteer-core": "25.16.0"
+  }
+}

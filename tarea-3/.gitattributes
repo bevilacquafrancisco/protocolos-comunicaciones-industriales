@@ -3,3 +3,7 @@
 # hace fallar a bash en la primera linea del script.
 *.sh text eol=lf
 *.py text eol=lf
+
+# El sparkplug_b.proto es una copia byte a byte del oficial de Eclipse Tahu: su SHA-256 se
+# verifica en las pruebas del dispositivo 3 y de la web.
+*.proto text eol=lf

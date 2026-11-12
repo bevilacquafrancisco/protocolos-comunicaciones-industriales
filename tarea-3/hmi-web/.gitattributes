@@ -1,0 +1,4 @@
+# Bibliotecas de terceros: byte a byte como se publicaron (entrega.test.js compara su SHA-256 con
+# node_modules). Sin esto, core.autocrlf en Windows las pasaria a CRLF al hacer checkout.
+vendor/** -text
+proto/*.proto text eol=lf

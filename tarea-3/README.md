@@ -48,7 +48,7 @@ verificación en banco ([firmware/README.md](firmware/README.md), [edge-nodered/
 | `tests/fixtures/` | Vectores golden del CRC, compartidos por el esclavo y el maestro | ✅ |
 | `tools/` | Generador de vectores (pymodbus como oráculo), hash de la contraseña OPC UA, verificador del servidor OPC UA | ✅ |
 | `gateway-sparkplug/` | Dispositivo 3: cliente OPC UA (T2 adaptado) + Edge Node Sparkplug B 3.0 ([README](gateway-sparkplug/README.md)) | 🟨 PC ✅ · nube y banco ⬜ |
-| `hmi-web/` | Host Application | vacío |
+| `hmi-web/` | Host Application: página web Sparkplug B con semáforo de las cuatro capas ([README](hmi-web/README.md)) | 🟨 PC ✅ · nube ⬜ |
 | `informe/` | **Solo los PDF entregables** (hoy: `Bevilacqua_Peralta_PdCI_T3_26_preliminar.pdf`) | ✅ preliminar |
 | `defensa/` | Guion de 12 min y diapositivas | vacío |
 

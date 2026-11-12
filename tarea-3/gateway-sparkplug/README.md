@@ -1,189 +1,192 @@
-# Device 3: OPC UA client and Sparkplug B Edge Node
+# Dispositivo 3: cliente OPC UA y Edge Node Sparkplug B
 
 Tarea Nº3 · Fase F5 · PC o VM (Python 3.11+)
 
-The device has two pieces:
+El dispositivo tiene dos piezas:
 
-- An **OPC UA client**. It is the T2 one, adapted (ADR-013). It subscribes to the device 2 nodes
-  that the data dictionary lists.
-- A **Sparkplug B 3.0 Edge Node**. It publishes those nodes to an MQTT broker in the cloud (I-03)
-  and carries the Host Application's commands down to the ESP32's LED.
+- Un **cliente OPC UA**. Es el de la T2, adaptado (ADR-013). Se suscribe a los nodos del
+  dispositivo 2 que lista el diccionario de datos.
+- Un **Edge Node Sparkplug B 3.0**. Publica esos nodos en un broker MQTT en la nube (I-03) y lleva
+  los comandos de la Host Application hasta el LED del ESP32.
 
-**Status.** Everything below was tested on the PC: the 58 tests pass, plus one real end-to-end
-session against Node-RED, the OPC UA server in SignAndEncrypt and the simulator of the slave.
-Two things are pending and are manual (§8):
+**Estado.** Todo lo que sigue se probó en la PC: pasan las 58 pruebas, más una sesión real de punta
+a punta contra Node-RED, el servidor OPC UA en SignAndEncrypt y el simulador del esclavo. Quedan
+dos cosas pendientes, y son manuales (§8):
 
-- the run against the **cloud broker** (it needs the account and the users of ADR-005);
-- the check with **MQTT Explorer**.
+- la corrida contra el **broker en la nube** (necesita la cuenta y los usuarios del ADR-005);
+- la verificación con **MQTT Explorer**.
 
 ---
 
-## 1. Contents
+## 1. Qué hay y dónde
 
-| Path | Contents |
+| Ruta | Contenido |
 |---|---|
-| `src/opcua_client.py` | T2 client. The header lists what was reused, adapted and dropped, with the reason. Subscription with 100/100/1, reconnection with backoff 1-30 s and writes |
-| `src/metrics.py` | The metrics are **read from** `docs/diccionario-de-datos.md`: name, type, alias, origin, NodeId and whether it is writable. No metric is written in the code (I-06) |
-| `src/sparkplug.py` | Topics, `seq` and Protobuf encoding by type (spec §6.4.16). No state and no network |
-| `src/ciclo_vida.py` | **Lifecycle state machine** (ADR-020): NBIRTH, DBIRTH, NDATA, DDATA, DDEATH, Rebirth and DCMD. Each rule cites its `tck-id` |
-| `src/sparkplug_edge_node.py` | I/O: paho MQTT (TLS, Will), the bridge with asyncio, the JSONL record and the program |
-| `src/sparkplug_b_pb2.py` | **Generated** from `proto/` (§3). Not edited |
-| `proto/sparkplug_b.proto` | Official Eclipse Tahu file, **unmodified**. Its SHA-256 is pinned in a test |
-| `tools/traer_certificado_servidor.py` | Fetches the OPC UA server certificate. It saves it only if the thumbprint matches the panel's |
-| `tools/observador_sparkplug.py` | Read-only subscriber. It decodes, **verifies `seq` and `bdSeq`** and archives as JSONL |
-| `tools/host_comandos.py` | NCMD Rebirth and DCMD, as the web will send them in F6 |
-| `tools/broker_dev.py` | **Development** broker (amqtt) with TLS and users. **Never** used in the demo (I-03) |
-| `tests/` | pytest: dictionary, codec, state machine, OPC UA client and the full system |
+| `src/opcua_client.py` | Cliente de la T2. El encabezado lista qué se reutilizó, qué se adaptó y qué se descartó, con el motivo. Suscripción 100/100/1, reconexión con retroceso 1-30 s y escrituras |
+| `src/metrics.py` | Las métricas se **leen** de `docs/diccionario-de-datos.md`: nombre, tipo, alias, origen, NodeId y si es escribible. Ninguna métrica está escrita en el código (I-06) |
+| `src/sparkplug.py` | Tópicos, `seq` y codificación Protobuf por tipo (especificación §6.4.16). Sin estado y sin red |
+| `src/ciclo_vida.py` | **Máquina de estados del ciclo de vida** (ADR-020): NBIRTH, DBIRTH, NDATA, DDATA, DDEATH, Rebirth y DCMD. Cada regla cita su `tck-id` |
+| `src/sparkplug_edge_node.py` | E/S: paho MQTT (TLS, Will), el puente con asyncio, el registro JSONL y el programa |
+| `src/sparkplug_b_pb2.py` | **Generado** desde `proto/` (§3). No se edita |
+| `proto/sparkplug_b.proto` | Archivo oficial de Eclipse Tahu, **sin modificar**. Su SHA-256 está fijado en una prueba |
+| `tools/traer_certificado_servidor.py` | Trae el certificado del servidor OPC UA. Lo guarda solo si la huella coincide con la del panel |
+| `tools/observador_sparkplug.py` | Suscriptor de solo lectura. Decodifica, **verifica `seq` y `bdSeq`** y archiva en JSONL |
+| `tools/host_comandos.py` | NCMD Rebirth y DCMD, como los envía la web |
+| `tools/broker_dev.py` | Broker de **desarrollo** (amqtt) con TLS, usuarios y un WebSocket opcional para la web. **Nunca** se usa en la demo (I-03) |
+| `tools/fake_edge_node.py` | Edge Node **real** con datos sintéticos, para desarrollar la web (F6). Comandos por teclado: `dnr`, `ok`, `crc`, `opcua off` y `on`, `saltar` (salto de `seq`), `escrituras falla` y `ok`, `matar` |
+| `tests/` | pytest: diccionario, codec, máquina de estados, cliente OPC UA y sistema completo |
 
-## 2. Versions
+## 2. Versiones
 
-All are exact. None was less than two weeks old when it was pinned (2026-11-12).
+Todas exactas. Ninguna tenía menos de dos semanas al fijarla (2026-11-12).
 
-| Package | Version | Why |
+| Paquete | Versión | Por qué |
 |---|---|---|
-| Python | ≥ 3.11 | Tested on 3.11 |
-| asyncua | 2.1.0 | The same version as the T2 (ADR-013) |
-| paho-mqtt | 2.1.0 | MQTT 3.1.1 with TLS and Will. 2.2.0 came out on 2026-11-04 |
-| protobuf | 7.36.2 | Runtime of the generated code |
-| cryptography | 50.0.2 | It is what signs and encrypts Basic256Sha256 |
-| grpcio-tools / grpcio | 1.84.0 (dev) | Ships `protoc`, so there is nothing to install separately |
-| amqtt | 0.12.1 (dev) | Broker for the tests only |
+| Python | ≥ 3.11 | Probado en 3.11 |
+| asyncua | 2.1.0 | La misma versión que la T2 (ADR-013) |
+| paho-mqtt | 2.1.0 | MQTT 3.1.1 con TLS y Will. La 2.2.0 salió el 2026-11-04 |
+| protobuf | 7.36.2 | Runtime del código generado |
+| cryptography | 50.0.2 | Es la que firma y cifra Basic256Sha256 |
+| grpcio-tools / grpcio | 1.84.0 (dev) | Trae `protoc`, así que no hay que instalar nada aparte |
+| amqtt | 0.12.1 (dev) | Broker solo para las pruebas |
 | pytest / pytest-asyncio | 9.2.0 / 1.4.0 (dev) | — |
 
-## 3. Installation and Protobuf generation
+## 3. Instalación y generación del Protobuf
 
 ```bash
 cd tarea-3/gateway-sparkplug
 python3.11 -m venv .venv
 .venv/bin/pip install -r requirements.txt          # demo
-.venv/bin/pip install -r requirements-dev.txt      # development and tests
+.venv/bin/pip install -r requirements-dev.txt      # desarrollo y pruebas
 ```
 
-On Windows the paths are `.venv\Scripts\python`.
+En Windows las rutas son `.venv\Scripts\python`.
 
-The generated module is versioned, so you only need to regenerate it if the `.proto` changes:
+El módulo generado está versionado, así que solo hay que regenerarlo si cambia el `.proto`:
 
 ```bash
 .venv/bin/python -m grpc_tools.protoc -I proto --python_out=src proto/sparkplug_b.proto
 ```
 
-`test_sparkplug.py::test_proto_sin_modificar_y_pb2_al_dia` regenerates the module in a temporary
-folder and fails if it doesn't match the versioned one. It also fails if the `.proto` stops
-being Tahu's.
+`test_sparkplug.py::test_proto_sin_modificar_y_pb2_al_dia` regenera el módulo en una carpeta
+temporal y falla si no coincide con el versionado. También falla si el `.proto` deja de ser el de
+Tahu.
 
-## 4. Configuration
+## 4. Configuración
 
-Everything is read from `tarea-3/.env`, created from `.env.example` with permissions 600. That
-file never goes into git.
+Todo se lee de `tarea-3/.env`, que se crea a partir de `.env.example` con permisos 600. Ese archivo
+nunca va a git.
 
-| Variable | Use |
+| Variable | Uso |
 |---|---|
-| `OPCUA_URL` | `opc.tcp://<literal IP of device 2>:4840`. Never a host name (T2) |
-| `OPCUA_SEGURIDAD` | `SignAndEncrypt` (ADR-009). `None` only for diagnostics |
-| `OPCUA_CLIENTE_USUARIO` / `OPCUA_CLIENTE_CLAVE` | User with write permission. Without it, the DCMDs end in `BadUserAccessDenied` |
-| `MQTT_HOST`, `MQTT_PUERTO_TLS` | Cloud broker, port 8883 with TLS |
-| `MQTT_USUARIO_EDGE` / `MQTT_CLAVE_EDGE` | `edge_node` user (ADR-005) |
-| `MQTT_CA` | Empty: the system CAs |
-| `SPB_GROUP_ID`, `SPB_EDGE_NODE_ID`, `SPB_DEVICE_ID`, `SPB_HOST_ID` | Dictionary §4 |
+| `OPCUA_URL` | `opc.tcp://<IP literal del dispositivo 2>:4840`. Nunca un nombre de host (T2) |
+| `OPCUA_SEGURIDAD` | `SignAndEncrypt` (ADR-009). `None` solo para diagnóstico |
+| `OPCUA_CLIENTE_USUARIO` / `OPCUA_CLIENTE_CLAVE` | Usuario con permiso de escritura. Sin él, los DCMD terminan en `BadUserAccessDenied` |
+| `MQTT_HOST`, `MQTT_PUERTO_TLS` | Broker en la nube, puerto 8883 con TLS |
+| `MQTT_USUARIO_EDGE` / `MQTT_CLAVE_EDGE` | Usuario `edge_node` (ADR-005) |
+| `MQTT_CA` | Vacío: las CA del sistema |
+| `SPB_GROUP_ID`, `SPB_EDGE_NODE_ID`, `SPB_DEVICE_ID`, `SPB_HOST_ID` | Diccionario §4 |
 
-**Security**
+**Seguridad**
 
-- MQTT without TLS is refused unless the broker is `127.0.0.1`.
-- Received CMDs are validated before anything is written: retained, from another node, larger
-  than 16 KiB, unknown metric, read-only, wrong type or out of range.
-- An anonymous OPC UA session is read-only. The server enforces it, not this client.
+- MQTT sin TLS se rechaza, salvo que el broker sea `127.0.0.1`.
+- Los CMD recibidos se validan antes de escribir nada: se descartan si llegan retenidos, si son
+  para otro nodo, si superan 16 KiB, si la métrica es desconocida o de solo lectura, o si el tipo
+  o el rango no corresponden.
+- Una sesión OPC UA anónima es de solo lectura. Lo impone el servidor, no este cliente.
 
-## 5. OPC UA certificates (mutual trust)
+## 5. Certificados OPC UA (confianza mutua)
 
-1. Bring in the server certificate. Its thumbprint is in the Node-RED panel, under
+1. Traer el certificado del servidor. Su huella está en el panel de Node-RED, en
    *Servidor OPC UA · lista de confianza*:
 
    ```bash
    .venv/bin/python tools/traer_certificado_servidor.py opc.tcp://192.168.10.1:4840 --huella <sha1 del panel>
    ```
 
-   If the thumbprint doesn't match, **nothing is saved**. On each connection the client checks
-   again that the server is presenting that same certificate.
-2. Start the Edge Node. The first time it generates `pki/own/cliente_cert.der` (RSA 2048, URI
-   `urn:unraf:pdci:t3:gateway`) and prints its thumbprint. The server rejects it, and it is
-   retried with backoff 1, 2, 4… s.
-3. In the Node-RED panel, compare the thumbprint and click **Confiar**. The next attempt opens
-   the session; no restart needed (`docs/seguridad-opcua.md` §4).
+   Si la huella no coincide, **no se guarda nada**. En cada conexión el cliente vuelve a verificar
+   que el servidor presente ese mismo certificado.
+2. Arrancar el Edge Node. La primera vez genera `pki/own/cliente_cert.der` (RSA 2048, URI
+   `urn:unraf:pdci:t3:gateway`) e imprime su huella. El servidor lo rechaza, y se reintenta con
+   retroceso 1, 2, 4… s.
+3. En el panel de Node-RED, comparar la huella y tocar **Confiar**. El intento siguiente abre la
+   sesión, sin reiniciar nada (`docs/seguridad-opcua.md` §4).
 
-## 6. Running
+## 6. Ejecución
 
 ```bash
-.venv/bin/python src/sparkplug_edge_node.py                 # demo: .env pointing at the cloud
-.venv/bin/python src/sparkplug_edge_node.py --opcua-modo lectura   # T2 Mode A, to compare (ADR-004)
-.venv/bin/python src/sparkplug_edge_node.py --esperar-host  # BIRTH only with the Host Application online
+.venv/bin/python src/sparkplug_edge_node.py                 # demo: .env apuntando a la nube
+.venv/bin/python src/sparkplug_edge_node.py --opcua-modo lectura   # Modo A de la T2, para comparar (ADR-004)
+.venv/bin/python src/sparkplug_edge_node.py --esperar-host  # BIRTH solo con la Host Application en línea
 ```
 
-**Ctrl+C** publishes the NDEATH and disconnects. Spec 3.0 requires it on an intentional
-disconnect.
+**Ctrl+C** publica el NDEATH y desconecta. La especificación 3.0 lo exige en una desconexión
+intencional.
 
-**`kill -9` or a cut cable**: the broker publishes the NDEATH (the Will).
+**`kill -9` o un cable cortado**: el NDEATH lo publica el broker (el Will).
 
-- After a kill, the operating system closes the socket and the NDEATH comes out **right away**.
-- After a silent cut, it comes out after 1.5 × the 10 s keepalive, that is, **15 s**.
+- Tras un kill, el sistema operativo cierra el socket y el NDEATH sale **enseguida**.
+- Tras un corte silencioso, sale a los 1,5 × 10 s de keepalive, es decir, a los **15 s**.
 
-**Evidence record**: `logs/edge-node-<fecha>.jsonl`. Each published (`tx`) or received (`rx`)
-message takes one line with topic, type, QoS, `seq`, `bdSeq` and the metrics with name, alias,
-type and value. Each OPC UA Write takes another line with its StatusCode.
+**Registro de evidencia**: `logs/edge-node-<fecha>.jsonl`. Cada mensaje publicado (`tx`) o recibido
+(`rx`) ocupa una línea con tópico, tipo, QoS, `seq`, `bdSeq` y las métricas con nombre, alias,
+tipo y valor. Cada Write OPC UA ocupa otra línea con su StatusCode.
 
-### Development without hardware or cloud
+### Desarrollo sin hardware ni nube
 
 ```bash
-.venv/bin/python tools/broker_dev.py --carpeta .dev-broker --puerto 18883   # prints the CA and keys
+.venv/bin/python tools/broker_dev.py --carpeta .dev-broker --puerto 18883 --puerto-ws 18884   # CA, claves y WebSocket para la web
 .venv/bin/python tools/observador_sparkplug.py --mqtt-ca .dev-broker/ca.pem --puerto 18883 --salida logs/obs.jsonl
-.venv/bin/python src/sparkplug_edge_node.py --mqtt-ca .dev-broker/ca.pem      # with MQTT_HOST=127.0.0.1
+.venv/bin/python src/sparkplug_edge_node.py --mqtt-ca .dev-broker/ca.pem      # con MQTT_HOST=127.0.0.1
 .venv/bin/python tools/host_comandos.py --mqtt-ca .dev-broker/ca.pem dcmd Outputs/LedDigital true
+.venv/bin/python tools/fake_edge_node.py --env <.env> --mqtt-ca .dev-broker/ca.pem   # en lugar del Edge real
 ```
 
-## 7. Tests
+## 7. Pruebas
 
 ```bash
-.venv/bin/python -m pytest              # 58 tests, ~16 s
-.venv/bin/python -m pytest -m "not red" # without network: dictionary, codec and state machine (0.5 s)
+.venv/bin/python -m pytest              # 58 pruebas, ~16 s
+.venv/bin/python -m pytest -m "not red" # sin red: diccionario, codec y máquina de estados (0,5 s)
 ```
 
-| File | What it tests |
+| Archivo | Qué prueba |
 |---|---|
-| `test_metrics.py` | The real dictionary yields the 15 metrics. Duplicate aliases, an unsupported type or Rebirth with an alias are **rejected** |
-| `test_sparkplug.py` | Round trip for each type: UInt32 in `int_value`, Int64 in two's complement, `is_null`. `seq` wraps from 255 to 0. `timestamp` in ms. Topics. Unmodified `.proto` and up-to-date `_pb2` |
-| `test_ciclo_vida.py` | NBIRTH with `seq` = 0, `bdSeq`, Rebirth with no alias and the four layers. DBIRTH. DATA only on change and only with alias. One `seq` for NDATA and DDATA across 600 messages. DDEATH and DBIRTH. Reconnection. Persisted `bdSeq` with 255→0. Rebirth. DCMD by alias and by name, plus 9 rejection cases. STATE |
-| `test_opcua_client.py` | Real asyncua server: 10 items, a Write that comes back through the subscription, a write to a read-only node, the server dropping and reconnecting with backoff 1 s → 2 s |
-| `test_sistema.py` | **The Edge Node as a subprocess** against a TLS broker and an OPC UA server. It runs through the whole lifecycle, including the **broker cut** (`bdSeq`+1, `Reconexiones`=1) and the **kill** (NDEATH emitted by the broker with the matching `bdSeq`). It ends by checking that the observer recorded **no violations** |
+| `test_metrics.py` | El diccionario real da las 15 métricas. Se **rechazan** alias repetidos, un tipo no soportado o Rebirth con alias |
+| `test_sparkplug.py` | Ida y vuelta por tipo: UInt32 en `int_value`, Int64 en complemento a 2, `is_null`. `seq` vuelve de 255 a 0. `timestamp` en ms. Tópicos. `.proto` sin modificar y `_pb2` al día |
+| `test_ciclo_vida.py` | NBIRTH con `seq` = 0, `bdSeq`, Rebirth sin alias y las cuatro capas. DBIRTH. DATA solo ante cambio y solo con alias. Un único `seq` para NDATA y DDATA en 600 mensajes. DDEATH y DBIRTH. Reconexión. `bdSeq` persistido, con 255→0. Rebirth. DCMD por alias y por nombre, más 9 casos de rechazo. STATE |
+| `test_opcua_client.py` | Servidor asyncua real: 10 ítems, un Write que vuelve por la suscripción, escritura sobre un nodo de solo lectura, caída del servidor y reconexión con retroceso 1 s → 2 s |
+| `test_sistema.py` | **El Edge Node como subproceso** contra un broker TLS y un servidor OPC UA. Recorre el ciclo de vida completo, incluido el **corte del broker** (`bdSeq`+1, `Reconexiones`=1) y el **kill** (NDEATH emitido por el broker con el `bdSeq` que corresponde). Al final verifica que el observador **no registró violaciones** |
 
-The core's tests were validated with mutation: `seq` modulo 257 and `Reconexiones` without
-incrementing are both detected.
+Las pruebas del núcleo se validaron con mutación: `seq` módulo 257 y `Reconexiones` sin incrementar
+se detectan las dos.
 
-**Real end-to-end session (PC, 2026-11-12)**, archived in
-`docs/capturas/sparkplug-pc-observador.jsonl` (observer) and `sparkplug-pc-edge-node.jsonl`:
+**Sesión real de punta a punta (PC, 2026-11-12)**, archivada en
+`docs/capturas/sparkplug-pc-observador.jsonl` (observador) y `sparkplug-pc-edge-node.jsonl`:
 
-- **Chain**: Edge Node, then OPC UA SignAndEncrypt with a user, then Node-RED, then Modbus, then
-  the simulator, which runs the firmware's stack.
-- **Messages**: NBIRTH 3, DBIRTH 4, NDATA 262, DDATA 777, DCMD 8, DDEATH 1, NDEATH 1 (emitted by
-  the broker on the kill) and NCMD 1.
-- **`seq`**: wrapped from 255 to 0 three times with no violation. `bdSeq` 0, 0 and 1 (birth,
-  Rebirth and restart).
-- **Command path**: 8 of 8 DCMDs ended in `Write … Good`, and the slave's LED switched each time.
-  From DCMD to the confirmation DDATA it took **149-223 ms** (median 203 ms), measured with a
-  local broker.
-- **Grouping** (ADR-021): it went from 9.3 to 4.9 messages per second.
+- **Cadena**: Edge Node, luego OPC UA SignAndEncrypt con usuario, luego Node-RED, luego Modbus,
+  luego el simulador, que ejecuta el stack del firmware.
+- **Mensajes**: NBIRTH 3, DBIRTH 4, NDATA 262, DDATA 777, DCMD 8, DDEATH 1, NDEATH 1 (emitido por el
+  broker al matar el proceso) y NCMD 1.
+- **`seq`**: dio la vuelta de 255 a 0 tres veces sin ninguna violación. `bdSeq` 0, 0 y 1 (nacimiento,
+  Rebirth y reinicio).
+- **Camino de comando**: 8 de 8 DCMD terminaron en `Write … Good`, y el LED del esclavo conmutó cada
+  vez. Del DCMD al DDATA de confirmación tardó **149-223 ms** (mediana 203 ms), medido con broker
+  local.
+- **Agrupamiento** (ADR-021): pasó de 9,3 a 4,9 mensajes por segundo.
 
-## 8. Pending
+## 8. Pendiente
 
-| # | Test | Criterion |
+| # | Prueba | Criterio |
 |---|---|---|
-| P-1 | Create the cloud broker and the three users with per-topic permissions (ADR-005) | `edge_node` cannot subscribe to `spBv1.0/#` (SUBACK 0x80) |
-| P-2 | Edge Node against the cloud, with **MQTT Explorer** subscribed to `spBv1.0/#` with the `observador` user | NBIRTH, DBIRTH, NDATA and DDATA visible. On killing the process, the broker's NDEATH |
-| P-3 | Same session with `tools/observador_sparkplug.py` archiving | The 7 types and `violaciones: ninguna` |
-| P-4 | From the classroom network: `openssl s_client -connect <broker>:8883` (R-06) | TLS handshake OK |
-| P-5 | Bench: Raspberry Pi, `eth0`, the real ESP32 | Same exit criterion. Latency DCMD → LED measured |
+| P-1 | Crear el broker en la nube y los tres usuarios con permisos por tópico (ADR-005) | `edge_node` no puede suscribirse a `spBv1.0/#` (SUBACK 0x80) |
+| P-2 | Edge Node contra la nube, con **MQTT Explorer** suscripto a `spBv1.0/#` con el usuario `observador` | Se ven NBIRTH, DBIRTH, NDATA y DDATA. Al matar el proceso, el NDEATH del broker |
+| P-3 | La misma sesión con `tools/observador_sparkplug.py` archivando | Los 7 tipos y `violaciones: ninguna` |
+| P-4 | Desde la red del aula: `openssl s_client -connect <broker>:8883` (R-06) | Handshake TLS correcto |
+| P-5 | Banco: Raspberry Pi, `eth0`, el ESP32 real | El mismo criterio de salida. Latencia DCMD → LED medida |
 
-**Known limitations**
+**Limitaciones conocidas**
 
-- The ESP32's ADC noise has no deadband and each change produces a DDATA. Measure it on the
-  bench before deciding whether to add one (YAGNI).
-- `Status/OPCUA/Estado` reports the session from device 3 to device 2, as the dictionary
-  defines it.
+- El ruido del ADC del ESP32 no tiene banda muerta y cada cambio genera un DDATA. Hay que medirlo en
+  el banco antes de decidir si agregarla (YAGNI).
+- `Status/OPCUA/Estado` informa la sesión del dispositivo 3 con el dispositivo 2, como lo define el
+  diccionario.

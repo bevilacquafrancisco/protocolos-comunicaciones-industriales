@@ -1,0 +1,4 @@
+# Host Application — no se versiona:
+# credenciales del broker (plantilla versionada: config.example.js)
+config.js
+node_modules/
