@@ -39,18 +39,18 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ cumplido y con evidencia
 
 | # | Requisito | Artefacto | Evidencia | Informe | Estado |
 |---|---|---|---|---|---|
-| 3.0 | El cliente OPC UA actúa como Edge Node publicador | `src/sparkplug_edge_node.py` | Captura de MQTT Explorer | 4.4 Edge Node | ⬜ |
+| 3.0 | El cliente OPC UA actúa como Edge Node publicador | `src/sparkplug_edge_node.py` | `capturas/sparkplug-pc-observador.jsonl` (PC); MQTT Explorer contra la nube **pendiente** | 4.4 Edge Node | 🟨 PC ✅ |
 | 3.1 | Broker **no local**, el paquete va por internet | Broker en la nube | Captura del panel del broker + `traceroute` | 3.3 Infraestructura MQTT | ⬜ |
 | 3.2 | Página web como Host Application suscriptora | `hmi-web/` | Captura de la interfaz | 4.5 Host Application | ⬜ |
 | 3.3 | La web muestra el estado de entradas y salidas del dispositivo 1 | `hmi-web/app.js` | Captura con valores vivos | 4.5 | ⬜ |
-| 3.4 | La web acciona la salida digital y varía la analógica mediante `DCMD` | Flujo DCMD → OPC UA Write → Modbus FC 05/06 | Video del comando extremo a extremo | 7.2 Camino de comando | ⬜ |
+| 3.4 | La web acciona la salida digital y varía la analógica mediante `DCMD` | Flujo DCMD → OPC UA Write → Modbus FC 05/06 | Edge Node → LED del esclavo verificado en la PC (8 DCMD, 149-223 ms hasta el DDATA de confirmación); web y video **pendientes (F6)** | 7.2 Camino de comando | 🟨 Edge ✅ · web ⬜ |
 | 3.5 | La web muestra `DEVICE NOT REACHED`, `CRC ERROR`, `DONE` | Métrica `Status/MODBUS/Estado` | Captura de los tres estados provocados | 7.3 | ⬜ |
 | 3.6 | La web muestra el estado OPC UA: `ERROR` o `DONE` | Métrica `Status/OPCUA/Estado` | Captura de ambos estados | 7.3 | ⬜ |
 | 3.7 | Roles: dispositivo 3 = Edge Node, dispositivo 1 = Device, web = Host Application | Diagrama de roles Sparkplug | Diagrama | 4.4.1 | ⬜ |
 | 3.8 | Estructura de tópicos `spBv1.0/{group}/{type}/{node}[/{device}]`, **con identificadores justificados** | Diccionario §4 | Árbol de tópicos en MQTT Explorer | 5.3 Espacio de nombres | ⬜ |
-| 3.9 | Payload **Protobuf** según `sparkplug_b.proto`, nunca JSON propio | `proto/sparkplug_b.proto` | Volcado hexadecimal del payload + su decodificación | 6.4 Análisis de payload Sparkplug | ⬜ |
-| 3.10 | Ciclo de vida: `NBIRTH` con `seq=0`, `bdSeq`, `Node Control/Rebirth`; `DBIRTH`; `NDEATH` como Will; `NDATA`/`DDATA` ante cambio con `seq` 0–255; `DDEATH` y nuevo `DBIRTH` | `src/sparkplug_edge_node.py` | Capturas de los cinco tipos de mensaje | 7.1 Ciclo de vida | ⬜ |
-| 3.11 | Estados de comunicación como métricas del Edge Node | ADR-006 | Captura de `NDATA` con las métricas de estado | 5.3 | ⬜ |
+| 3.9 | Payload **Protobuf** según `sparkplug_b.proto`, nunca JSON propio | `proto/sparkplug_b.proto` (idéntico a Tahu, SHA-256 en `test_sparkplug.py`) | Volcado hexadecimal del payload + su decodificación | 6.4 Análisis de payload Sparkplug | 🟨 código ✅ · volcado ⬜ |
+| 3.10 | Ciclo de vida: `NBIRTH` con `seq=0`, `bdSeq`, `Node Control/Rebirth`; `DBIRTH`; `NDEATH` como Will; `NDATA`/`DDATA` ante cambio con `seq` 0–255; `DDEATH` y nuevo `DBIRTH` | `src/ciclo_vida.py` + `src/sparkplug_edge_node.py` | Sesión archivada con los 7 tipos, `seq` sin violaciones y 3 vueltas 255→0; `test_sistema.py` | 7.1 Ciclo de vida | 🟨 PC ✅ · nube ⬜ |
+| 3.11 | Estados de comunicación como métricas del Edge Node | ADR-006 | `NBIRTH`/`NDATA` con `Status/*` en la sesión archivada | 5.3 | ✅ (PC) |
 | 3.12 | La web publica `spBv1.0/STATE/{host_id}` retenido, JSON con `online` y `timestamp`, con `offline` como Will | `hmi-web/sparkplug.js` | Captura del mensaje retenido | 7.1.2 | ⬜ |
 | 3.13 | Ante salto de `seq` o datos sin BIRTH, la web pide Rebirth con `NCMD` | `hmi-web/sparkplug.js` | Captura del `NCMD` y del `NBIRTH` resultante | 7.1.3 | ⬜ |
 | 3.14 | Broker con MQTT 3.1.1/5.0, Last Will, retenidos y WSS; **documentar el nivel de seguridad** | ADR-005 | Tabla de usuarios y permisos por tópico | 8. Seguridad | ⬜ |
@@ -61,8 +61,8 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ cumplido y con evidencia
 | # | Requisito | Artefacto | Evidencia | Informe | Estado |
 |---|---|---|---|---|---|
 | 4.1 | Informar la falla **y en qué parte se generó**, en tiempo real | Semáforo por capa en la web | Capturas de cada falla inyectada | 7.3 | ⬜ |
-| 4.2 | Aprovechar `NDEATH`/Last Will, `DDEATH` y los saltos de `seq` | `src/sparkplug_edge_node.py` + `hmi-web/` | Capturas de los tres mecanismos | 7.1 | ⬜ |
-| 4.3 | Reconexión automática: nueva sesión MQTT con `bdSeq` incrementado, `NBIRTH` con `seq=0`, `DBIRTH`, y la web se actualiza sola | Lógica de reconexión | Video de la secuencia completa | 7.4 Recuperación | ⬜ |
+| 4.2 | Aprovechar `NDEATH`/Last Will, `DDEATH` y los saltos de `seq` | `src/sparkplug_edge_node.py` + `hmi-web/` | NDEATH del broker y DDEATH en la sesión archivada; reacción de la web **pendiente (F6)** | 7.1 | 🟨 Edge ✅ |
+| 4.3 | Reconexión automática: nueva sesión MQTT con `bdSeq` incrementado, `NBIRTH` con `seq=0`, `DBIRTH`, y la web se actualiza sola | Lógica de reconexión (ADR-022, ADR-023) | `test_sistema.py`: corte del broker → `bdSeq`+1, NBIRTH seq 0, `Reconexiones`=1; video **pendiente** | 7.4 Recuperación | 🟨 Edge ✅ |
 | 4.4 | Verificar el tráfico con una herramienta externa que decodifique Sparkplug B e incluir capturas de BIRTH, DATA, CMD y DEATH | MQTT Explorer | Cuatro capturas en `docs/capturas/` | Anexo B | ⬜ |
 
 ## Requisitos transversales

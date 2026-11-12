@@ -22,13 +22,17 @@ Revisión contra el código de las Tareas 1 y 2 ([analisis-t1.md](analisis-t1.md
 | 010 | **Aceptado (2026-11-09)** | MicroPython con Thonny |
 | 011 | **Aceptado (F4)** | Servidor OPC UA del dispositivo 2 con `node-opcua` desde function nodes → ADR-019 |
 | 012 | **Aceptado (F3)** | Delimitación de respuestas en el maestro por longitud esperada |
-| 013 | Propuesto | Cliente OPC UA del dispositivo 3 = v2 de la T2, adaptado |
+| 013 | **Aceptado (F5)** | Cliente OPC UA del dispositivo 3 = v2 de la T2, adaptado (tabla de cambios en `opcua_client.py`) |
 | 014 | **Aceptado (F3)** | Reintento y ausencia sostenida heredados de la T1 como disparador de `DDEATH` |
 | 015 | **Aceptado (F4)** | El Write OPC UA se responde con el eco MODBus, no al encolar (medido: 20-62 ms en la PC) |
 | 016 | Aceptado (F3) | Dashboard 2.0: el Dashboard original está sin mantenimiento |
 | 017 | Aceptado (F3) | Transporte TCP de desarrollo que emula el desajuste de línea |
 | 018 | Aceptado (F3) | Descubrimiento en dos fases (menos de 60 s en el caso típico) |
 | 019 | Aceptado (F4) | Plan A′ ejecutado (`node-opcua` 2.160.0); el plan B queda como contingencia de R-03 |
+| 020 | Aceptado (F5) | Ciclo de vida Sparkplug como máquina de estados pura; un cliente paho por conexión |
+| 021 | Aceptado (F5) | NDATA de contadores a 1 Hz y un DDATA por PublishResponse (medido: 9,3 → 4,9 msg/s) |
+| 022 | Aceptado (F5) | `bdSeq` persistido; alias y origen de cada métrica en el diccionario |
+| 023 | Aceptado (F5) | Reconexión OPC UA y MQTT con retroceso exponencial 1-30 s |
 
 ---
 
@@ -498,6 +502,96 @@ la misma que la Tarea Nº2 midió.
   verificado en la PC ([seguridad-opcua.md](seguridad-opcua.md) §4).
 - R-03 sigue abierto hasta instalar en la Raspberry Pi del laboratorio; su contingencia (opción 3)
   no cambia.
+
+---
+
+## ADR-020 — El ciclo de vida Sparkplug es una máquina de estados pura, separada de la red *(Aceptado, F5)*
+
+**Contexto.** El Edge Node mezcla tres fuentes de eventos asincrónicas (MQTT en el hilo de paho,
+OPC UA en asyncio y un temporizador) y la consigna evalúa reglas finas: `seq` único de 0 a 255,
+`bdSeq` igual en Will y NBIRTH, DDEATH y DBIRTH ante cambios de disponibilidad, Rebirth.
+
+**Opciones.** 1. Lógica dentro de los callbacks de paho y asyncua. 2. **Núcleo puro
+(`ciclo_vida.py`): cada evento entra por un método y sale la lista de mensajes; la E/S
+(`sparkplug_edge_node.py`) solo publica.** 3. Biblioteca Sparkplug de terceros.
+
+**Decisión.** Opción 2. Los callbacks de paho no tocan estado: encolan el evento en el event loop
+(`call_soon_threadsafe`), así todo el estado se modifica en un solo hilo. Un cliente paho **nuevo
+por conexión**, porque el Will viaja en el CONNECT: con la reconexión automática de paho el
+NDEATH seguiría llevando el `bdSeq` de la primera conexión.
+
+**Fundamento.** Testabilidad (Sommerville, cap. 8): 21 pruebas del núcleo corren en 0,5 s, sin
+broker, y verifican cada regla citando su `tck-id` de la especificación. Dos mutaciones
+deliberadas (`seq` módulo 257, `Reconexiones` sin incrementar) fueron detectadas. La opción 3
+quedó descartada en R-13: Tahu no publica un paquete Python mantenido; el `.proto` oficial más
+`protobuf` alcanza.
+
+**Consecuencias.** Hay dos capas que leer en lugar de una. A cambio, el informe y la defensa
+pueden recorrer el ciclo de vida en un solo archivo sin código de red.
+
+---
+
+## ADR-021 — Agrupamiento de NDATA y DDATA *(Aceptado, F5)*
+
+**Contexto.** Con el sondeo de 250 ms, los contadores MODBus cambian ~16 veces por segundo, y
+cada movimiento del potenciómetro cambia **dos** métricas (`Potenciometro` y su porcentaje), que
+asyncua entrega como callbacks separados aunque llegaron en el mismo PublishResponse.
+
+**Decisión.** (a) Contadores MODBus (UInt32 de origen OPC UA): un NDATA por segundo como máximo.
+Los estados (`Status/*/Estado`) y los contadores internos salen al instante. (b) Los cambios del
+dispositivo de un mismo PublishResponse van en **un** DDATA (se vacía con `call_soon`, después de
+la última notificación). (c) Si un DDATA diferido está pendiente, sale antes que cualquier NDATA
+inmediato y que un DDEATH: orden cronológico.
+
+**Fundamento.** La especificación permite varias métricas por DATA y pide orden cronológico
+(`data-publish-nbirth-order`). **Medido** en la PC (sesión archivada
+`docs/capturas/sparkplug-pc-observador.jsonl`, simulador en modo automático, 20 s): antes,
+165 DDATA de 1 métrica (9,3 mensajes/s en total); después, 79 DDATA de 2-3 métricas
+(4,9 mensajes/s), y el valor crudo y el porcentaje llegan siempre juntos y consistentes. Para el
+operador, un contador a 1 Hz es indistinguible de uno a 16 Hz.
+
+**Consecuencias.** Un contador puede mostrarse hasta 1 s atrasado. Un cambio de estado nunca se
+atrasa, que es lo que importa para diagnosticar.
+
+---
+
+## ADR-022 — `bdSeq` persistido y alias definidos en el diccionario *(Aceptado, F5)*
+
+**Contexto.** (a) La especificación pide que `bdSeq` empiece en 0 y se incremente en cada
+CONNECT. Si el proceso se reinicia y vuelve a 0, el broker puede entregar **después** el Will de
+la sesión anterior con el mismo `bdSeq`, y la Host Application daría por muerta la sesión nueva.
+(b) Con alias, los DATA y CMD viajan **solo** con el alias (`payloads-alias-data-cmd-requirement`):
+el alias pasa a ser parte del contrato con la web.
+
+**Decisión.** (a) `bdSeq` en `gateway-sparkplug/estado/bdseq.json`, escrito de forma atómica
+**antes** de cada CONNECT (un corte después de conectar no lo repite). (b) Columnas *Alias* y
+*Origen* en el diccionario de datos: nodo 10-49, dispositivo 101-199. `Node Control/Rebirth` va
+sin alias, porque la especificación lo prohíbe, y `bdSeq` también, porque nunca viaja en un DATA.
+
+**Fundamento.** I-06 (una sola fuente de verdad) y la regla del ciclo de vida. Verificado: tras un
+kill, el proceso nuevo publicó NBIRTH con `bdSeq` 1 (archivo y prueba `test_sistema.py`).
+
+**Consecuencias.** Borrar `estado/` reinicia la cuenta. No rompe nada: el Will viejo solo se
+confunde si coincide con el `bdSeq` de la sesión nueva.
+
+---
+
+## ADR-023 — Reconexión con retroceso exponencial 1-30 s en OPC UA y en MQTT *(Aceptado, F5)*
+
+**Contexto.** La T2 reintentaba OPC UA cada 2 s fijos. La consigna F5 pide retroceso exponencial.
+
+**Decisión.** Espera = min(1 s × 2^(intento−1), 30 s); vuelve a 1 s tras una sesión establecida.
+La misma función para OPC UA y MQTT. Sin jitter.
+
+**Fundamento.** Un corte breve se recupera en 1 s (mejor que los 2 s de la T2) y un dispositivo
+caído mucho tiempo recibe un intento cada 30 s. Cada intento OPC UA abre canal y sesión, y cada
+intento MQTT hace un handshake TLS contra un servicio con cuota. El jitter evita reconexiones
+sincronizadas de **muchos** clientes. Acá hay uno por servidor, así que no aporta. Verificado: en
+`test_opcua_client.py` las esperas fueron 1 s y 2 s, y en la sesión real, 1, 2 y 4 s mientras el
+servidor rechazaba el certificado.
+
+**Consecuencias.** Tras una caída larga, la recuperación puede tardar hasta 30 s más que con un
+reintento fijo corto.
 
 ---
 

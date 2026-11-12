@@ -7,7 +7,7 @@ flowchart TD
     A --> C["[DF-3.3] Armar NDEATH con bdSeq actual<br/>y registrarlo como Last Will<br/>(QoS 1, no retenido)"]
     C --> D["[DF-3.4] Conectar al broker en la nube<br/>TLS 8883 · usuario edge_node · clean start"]
     D -- "Falla" --> RC
-    D -- "CONNACK" --> E["[DF-3.5] Suscribir NCMD, DCMD<br/>y spBv1.0/STATE/+"]
+    D -- "CONNACK" --> E["[DF-3.5] Suscribir NCMD, DCMD y STATE/host (QoS 1)<br/>esperar el SUBACK antes del NBIRTH<br/>(opcional: esperar STATE online del host)"]
     E --> F["[DF-3.6] Publicar NBIRTH<br/>seq = 0 · bdSeq · Node Control/Rebirth = false<br/>Status/MODBUS/* · Status/OPCUA/Estado<br/>Status/MQTT/Reconexiones · Status/Sparkplug/Rebirths"]
     F --> G{"[DF-3.7] ¿Dispositivo 1 disponible?<br/>sesión OPC UA activa y<br/>Status.MODBUS.Estado ≠ DEVICE NOT REACHED"}
     G -- Sí --> H["[DF-3.8] Publicar DBIRTH<br/>Inputs/* y Outputs/* con valor actual<br/>seq = seq + 1 (módulo 256)"]
@@ -15,8 +15,8 @@ flowchart TD
     H --> L
 
     L(["[DF-3.9] Bucle de eventos"]) --> EV{"¿Qué evento<br/>llegó?"}
-    EV -- "Δ métrica<br/>de nodo" --> N1["[DF-3.10] NDATA solo con lo que cambió<br/>seq = (seq + 1) mod 256"]
-    EV -- "Δ Inputs/*<br/>u Outputs/*" --> N2["[DF-3.11] DDATA solo con lo que cambió<br/>seq = (seq + 1) mod 256"]
+    EV -- "Δ métrica<br/>de nodo" --> N1["[DF-3.10] NDATA solo con lo que cambió<br/>estados: al instante · contadores: 1 por segundo (ADR-021)<br/>seq = (seq + 1) mod 256"]
+    EV -- "Δ Inputs/*<br/>u Outputs/*" --> N2["[DF-3.11] DDATA solo con lo que cambió<br/>un DDATA por PublishResponse OPC UA (ADR-021)<br/>solo alias · timestamp = SourceTimestamp<br/>seq = (seq + 1) mod 256"]
     EV -- "Cambia la<br/>disponibilidad" --> N3{"[DF-3.12] ¿Pasó a<br/>no disponible?"}
     N3 -- Sí --> DD["Publicar DDEATH<br/>(seq + 1)"]
     N3 -- "No: se recuperó" --> DB["Publicar DBIRTH nuevo<br/>(seq + 1)"]
@@ -24,8 +24,8 @@ flowchart TD
     EV -- "DCMD" --> CM{"[DF-3.14] ¿Métrica conocida,<br/>tipo y rango válidos?"}
     CM -- No --> CMX["Ignorar y registrar<br/>(no se escribe nada)"]
     CM -- Sí --> CMW["[DF-3.15] OPC UA Write (Escritor C5 de la T2)<br/>el estado real vuelve por la suscripción<br/>→ DDATA de confirmación"]
-    EV -- "Cae<br/>OPC UA" --> OU["[DF-3.16] Status/OPCUA/Estado = ERROR → NDATA<br/>DDEATH · reconexión C7 cada 2 s<br/>al volver: DONE → NDATA y DBIRTH"]
-    EV -- "Cae<br/>MQTT" --> RC["[DF-3.17] Reconexiones++<br/>bdSeq = (bdSeq + 1) mod 256 y persistir<br/>espera con backoff"]
+    EV -- "Cae<br/>OPC UA" --> OU["[DF-3.16] Status/OPCUA/Estado = ERROR → NDATA<br/>DDEATH · reconexión C7 con retroceso 1, 2, 4… 30 s<br/>al volver: DONE → NDATA y DBIRTH"]
+    EV -- "Cae<br/>MQTT" --> RC["[DF-3.17] Reconexiones++<br/>bdSeq = (bdSeq + 1) mod 256 y persistir<br/>cliente MQTT NUEVO (Will nuevo) · retroceso 1… 30 s"]
     RC --> C
     N1 --> L
     N2 --> L

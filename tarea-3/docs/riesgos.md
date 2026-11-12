@@ -25,7 +25,7 @@ Sin disparador medible, un riesgo no está gestionado.
 | R-07 | El ESP32 #2 hereda el 11,6 % de error del Esclavo 2 de la T1 | 2 | 2 | 4 | F2 |
 | R-14 | Ciclos DDEATH/DBIRTH por fallos aislados | 2 | 2 | 4 | F5 |
 | R-11 | Citar números de la T2 que no tienen evidencia en el repositorio | 2 | 2 | 4 | Informe |
-| R-13 | Biblioteca Sparkplug B para Python inmadura o sin empaquetar | 2 | 2 | 4 | F5 |
+| R-13 | ~~Biblioteca Sparkplug B para Python~~ **Cerrado 2026-11-12** (contingencia adoptada) | — | — | 0 | — |
 | R-03 | `node-opcua` no corre en la imagen de la Raspberry Pi del laboratorio | 1 | 3 | 3 | F4 |
 | R-08 | Credenciales MQTT expuestas en el navegador | 3 | 1 | 3 | F6 |
 | R-12 | Restaurar mal la microSD del laboratorio | 1 | 3 | 3 | F3-F4 |
@@ -158,6 +158,7 @@ Sin disparador medible, un riesgo no está gestionado.
 | **Mitigación** | Spike corto al inicio de F5: compilar `sparkplug_b.proto` con `protoc` y probar codificar/decodificar un NBIRTH contra MQTT Explorer |
 | **Disparador** | Más de medio día sin un NBIRTH decodificado correctamente por MQTT Explorer |
 | **Contingencia** | `protobuf` oficial + `sparkplug_b_pb2.py` generado y versionado, sin Tahu |
+| **Cierre (F5)** | Se adoptó la contingencia como camino principal: `sparkplug_b.proto` idéntico al de Eclipse Tahu (SHA-256 fijado en una prueba), `protoc` de grpcio-tools 1.84.0, protobuf 7.36.2. Codificación verificada contra el texto de la especificación §6.4.16 (ADR-020) |
 
 ### R-14 — Ciclos DDEATH/DBIRTH por fallos aislados
 
@@ -168,6 +169,7 @@ Sin disparador medible, un riesgo no está gestionado.
 | **Mitigación** | ADR-014: `DDEATH` solo tras ausencia sostenida (2000 ms) |
 | **Disparador** | Más de un par DDEATH/DBIRTH por minuto con el esclavo conectado |
 | **Contingencia** | Subir la ausencia sostenida y revisar la capa física (R-07) |
+| **Estado (F5)** | Implementado: el Edge Node dispara DDEATH solo con `DEVICE NOT REACHED`, que el maestro declara tras la ausencia sostenida. En la sesión real de la PC hubo un solo DDEATH, el provocado (esclavo en silencio 5 s), mientras que los 4 TIMEOUT aislados previos de la misma sesión (contador de 174 a 178) **no** lo dispararon. Falta el banco |
 
 ### R-16 — `serial in` deja de recibir tras reabrir el puerto
 
