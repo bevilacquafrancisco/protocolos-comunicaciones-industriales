@@ -21,7 +21,7 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ cumplido y con evidencia
 | 1.3 | Definir nombre, tipo y dirección Modbus de cada E/S, reutilizables como métricas Sparkplug | `docs/diccionario-de-datos.md` | Tabla única de las tres capas | 5.1 | ⬜ |
 | 1.a | Conexión física RS-485 **con CRC generado y verificado en maestro y esclavo** | `firmware/esclavo-modbus/lib/modbus_slave/crc16.py` + `edge-nodered/lib/modbus.js` | Tests *golden* en CPython y JS; captura del sniffer | 6.1 CRC-16 y su implementación | 🟨 los mismos 23 vectores pasan en el esclavo y en el maestro; falta el sniffer en banco |
 | 1.b | Explicar intercambio de mensajes, rutinas comentadas y **todos** los campos de la trama | `docs/diagramas/secuencia-modbus.mmd` + informe | Decodificación byte a byte de una trama real | 6.2 Análisis de trama Modbus | ⬜ |
-| 1.c | Contador de peticiones aceptadas y con error en el maestro, **visible en todas las capas** | Contadores de `lib/maestro.js`, persistidos; panel de las cuatro capas | Captura de la web con los cuatro contadores | 7.3 Observabilidad | 🟨 MODBus, Dashboard y OPC UA ✅ · MQTT/Sparkplug ⬜ |
+| 1.c | Contador de peticiones aceptadas y con error en el maestro, **visible en todas las capas** | Contadores de `lib/maestro.js`, persistidos; panel de las cuatro capas | `capturas/f7/web-modbus-done-opcua-done.png` (los cuatro contadores en la web, vía OPC UA y Sparkplug) | 7.3 Observabilidad | ✅ (PC) · banco ⬜ |
 | 1.d | Maestro configurable en vivo para un esclavo que trae la cátedra | Dashboard de configuración + asistente de descubrimiento | Video o captura del ensayo contra el ESP32 #2 | 4.2.3 Configuración en runtime | 🟨 PC ✅ (descubrimiento y Aplicar desde el panel) · banco ⬜ |
 
 ## Consigna 2 — OPC UA entre dispositivo 2 y dispositivo 3
@@ -54,16 +54,16 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ cumplido y con evidencia
 | 3.12 | La web publica `spBv1.0/STATE/{host_id}` retenido, JSON con `online` y `timestamp`, con `offline` como Will | `hmi-web/app.js` (STATE con el timestamp de su Will, ADR-024) | Registro de eventos: `STATE offline (retenido)` → `STATE online` | 7.1.2 | ✅ (PC) |
 | 3.13 | Ante salto de `seq` o datos sin BIRTH, la web pide Rebirth con `NCMD` | `hmi-web/sparkplug.js` | `ui.test.js`: salto de `seq` → NCMD → NBIRTH, contador web y Edge | 7.1.3 | ✅ (PC) |
 | 3.14 | Broker con MQTT 3.1.1/5.0, Last Will, retenidos y WSS; **documentar el nivel de seguridad** | ADR-005 | Tabla de usuarios y permisos por tópico | 8. Seguridad | ⬜ |
-| 3.b | Explicar, por cada tipo de mensaje, el tópico y los campos del payload (`timestamp`, `seq`, métricas con `name`, `datatype`, `value`) | Informe §6.4 | Tabla por tipo de mensaje | 6.4 | ⬜ |
+| 3.b | Explicar, por cada tipo de mensaje, el tópico y los campos del payload (`timestamp`, `seq`, métricas con `name`, `datatype`, `value`) | Informe §6.4 | `capturas/f7/sparkplug-mensajes-decodificados.md`: un mensaje real de cada tipo + volcado hexadecimal campo por campo | 6.4 | ✅ (PC) |
 
 ## Consigna 4 — Verificación del estado funcional y recuperación
 
 | # | Requisito | Artefacto | Evidencia | Informe | Estado |
 |---|---|---|---|---|---|
-| 4.1 | Informar la falla **y en qué parte se generó**, en tiempo real | Semáforo por capa en la web (color + ícono + texto) | `capturas/hmi-ddeath.png`; cada falla del `fake_edge_node` | 7.3 | 🟨 PC ✅ · banco ⬜ |
+| 4.1 | Informar la falla **y en qué parte se generó**, en tiempo real | Semáforo por capa en la web (color + ícono + texto) | Figuras 1-9 de `capturas/README.md`: cada estado de cada capa en la web; campaña F-01..F-10 (`resultados-pruebas.md`) | 7.3 | ✅ (PC) · banco ⬜ |
 | 4.2 | Aprovechar `NDEATH`/Last Will, `DDEATH` y los saltos de `seq` | `src/sparkplug_edge_node.py` + `hmi-web/` | NDEATH del broker y DDEATH en la sesión archivada; la web los marca OBSOLETO y pide Rebirth ante salto de `seq` (`ui.test.js`) | 7.1 | ✅ (PC) |
-| 4.3 | Reconexión automática: nueva sesión MQTT con `bdSeq` incrementado, `NBIRTH` con `seq=0`, `DBIRTH`, y la web se actualiza sola | Lógica de reconexión (ADR-022, ADR-023) | `test_sistema.py`: corte del broker → `bdSeq`+1, NBIRTH seq 0, `Reconexiones`=1; video **pendiente** | 7.4 Recuperación | 🟨 Edge ✅ |
-| 4.4 | Verificar el tráfico con una herramienta externa que decodifique Sparkplug B e incluir capturas de BIRTH, DATA, CMD y DEATH | MQTT Explorer | Cuatro capturas en `docs/capturas/` | Anexo B | ⬜ |
+| 4.3 | Reconexión automática: nueva sesión MQTT con `bdSeq` incrementado, `NBIRTH` con `seq=0`, `DBIRTH`, y la web se actualiza sola | Lógica de reconexión (ADR-022, ADR-023) | F-05 y F-06 en el banco virtual: `bdSeq`+1, NBIRTH `seq` 0, `Reconexiones`+1, web EN LÍNEA sola en 0,8 s y 3,1 s; Figuras 7a/7b; video **pendiente** | 7.4 Recuperación | ✅ (PC) · video ⬜ |
+| 4.4 | Verificar el tráfico con una herramienta externa que decodifique Sparkplug B e incluir capturas de BIRTH, DATA, CMD y DEATH | `tools/observador_sparkplug.py` (decodifica y verifica `seq`/`bdSeq`); MQTT Explorer contra la nube **pendiente** | `capturas/f7/sparkplug-*-observador.jsonl` + `sparkplug-mensajes-decodificados.md` | Anexo B | 🟨 PC ✅ · MQTT Explorer ⬜ |
 
 ## Requisitos transversales
 

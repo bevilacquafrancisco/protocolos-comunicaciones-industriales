@@ -1,0 +1,1129 @@
+{
+  "fecha": "2026-11-14T14:57:35.476Z",
+  "commit": "8ada48c",
+  "minutos": 30,
+  "muestras": [
+    {
+      "t": 1794668267209,
+      "memoriaMiB": {
+        "broker": 44.2,
+        "proxy": 25.9,
+        "obs": 56.7,
+        "sim": 19.5,
+        "nodered": 297.4,
+        "edge": 61.7,
+        "chrome": 493.2
+      },
+      "webMiB": 12.2,
+      "web": {
+        "seq": "8",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668298135,
+      "memoriaMiB": {
+        "broker": 44.2,
+        "proxy": 25.9,
+        "obs": 56.9,
+        "sim": 19.5,
+        "nodered": 171.9,
+        "edge": 61.9,
+        "chrome": 565.3
+      },
+      "webMiB": 10.9,
+      "web": {
+        "seq": "159",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668328733,
+      "memoriaMiB": {
+        "broker": 44.1,
+        "proxy": 25.8,
+        "obs": 57.1,
+        "sim": 19.5,
+        "nodered": 173,
+        "edge": 62.1,
+        "chrome": 506.7
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "51",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668359240,
+      "memoriaMiB": {
+        "broker": 44.1,
+        "proxy": 25.8,
+        "obs": 57.3,
+        "sim": 19.5,
+        "nodered": 172.9,
+        "edge": 62.3,
+        "chrome": 504.7
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "200",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668389752,
+      "memoriaMiB": {
+        "broker": 44.1,
+        "proxy": 25.8,
+        "obs": 57.5,
+        "sim": 19.5,
+        "nodered": 176,
+        "edge": 62.5,
+        "chrome": 500
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "98",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668420476,
+      "memoriaMiB": {
+        "broker": 44.2,
+        "proxy": 25.9,
+        "obs": 57.7,
+        "sim": 19.5,
+        "nodered": 176.2,
+        "edge": 62.8,
+        "chrome": 496.3
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "247",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668451054,
+      "memoriaMiB": {
+        "broker": 44.2,
+        "proxy": 25.9,
+        "obs": 57.9,
+        "sim": 19.5,
+        "nodered": 176.7,
+        "edge": 63,
+        "chrome": 500.6
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "142",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668481562,
+      "memoriaMiB": {
+        "broker": 43.1,
+        "proxy": 25.4,
+        "obs": 57.2,
+        "sim": 19,
+        "nodered": 175.2,
+        "edge": 62.3,
+        "chrome": 454.6
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "39",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668512451,
+      "memoriaMiB": {
+        "broker": 43.1,
+        "proxy": 25.4,
+        "obs": 57.4,
+        "sim": 19,
+        "nodered": 175.3,
+        "edge": 62.3,
+        "chrome": 465.1
+      },
+      "webMiB": 10.9,
+      "web": {
+        "seq": "189",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668543041,
+      "memoriaMiB": {
+        "broker": 43.1,
+        "proxy": 25.4,
+        "obs": 57.6,
+        "sim": 19,
+        "nodered": 175.2,
+        "edge": 62.3,
+        "chrome": 462.3
+      },
+      "webMiB": 10.9,
+      "web": {
+        "seq": "82",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668573588,
+      "memoriaMiB": {
+        "broker": 43.3,
+        "proxy": 25.6,
+        "obs": 58,
+        "sim": 19.2,
+        "nodered": 176.1,
+        "edge": 62.5,
+        "chrome": 461
+      },
+      "webMiB": 10.8,
+      "web": {
+        "seq": "231",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668604175,
+      "memoriaMiB": {
+        "broker": 43.3,
+        "proxy": 25.6,
+        "obs": 58.2,
+        "sim": 19.2,
+        "nodered": 175,
+        "edge": 62.5,
+        "chrome": 496.6
+      },
+      "webMiB": 11,
+      "web": {
+        "seq": "125",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668634772,
+      "memoriaMiB": {
+        "broker": 43.3,
+        "proxy": 25.6,
+        "obs": 58.4,
+        "sim": 19.2,
+        "nodered": 181.7,
+        "edge": 62.5,
+        "chrome": 496.8
+      },
+      "webMiB": 10.9,
+      "web": {
+        "seq": "20",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668665411,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 58.5,
+        "sim": 19.1,
+        "nodered": 181.8,
+        "edge": 62.5,
+        "chrome": 490.5
+      },
+      "webMiB": 11.5,
+      "web": {
+        "seq": "169",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668695909,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 58.7,
+        "sim": 19.1,
+        "nodered": 182.1,
+        "edge": 62.5,
+        "chrome": 490.3
+      },
+      "webMiB": 11.4,
+      "web": {
+        "seq": "64",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668726478,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 59,
+        "sim": 19.1,
+        "nodered": 182.1,
+        "edge": 62.5,
+        "chrome": 490.4
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "215",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668756929,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 59.1,
+        "sim": 19.1,
+        "nodered": 181.1,
+        "edge": 62.5,
+        "chrome": 491
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "112",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668787408,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 59.3,
+        "sim": 19.1,
+        "nodered": 180.8,
+        "edge": 62.5,
+        "chrome": 498.3
+      },
+      "webMiB": 11.2,
+      "web": {
+        "seq": "8",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668818081,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 59.5,
+        "sim": 19.1,
+        "nodered": 181.2,
+        "edge": 62.5,
+        "chrome": 497.3
+      },
+      "webMiB": 11.2,
+      "web": {
+        "seq": "157",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668848704,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 59.8,
+        "sim": 19.1,
+        "nodered": 182.5,
+        "edge": 62.5,
+        "chrome": 492.4
+      },
+      "webMiB": 11.1,
+      "web": {
+        "seq": "50",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668879170,
+      "memoriaMiB": {
+        "broker": 43.3,
+        "proxy": 25.6,
+        "obs": 60,
+        "sim": 19.2,
+        "nodered": 181.6,
+        "edge": 62.5,
+        "chrome": 492.9
+      },
+      "webMiB": 11,
+      "web": {
+        "seq": "202",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668909640,
+      "memoriaMiB": {
+        "broker": 43.3,
+        "proxy": 25.6,
+        "obs": 60.2,
+        "sim": 19.2,
+        "nodered": 182.1,
+        "edge": 62.5,
+        "chrome": 498.6
+      },
+      "webMiB": 11.1,
+      "web": {
+        "seq": "95",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668940105,
+      "memoriaMiB": {
+        "broker": 43.3,
+        "proxy": 25.5,
+        "obs": 60.3,
+        "sim": 19.1,
+        "nodered": 183.9,
+        "edge": 62.5,
+        "chrome": 492.4
+      },
+      "webMiB": 11.8,
+      "web": {
+        "seq": "245",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794668970590,
+      "memoriaMiB": {
+        "broker": 43.3,
+        "proxy": 25.5,
+        "obs": 60.5,
+        "sim": 19.1,
+        "nodered": 181.6,
+        "edge": 62.5,
+        "chrome": 492.4
+      },
+      "webMiB": 11.7,
+      "web": {
+        "seq": "139",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669001050,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 60.7,
+        "sim": 19.1,
+        "nodered": 183.9,
+        "edge": 62.5,
+        "chrome": 492.2
+      },
+      "webMiB": 11.6,
+      "web": {
+        "seq": "33",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669031518,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 60.9,
+        "sim": 19.2,
+        "nodered": 181.8,
+        "edge": 62.5,
+        "chrome": 492.1
+      },
+      "webMiB": 11.6,
+      "web": {
+        "seq": "181",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669062039,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 61.2,
+        "sim": 19.2,
+        "nodered": 182.2,
+        "edge": 62.5,
+        "chrome": 492.8
+      },
+      "webMiB": 11.5,
+      "web": {
+        "seq": "75",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669092511,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 61.4,
+        "sim": 19.2,
+        "nodered": 185,
+        "edge": 62.5,
+        "chrome": 492.7
+      },
+      "webMiB": 11.4,
+      "web": {
+        "seq": "225",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669123005,
+      "memoriaMiB": {
+        "broker": 43.2,
+        "proxy": 25.5,
+        "obs": 61.6,
+        "sim": 19.2,
+        "nodered": 189.9,
+        "edge": 62.5,
+        "chrome": 492.8
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "117",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669153462,
+      "memoriaMiB": {
+        "broker": 32.4,
+        "proxy": 19.7,
+        "obs": 50.7,
+        "sim": 15.3,
+        "nodered": 181.8,
+        "edge": 50.2,
+        "chrome": 472.8
+      },
+      "webMiB": 11.4,
+      "web": {
+        "seq": "8",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669183922,
+      "memoriaMiB": {
+        "broker": 32.4,
+        "proxy": 19.7,
+        "obs": 50.9,
+        "sim": 15.3,
+        "nodered": 180.6,
+        "edge": 50.3,
+        "chrome": 472.8
+      },
+      "webMiB": 11.6,
+      "web": {
+        "seq": "159",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669214417,
+      "memoriaMiB": {
+        "broker": 32.4,
+        "proxy": 19.7,
+        "obs": 51.1,
+        "sim": 15.3,
+        "nodered": 180.7,
+        "edge": 50.2,
+        "chrome": 473.7
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "54",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669244887,
+      "memoriaMiB": {
+        "broker": 32.4,
+        "proxy": 19.7,
+        "obs": 51.3,
+        "sim": 15.3,
+        "nodered": 182.8,
+        "edge": 50.2,
+        "chrome": 473.6
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "203",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669275382,
+      "memoriaMiB": {
+        "broker": 32.4,
+        "proxy": 19.7,
+        "obs": 51.5,
+        "sim": 15.3,
+        "nodered": 180.9,
+        "edge": 50.2,
+        "chrome": 473.1
+      },
+      "webMiB": 11.8,
+      "web": {
+        "seq": "97",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669305868,
+      "memoriaMiB": {
+        "broker": 32.4,
+        "proxy": 19.7,
+        "obs": 51.7,
+        "sim": 15.3,
+        "nodered": 182.3,
+        "edge": 50.2,
+        "chrome": 473
+      },
+      "webMiB": 11.5,
+      "web": {
+        "seq": "248",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669336375,
+      "memoriaMiB": {
+        "broker": 32.4,
+        "proxy": 19.7,
+        "obs": 51.9,
+        "sim": 15.3,
+        "nodered": 181.8,
+        "edge": 50.3,
+        "chrome": 479.8
+      },
+      "webMiB": 11.3,
+      "web": {
+        "seq": "144",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669366974,
+      "memoriaMiB": {
+        "broker": 32.4,
+        "proxy": 19.7,
+        "obs": 52.1,
+        "sim": 15.3,
+        "nodered": 181.3,
+        "edge": 50.3,
+        "chrome": 474.2
+      },
+      "webMiB": 11.2,
+      "web": {
+        "seq": "36",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669397550,
+      "memoriaMiB": {
+        "broker": 32.4,
+        "proxy": 19.7,
+        "obs": 52.3,
+        "sim": 15.3,
+        "nodered": 181.3,
+        "edge": 50.3,
+        "chrome": 478.6
+      },
+      "webMiB": 11.2,
+      "web": {
+        "seq": "186",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669428146,
+      "memoriaMiB": {
+        "broker": 32.4,
+        "proxy": 19.7,
+        "obs": 52.5,
+        "sim": 15.3,
+        "nodered": 182.2,
+        "edge": 50.3,
+        "chrome": 476.2
+      },
+      "webMiB": 11.4,
+      "web": {
+        "seq": "78",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669458669,
+      "memoriaMiB": {
+        "broker": 28.8,
+        "proxy": 16.2,
+        "obs": 40.2,
+        "sim": 13.4,
+        "nodered": 168.7,
+        "edge": 37.9,
+        "chrome": 444.5
+      },
+      "webMiB": 12,
+      "web": {
+        "seq": "228",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669489232,
+      "memoriaMiB": {
+        "broker": 28.8,
+        "proxy": 16.2,
+        "obs": 40.4,
+        "sim": 13.4,
+        "nodered": 168.7,
+        "edge": 37.9,
+        "chrome": 444.7
+      },
+      "webMiB": 12,
+      "web": {
+        "seq": "122",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669519721,
+      "memoriaMiB": {
+        "broker": 28.8,
+        "proxy": 16.2,
+        "obs": 40.6,
+        "sim": 13.4,
+        "nodered": 168.8,
+        "edge": 37.9,
+        "chrome": 444.4
+      },
+      "webMiB": 11.9,
+      "web": {
+        "seq": "14",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669550279,
+      "memoriaMiB": {
+        "broker": 28.8,
+        "proxy": 16.2,
+        "obs": 40.8,
+        "sim": 13.4,
+        "nodered": 168.7,
+        "edge": 37.9,
+        "chrome": 444.3
+      },
+      "webMiB": 11.9,
+      "web": {
+        "seq": "164",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669580812,
+      "memoriaMiB": {
+        "broker": 28.8,
+        "proxy": 16.2,
+        "obs": 41,
+        "sim": 13.4,
+        "nodered": 169.2,
+        "edge": 37.9,
+        "chrome": 445.8
+      },
+      "webMiB": 11.8,
+      "web": {
+        "seq": "56",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669611316,
+      "memoriaMiB": {
+        "broker": 28.8,
+        "proxy": 16.2,
+        "obs": 41.2,
+        "sim": 13.4,
+        "nodered": 171.8,
+        "edge": 37.9,
+        "chrome": 445
+      },
+      "webMiB": 11.7,
+      "web": {
+        "seq": "205",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669641825,
+      "memoriaMiB": {
+        "broker": 28.9,
+        "proxy": 16.2,
+        "obs": 41.4,
+        "sim": 13.4,
+        "nodered": 172.1,
+        "edge": 37.9,
+        "chrome": 451
+      },
+      "webMiB": 11.6,
+      "web": {
+        "seq": "100",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669672376,
+      "memoriaMiB": {
+        "broker": 28.9,
+        "proxy": 16.2,
+        "obs": 41.6,
+        "sim": 13.4,
+        "nodered": 172.2,
+        "edge": 37.9,
+        "chrome": 445.4
+      },
+      "webMiB": 11.6,
+      "web": {
+        "seq": "251",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669702869,
+      "memoriaMiB": {
+        "broker": 28.9,
+        "proxy": 16.2,
+        "obs": 41.8,
+        "sim": 13.4,
+        "nodered": 172.1,
+        "edge": 37.9,
+        "chrome": 445.6
+      },
+      "webMiB": 11.5,
+      "web": {
+        "seq": "143",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669733451,
+      "memoriaMiB": {
+        "broker": 28.9,
+        "proxy": 16.2,
+        "obs": 42,
+        "sim": 13.4,
+        "nodered": 172.8,
+        "edge": 37.9,
+        "chrome": 451.7
+      },
+      "webMiB": 11.5,
+      "web": {
+        "seq": "38",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669763965,
+      "memoriaMiB": {
+        "broker": 27.9,
+        "proxy": 16,
+        "obs": 38.7,
+        "sim": 13.1,
+        "nodered": 171.4,
+        "edge": 35.3,
+        "chrome": 448.3
+      },
+      "webMiB": 11.5,
+      "web": {
+        "seq": "187",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669794467,
+      "memoriaMiB": {
+        "broker": 27.9,
+        "proxy": 16,
+        "obs": 38.9,
+        "sim": 13.1,
+        "nodered": 170.9,
+        "edge": 35.3,
+        "chrome": 448.5
+      },
+      "webMiB": 12.2,
+      "web": {
+        "seq": "82",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669825171,
+      "memoriaMiB": {
+        "broker": 27.9,
+        "proxy": 16,
+        "obs": 39.1,
+        "sim": 13.1,
+        "nodered": 171.4,
+        "edge": 35.3,
+        "chrome": 442.9
+      },
+      "webMiB": 12.1,
+      "web": {
+        "seq": "233",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669855695,
+      "memoriaMiB": {
+        "broker": 27.9,
+        "proxy": 16,
+        "obs": 39.3,
+        "sim": 13.1,
+        "nodered": 170.9,
+        "edge": 35.3,
+        "chrome": 442.3
+      },
+      "webMiB": 12.1,
+      "web": {
+        "seq": "125",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669886215,
+      "memoriaMiB": {
+        "broker": 27.9,
+        "proxy": 16,
+        "obs": 39.5,
+        "sim": 13.1,
+        "nodered": 170.9,
+        "edge": 35.3,
+        "chrome": 441.9
+      },
+      "webMiB": 12,
+      "web": {
+        "seq": "19",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669916932,
+      "memoriaMiB": {
+        "broker": 27.9,
+        "proxy": 16,
+        "obs": 39.7,
+        "sim": 13.1,
+        "nodered": 171,
+        "edge": 35.3,
+        "chrome": 446.4
+      },
+      "webMiB": 11.9,
+      "web": {
+        "seq": "170",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669947539,
+      "memoriaMiB": {
+        "broker": 27.9,
+        "proxy": 16,
+        "obs": 39.9,
+        "sim": 13.1,
+        "nodered": 171,
+        "edge": 35.3,
+        "chrome": 442.6
+      },
+      "webMiB": 11.9,
+      "web": {
+        "seq": "66",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794669978035,
+      "memoriaMiB": {
+        "broker": 27.9,
+        "proxy": 16,
+        "obs": 40.1,
+        "sim": 13.1,
+        "nodered": 170.9,
+        "edge": 35.3,
+        "chrome": 442.6
+      },
+      "webMiB": 11.8,
+      "web": {
+        "seq": "214",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794670008588,
+      "memoriaMiB": {
+        "broker": 27.9,
+        "proxy": 16,
+        "obs": 40.3,
+        "sim": 13.1,
+        "nodered": 173.5,
+        "edge": 35.3,
+        "chrome": 443
+      },
+      "webMiB": 11.9,
+      "web": {
+        "seq": "107",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    },
+    {
+      "t": 1794670039242,
+      "memoriaMiB": {
+        "broker": 27.9,
+        "proxy": 16,
+        "obs": 40.5,
+        "sim": 13.1,
+        "nodered": 171.5,
+        "edge": 35.3,
+        "chrome": 442.8
+      },
+      "webMiB": 11.8,
+      "web": {
+        "seq": "2",
+        "rebirths": "1",
+        "nodo": "NODO EN LÍNEA",
+        "eventos": 7
+      }
+    }
+  ],
+  "violaciones": []
+}

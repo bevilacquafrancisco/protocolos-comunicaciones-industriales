@@ -1,0 +1,548 @@
+{
+  "fecha": "2026-11-12T23:51:53.538Z",
+  "commit": "8ada48c",
+  "fallas": {
+    "F-01": {
+      "id": "F-01",
+      "desc": "el esclavo no responde (simulador en silencio = sin alimentacion)",
+      "inyeccion": 1794527778269,
+      "resultado": "FALLA",
+      "error": "Waiting failed: 60000ms exceeded"
+    },
+    "F-02": {
+      "id": "F-02",
+      "desc": "error de CRC (el simulador corrompe el CRC del 30 % de las respuestas)",
+      "inyeccion": 1794527842752,
+      "deteccionMs": 2068,
+      "detalleDeteccion": "NDATA Estado=CRC ERROR, CRC_ERROR=(otro NDATA)",
+      "recuperacionMs": 64,
+      "detalleRecuperacion": "NDATA Estado=DONE (el contador CRC_ERROR queda como historico)",
+      "resultado": "OK"
+    },
+    "F-03": {
+      "id": "F-03",
+      "desc": "Unit ID equivocado desde el Dashboard (1 -> 7) y correccion (7 -> 1)",
+      "inyeccion": 1794527848511,
+      "deteccionMs": 1501,
+      "detalleDeteccion": "DEVICE NOT REACHED -> DDEATH",
+      "resultado": "FALLA",
+      "error": "observador: timeout (30000 ms)"
+    },
+    "F-04": {
+      "id": "F-04",
+      "desc": "cae el servidor OPC UA (se detiene Node-RED)",
+      "inyeccion": 1794527885484,
+      "deteccionMs": 303,
+      "detalleDeteccion": "NDATA Status/OPCUA/Estado=ERROR + DDEATH; web: OPC UA en ERROR, MODBUS SIN DATOS",
+      "resultado": "FALLA",
+      "error": "observador: timeout (90000 ms)"
+    },
+    "F-05": {
+      "id": "F-05",
+      "desc": "cae el Edge Node (kill del proceso)",
+      "inyeccion": 1794527982855,
+      "deteccionMs": 275,
+      "detalleDeteccion": "NDEATH del broker (Will), bdSeq=2, coincide=true",
+      "resultado": "FALLA",
+      "error": "Waiting failed: 60000ms exceeded"
+    },
+    "F-06": {
+      "id": "F-06",
+      "desc": "se corta internet en el dispositivo 3 (corte silencioso en el proxy)",
+      "inyeccion": 1794528047861,
+      "deteccionMs": 20164,
+      "detalleDeteccion": "NDEATH por keepalive del broker a los 20164 ms (esperado ~15 s)",
+      "resultado": "FALLA",
+      "error": "Waiting failed: 60000ms exceeded"
+    },
+    "F-07": {
+      "id": "F-07",
+      "desc": "mensajes perdidos (Edge de prueba que salta un seq)",
+      "inyeccion": 1794528136504,
+      "deteccionMs": 6888,
+      "detalleDeteccion": "la web detecto el salto y publico NCMD Rebirth",
+      "resultado": "OK"
+    }
+  },
+  "latencias": {
+    "lectura": [
+      {
+        "t0": 1794527525333,
+        "campoAopcua": 251,
+        "opcuaAbroker": 116,
+        "brokerAweb": 14,
+        "total": 381
+      },
+      {
+        "t0": 1794527526873,
+        "campoAopcua": 278,
+        "opcuaAbroker": 160,
+        "brokerAweb": 6,
+        "total": 444
+      },
+      {
+        "t0": 1794527528297,
+        "campoAopcua": 154,
+        "opcuaAbroker": 146,
+        "brokerAweb": 5,
+        "total": 305
+      },
+      {
+        "t0": 1794527529794,
+        "campoAopcua": 201,
+        "opcuaAbroker": 117,
+        "brokerAweb": 6,
+        "total": 324
+      },
+      {
+        "t0": 1794527531007,
+        "campoAopcua": 291,
+        "opcuaAbroker": 99,
+        "brokerAweb": 4,
+        "total": 394
+      },
+      {
+        "t0": 1794527532425,
+        "campoAopcua": 153,
+        "opcuaAbroker": 95,
+        "brokerAweb": 6,
+        "total": 254
+      },
+      {
+        "t0": 1794527533554,
+        "campoAopcua": 123,
+        "opcuaAbroker": 174,
+        "brokerAweb": 12,
+        "total": 309
+      },
+      {
+        "t0": 1794527534950,
+        "campoAopcua": 271,
+        "opcuaAbroker": 143,
+        "brokerAweb": 11,
+        "total": 425
+      },
+      {
+        "t0": 1794527536306,
+        "campoAopcua": 236,
+        "opcuaAbroker": 130,
+        "brokerAweb": 6,
+        "total": 372
+      },
+      {
+        "t0": 1794527537757,
+        "campoAopcua": 63,
+        "opcuaAbroker": 163,
+        "brokerAweb": 12,
+        "total": 238
+      },
+      {
+        "t0": 1794527538956,
+        "campoAopcua": 155,
+        "opcuaAbroker": 160,
+        "brokerAweb": 5,
+        "total": 320
+      },
+      {
+        "t0": 1794527540042,
+        "campoAopcua": 97,
+        "opcuaAbroker": 118,
+        "brokerAweb": 6,
+        "total": 221
+      },
+      {
+        "t0": 1794527540984,
+        "campoAopcua": 173,
+        "opcuaAbroker": 181,
+        "brokerAweb": 7,
+        "total": 361
+      },
+      {
+        "t0": 1794527542359,
+        "campoAopcua": 108,
+        "opcuaAbroker": 177,
+        "brokerAweb": 9,
+        "total": 294
+      },
+      {
+        "t0": 1794527543874,
+        "campoAopcua": 123,
+        "opcuaAbroker": 179,
+        "brokerAweb": 5,
+        "total": 307
+      },
+      {
+        "t0": 1794527544901,
+        "campoAopcua": 140,
+        "opcuaAbroker": 228,
+        "brokerAweb": 9,
+        "total": 377
+      },
+      {
+        "t0": 1794527546370,
+        "campoAopcua": 220,
+        "opcuaAbroker": 209,
+        "brokerAweb": 4,
+        "total": 433
+      },
+      {
+        "t0": 1794527547701,
+        "campoAopcua": 170,
+        "opcuaAbroker": 25,
+        "brokerAweb": 6,
+        "total": 201
+      },
+      {
+        "t0": 1794527548726,
+        "campoAopcua": 187,
+        "opcuaAbroker": 184,
+        "brokerAweb": 6,
+        "total": 377
+      },
+      {
+        "t0": 1794527549974,
+        "campoAopcua": 219,
+        "opcuaAbroker": 210,
+        "brokerAweb": 6,
+        "total": 435
+      },
+      {
+        "t0": 1794527551188,
+        "campoAopcua": 315,
+        "opcuaAbroker": 204,
+        "brokerAweb": 7,
+        "total": 526
+      },
+      {
+        "t0": 1794527552481,
+        "campoAopcua": 77,
+        "opcuaAbroker": 131,
+        "brokerAweb": 3,
+        "total": 211
+      },
+      {
+        "t0": 1794527553887,
+        "campoAopcua": 216,
+        "opcuaAbroker": 223,
+        "brokerAweb": 5,
+        "total": 444
+      },
+      {
+        "t0": 1794527555220,
+        "campoAopcua": 203,
+        "opcuaAbroker": 107,
+        "brokerAweb": 11,
+        "total": 321
+      },
+      {
+        "t0": 1794527556262,
+        "campoAopcua": 218,
+        "opcuaAbroker": 28,
+        "brokerAweb": 4,
+        "total": 250
+      },
+      {
+        "t0": 1794527557320,
+        "campoAopcua": 201,
+        "opcuaAbroker": 176,
+        "brokerAweb": 4,
+        "total": 381
+      },
+      {
+        "t0": 1794527558511,
+        "campoAopcua": 49,
+        "opcuaAbroker": 220,
+        "brokerAweb": 4,
+        "total": 273
+      },
+      {
+        "t0": 1794527559535,
+        "campoAopcua": 64,
+        "opcuaAbroker": 168,
+        "brokerAweb": 5,
+        "total": 237
+      },
+      {
+        "t0": 1794527560936,
+        "campoAopcua": 233,
+        "opcuaAbroker": 224,
+        "brokerAweb": 7,
+        "total": 464
+      },
+      {
+        "t0": 1794527562243,
+        "campoAopcua": 250,
+        "opcuaAbroker": 105,
+        "brokerAweb": 6,
+        "total": 361
+      },
+      {
+        "t0": 1794527563365,
+        "campoAopcua": 156,
+        "opcuaAbroker": 161,
+        "brokerAweb": 9,
+        "total": 326
+      },
+      {
+        "t0": 1794527564638,
+        "campoAopcua": 187,
+        "opcuaAbroker": 162,
+        "brokerAweb": 11,
+        "total": 360
+      },
+      {
+        "t0": 1794527565756,
+        "campoAopcua": 124,
+        "opcuaAbroker": 191,
+        "brokerAweb": 3,
+        "total": 318
+      },
+      {
+        "t0": 1794527566935,
+        "campoAopcua": 234,
+        "opcuaAbroker": 216,
+        "brokerAweb": 17,
+        "total": 467
+      },
+      {
+        "t0": 1794527568452,
+        "campoAopcua": 298,
+        "opcuaAbroker": 161,
+        "brokerAweb": 4,
+        "total": 463
+      },
+      {
+        "t0": 1794527570004,
+        "campoAopcua": 279,
+        "opcuaAbroker": 161,
+        "brokerAweb": 5,
+        "total": 445
+      },
+      {
+        "t0": 1794527571378,
+        "campoAopcua": 204,
+        "opcuaAbroker": 176,
+        "brokerAweb": 3,
+        "total": 383
+      },
+      {
+        "t0": 1794527572744,
+        "campoAopcua": 142,
+        "opcuaAbroker": 176,
+        "brokerAweb": 7,
+        "total": 325
+      },
+      {
+        "t0": 1794527574236,
+        "campoAopcua": 219,
+        "opcuaAbroker": 130,
+        "brokerAweb": 2,
+        "total": 351
+      },
+      {
+        "t0": 1794527575785,
+        "campoAopcua": 237,
+        "opcuaAbroker": 212,
+        "brokerAweb": 7,
+        "total": 456
+      }
+    ],
+    "comando": [
+      {
+        "t0": 1794527577067,
+        "alLed": 69,
+        "aConfirmado": 271
+      },
+      {
+        "t0": 1794527578536,
+        "alLed": 33,
+        "aConfirmado": 219
+      },
+      {
+        "t0": 1794527579833,
+        "alLed": 60,
+        "aConfirmado": 227
+      },
+      {
+        "t0": 1794527581242,
+        "alLed": 31,
+        "aConfirmado": 139
+      },
+      {
+        "t0": 1794527582462,
+        "alLed": 37,
+        "aConfirmado": 201
+      },
+      {
+        "t0": 1794527583536,
+        "alLed": 19,
+        "aConfirmado": 227
+      },
+      {
+        "t0": 1794527584853,
+        "alLed": 40,
+        "aConfirmado": 165
+      },
+      {
+        "t0": 1794527586051,
+        "alLed": 36,
+        "aConfirmado": 217
+      },
+      {
+        "t0": 1794527587251,
+        "alLed": 35,
+        "aConfirmado": 221
+      },
+      {
+        "t0": 1794527588509,
+        "alLed": 34,
+        "aConfirmado": 52
+      },
+      {
+        "t0": 1794527589778,
+        "alLed": 50,
+        "aConfirmado": 179
+      },
+      {
+        "t0": 1794527590963,
+        "alLed": 36,
+        "aConfirmado": 83
+      },
+      {
+        "t0": 1794527592285,
+        "alLed": 41,
+        "aConfirmado": 185
+      },
+      {
+        "t0": 1794527593362,
+        "alLed": 40,
+        "aConfirmado": 200
+      },
+      {
+        "t0": 1794527594745,
+        "alLed": 44,
+        "aConfirmado": 225
+      },
+      {
+        "t0": 1794527595879,
+        "alLed": 30,
+        "aConfirmado": 180
+      },
+      {
+        "t0": 1794527597261,
+        "alLed": 33,
+        "aConfirmado": 221
+      },
+      {
+        "t0": 1794527598323,
+        "alLed": 46,
+        "aConfirmado": 236
+      },
+      {
+        "t0": 1794527599425,
+        "alLed": 33,
+        "aConfirmado": 218
+      },
+      {
+        "t0": 1794527600845,
+        "alLed": 58,
+        "aConfirmado": 208
+      },
+      {
+        "t0": 1794527602204,
+        "alLed": 50,
+        "aConfirmado": 267
+      },
+      {
+        "t0": 1794527603493,
+        "alLed": 36,
+        "aConfirmado": 170
+      },
+      {
+        "t0": 1794527604706,
+        "alLed": 38,
+        "aConfirmado": 151
+      },
+      {
+        "t0": 1794527605979,
+        "alLed": 36,
+        "aConfirmado": 184
+      },
+      {
+        "t0": 1794527607159,
+        "alLed": 24,
+        "aConfirmado": 205
+      },
+      {
+        "t0": 1794527608274,
+        "alLed": 26,
+        "aConfirmado": 62
+      },
+      {
+        "t0": 1794527609318,
+        "alLed": 34,
+        "aConfirmado": 110
+      },
+      {
+        "t0": 1794527610313,
+        "alLed": 51,
+        "aConfirmado": 100
+      },
+      {
+        "t0": 1794527611272,
+        "alLed": 52,
+        "aConfirmado": 115
+      },
+      {
+        "t0": 1794527612418,
+        "alLed": 40,
+        "aConfirmado": 59
+      }
+    ]
+  },
+  "ventanas": {
+    "regimen": {
+      "t0": 1794527616334,
+      "t1": 1794527677448,
+      "pcap": "trafico-regimen.pcapng"
+    },
+    "reposo": {
+      "t0": 1794527680456,
+      "t1": 1794527740684,
+      "pcap": "trafico-reposo.pcapng"
+    }
+  },
+  "capturas": {
+    "web-modbus-done-opcua-done": "web-modbus-done-opcua-done.png",
+    "eficiencia-SignAndEncrypt": {
+      "pcap": "eficiencia-SignAndEncrypt.pcapng",
+      "marcas": [
+        1794527742705,
+        1794527744713,
+        1794527746731,
+        1794527748749,
+        1794527750756
+      ]
+    },
+    "eficiencia-None": {
+      "pcap": "eficiencia-None.pcapng",
+      "marcas": [
+        1794527757816,
+        1794527759834,
+        1794527761848,
+        1794527763854,
+        1794527765869
+      ]
+    },
+    "modbus": "modbus-rtu-tcpdev.pcapng",
+    "error-F-01": "error-F-01.png",
+    "web-modbus-crc-error": "web-modbus-crc-error.png",
+    "error-F-03": "error-F-03.png",
+    "web-opcua-error": "web-opcua-error.png",
+    "error-F-04": "error-F-04.png",
+    "web-ndeath-nodo-obsoleto": "web-ndeath-nodo-obsoleto.png",
+    "error-F-05": "error-F-05.png",
+    "web-recuperacion-1-corte": "web-recuperacion-1-corte.png",
+    "error-F-06": "error-F-06.png"
+  }
+}

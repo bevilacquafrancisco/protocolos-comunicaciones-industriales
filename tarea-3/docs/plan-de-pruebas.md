@@ -123,6 +123,24 @@ la rama de comando, que recorre la cadena en sentido inverso.
 
 Cada fila es una prueba que debe ejecutarse, capturarse y, en la defensa, poder reproducirse en vivo.
 
+**Herramientas (F7).**
+
+- Para provocar cada falla: `scripts/inyectar-fallas.sh`, con `MODO=pc` en el banco virtual y
+  `MODO=banco` con el hardware.
+- Para la campaña automática, que mide la detección y la recuperación:
+  `node tools/banco_virtual.js campana --fases fallas`.
+- Resultados: [resultados-pruebas.md](resultados-pruebas.md) y [mediciones.md](mediciones.md) §4.
+
+**Cómo se provoca cada falla sin hardware.**
+
+| Falla | Equivalente en el banco virtual |
+|---|---|
+| F-01 | Simulador en silencio |
+| F-02 | Simulador que corrompe el CRC del 30 % de las respuestas |
+| F-06 | Proxy TCP con **corte silencioso**: sin FIN ni RST, como un cable cortado |
+| F-07 | Edge de prueba que saltea un `seq` |
+| F-10 | `esclavo_desconocido_sim.py` |
+
 | ID | Falla inyectada | Cómo se provoca | Detección esperada | Recuperación esperada |
 |---|---|---|---|---|
 | F-01 | El esclavo Modbus no responde | Desconectar su alimentación | `Status/MODBUS/Estado = DEVICE NOT REACHED`, contador `TIMEOUT` sube, `DDEATH` publicado | Al reconectar: `DBIRTH` nuevo y la web se repuebla sola |

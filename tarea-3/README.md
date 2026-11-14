@@ -44,9 +44,9 @@ verificación en banco ([firmware/README.md](firmware/README.md), [edge-nodered/
 | `firmware/esclavo-modbus/` | Dispositivo 1: esclavo MODBus RTU en MicroPython, stack propio ([README](firmware/README.md)) | 🟨 PC ✅ · banco ⬜ |
 | `edge-nodered/` | Dispositivo 2: maestro MODBus y servidor OPC UA en Node-RED, Dashboard de configuración en vivo y estadísticas ([README](edge-nodered/README.md), [seguridad OPC UA](docs/seguridad-opcua.md)) | 🟨 PC ✅ · banco ⬜ |
 | `simuladores/` | Esclavo simulado con el stack del firmware y fallas inyectables; esclavo desconocido | ✅ |
-| `scripts/` | `dev-serial.sh`: par de pty con socat y simulador (Linux) | ✅ |
+| `scripts/` | `dev-serial.sh`: par de pty con socat y simulador (Linux). `inyectar-fallas.sh`: menú de las fallas F-01 a F-10 (banco virtual o hardware) | ✅ |
 | `tests/fixtures/` | Vectores golden del CRC, compartidos por el esclavo y el maestro | ✅ |
-| `tools/` | Generador de vectores (pymodbus como oráculo), hash de la contraseña OPC UA, verificador del servidor OPC UA | ✅ |
+| `tools/` | Generador de vectores (pymodbus como oráculo), hash de la contraseña OPC UA, verificador del servidor OPC UA. **Banco virtual** (`banco_virtual.js`: la cadena completa sin hardware, campaña de fallas, latencias, tráfico y resistencia) y `analizar_banco.py` (tablas de `docs/mediciones.md`) | ✅ |
 | `gateway-sparkplug/` | Dispositivo 3: cliente OPC UA (T2 adaptado) + Edge Node Sparkplug B 3.0 ([README](gateway-sparkplug/README.md)) | 🟨 PC ✅ · nube y banco ⬜ |
 | `hmi-web/` | Host Application: página web Sparkplug B con semáforo de las cuatro capas ([README](hmi-web/README.md)) | 🟨 PC ✅ · nube ⬜ |
 | `informe/` | **Solo los PDF entregables** (hoy: `Bevilacqua_Peralta_PdCI_T3_26_preliminar.pdf`) | ✅ preliminar |
