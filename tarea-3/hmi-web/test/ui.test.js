@@ -127,6 +127,15 @@ eventos: ${(await txt('eventos')).slice(0, 600)}`);
             comando('ok');
             await hasta(() => document.getElementById('disp-vigencia').textContent === 'EN LÍNEA');
 
+            // 5b. F-04: cae OPC UA -> la capa OPC UA en ERROR y MODBUS como SIN DATOS (no un DONE viejo)
+            comando('opcua off');
+            await hasta(() => document.getElementById('capa-opcua').dataset.nivel === 'error');
+            assert.equal(await pagina.$eval('#capa-modbus', (e) => e.dataset.nivel), 'obsoleto');
+            assert.match(await txt('modbus-estado'), /SIN DATOS/);
+            comando('opcua on');
+            await hasta(() => document.getElementById('capa-modbus').dataset.nivel === 'ok'
+                && document.getElementById('disp-vigencia').textContent === 'EN LÍNEA');
+
             // 6. Celular: una columna, sin desplazamiento horizontal, controles de al menos 44 px
             await pagina.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
             await esperar(300);

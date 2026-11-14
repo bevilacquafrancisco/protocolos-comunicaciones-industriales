@@ -85,7 +85,10 @@ class Observador:
     def al_mensaje(self, topico: str, payload: bytes, retenido: bool, qos: int) -> dict:
         info = spb.analizar_topico(topico) or {"tipo": None}
         linea = {"ts": dt.datetime.now(dt.timezone.utc).isoformat(timespec="milliseconds"), "topico": topico,
-                 "tipo": info["tipo"], "qos": qos, "retenido": retenido, "bytes": len(payload)}
+                 "tipo": info["tipo"], "qos": qos, "retenido": retenido, "bytes": len(payload),
+                 # Bytes crudos: permiten el volcado campo por campo (tools/volcado_sparkplug.py)
+                 # sin volver a capturar.
+                 "hex": payload.hex()}
         if info["tipo"] == "STATE":
             linea["state"] = spb.leer_state(payload)
         elif info["tipo"]:

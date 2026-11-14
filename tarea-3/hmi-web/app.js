@@ -32,11 +32,13 @@
     const MAX_EVENTOS = 300;
     const ICONO = { ok: '✔', aviso: '▲', error: '✖', obsoleto: '◌', info: '·' };
 
-    const red = { estado: 'DESCONECTADO', intento: 0, conexiones: 0, reconexiones: 0, tsState: null };
+    const red = { estado: 'DESCONECTADO', intento: 0, conexiones: 0, reconexiones: 0, tsState: null,
+        credencialesRechazadas: false };
     let host = null;
     let cliente = null;
     let sucio = true;
     let ultimoDibujo = 0;
+    let dibujoPedido = false;
 
     // =========================================================================
     // Configuracion
@@ -106,6 +108,12 @@
         for (const e of r.eventos) registrar(e.nivel, e.texto);
         for (const p of r.publicar) publicar(p);
         sucio = true;
+        // Dibujar en el proximo cuadro (~16 ms) y no esperar el ciclo de 250 ms: ese ciclo sumaba
+        // 0-250 ms a la latencia de lectura (medido en F7, docs/mediciones.md).
+        if (!dibujoPedido && host) {
+            dibujoPedido = true;
+            requestAnimationFrame(() => { dibujoPedido = false; dibujar(); sucio = false; ultimoDibujo = Date.now(); });
+        }
     }
 
     function publicar(p) {
@@ -152,6 +160,7 @@
                 c.publish(host.topicos.state, window.Sparkplug.payloadState(true, ts), { qos: 1, retain: true });
                 red.estado = 'CONECTADO';
                 red.intento = 0;
+                red.credencialesRechazadas = false;
                 if (red.conexiones++ > 0) red.reconexiones += 1;
                 registrar('info', `MQTT conectado a ${new URL(cfg.url).host} · STATE online (timestamp ${ts})`);
                 aplicar(host.alConectar());
@@ -174,7 +183,15 @@
             }
             aplicar(r);
         });
-        c.on('error', (e) => registrar('error', `MQTT: ${e.message}`));
+        c.on('error', (e) => {
+            // F-09: CONNACK 4 (usuario o clave) o 5 (no autorizado) no es un corte de red: se
+            // avisa aparte, porque reintentar no lo arregla (hay que corregir config.js).
+            if (e.code === 4 || e.code === 5 || /Not authorized|Bad User/i.test(e.message)) {
+                avisar('Credenciales MQTT rechazadas por el broker: revisar usuario y clave en config.js');
+                red.credencialesRechazadas = true;
+            }
+            registrar('error', `MQTT: ${e.message}`);
+        });
         c.on('close', () => {
             if (cerrado || c !== cliente) return;
             cerrado = true;
@@ -233,10 +250,15 @@
 
         // MODBUS
         const est = m('Status/MODBUS/Estado');
-        const nivelModbus = !vigente(est) ? 'obsoleto'
+        // F-04: el estado MODBUS llega A TRAVES de OPC UA. Con OPC UA en ERROR, el ultimo valor no
+        // dice nada del bus actual: se muestra OBSOLETO, no un DONE verde que ya nadie verifica.
+        // La falla se informa en la capa que fallo (OPC UA) y la de abajo, como desconocida.
+        const opcuaCaido = m('Status/OPCUA/Estado').valor === 'ERROR';
+        const nivelModbus = !vigente(est) || opcuaCaido ? 'obsoleto'
             : { 'DONE': 'ok', 'CRC ERROR': 'aviso', 'DEVICE NOT REACHED': 'error' }[est.valor] || 'aviso';
         texto('modbus-estado', fijarCapa('capa-modbus', nivelModbus,
-            vigente(est) ? est.valor : `${est.valor ?? '—'} (${est.vigencia})`));
+            opcuaCaido ? 'SIN DATOS (OPC UA en ERROR)'
+                : vigente(est) ? est.valor : `${est.valor ?? '—'} (${est.vigencia})`));
         texto('modbus-ok', m('Status/MODBUS/OK').valor);
         texto('modbus-crc', m('Status/MODBUS/CRC_ERROR').valor);
         texto('modbus-timeout', m('Status/MODBUS/TIMEOUT').valor);
@@ -249,7 +271,8 @@
 
         // MQTT (la conexion de ESTA web)
         const nivelMqtt = { CONECTADO: 'ok', CONECTANDO: 'aviso', DESCONECTADO: 'error' }[red.estado];
-        texto('mqtt-estado', fijarCapa('capa-mqtt', nivelMqtt, red.estado));
+        texto('mqtt-estado', fijarCapa('capa-mqtt', nivelMqtt,
+            red.estado !== 'CONECTADO' && red.credencialesRechazadas ? 'CREDENCIALES RECHAZADAS' : red.estado));
         texto('mqtt-reconexiones', red.reconexiones);
         texto('mqtt-reconexiones-edge', m('Status/MQTT/Reconexiones').valor);
 

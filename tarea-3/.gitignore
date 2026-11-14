@@ -68,3 +68,6 @@ hmi-web/dist/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Banco virtual en ejecucion (scripts/inyectar-fallas.sh): registros y claves efimeras
+.banco/
