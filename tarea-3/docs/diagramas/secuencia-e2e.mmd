@@ -1,0 +1,42 @@
+%% secuencia-e2e.mmd — Caminos completos de lectura (campo → navegador) y de comando (navegador → campo)
+%% Tramas MODBus con CRC calculado por tarea-1/herramientas/modbus_tramas.py
+%% Payloads Sparkplug codificados con protobufjs 7.4.0 y el sparkplug_b.proto oficial (Eclipse Tahu)
+sequenceDiagram
+    autonumber
+    actor Op as Operador
+    participant D1 as Dispositivo 1<br/>ESP32 esclavo
+    participant D2 as Dispositivo 2<br/>Node-RED maestro + servidor OPC UA
+    participant D3 as Dispositivo 3<br/>cliente OPC UA + Edge Node
+    participant BR as Broker MQTT<br/>(internet)
+    participant HA as Host Application<br/>navegador
+
+    rect rgb(232, 238, 246)
+    Note over Op,HA: Camino de LECTURA — el operador presiona el pulsador
+    Op->>D1: pulsador GPIO18 a GND
+    Note over D1: DI 10001 = 1 (antirrebote, DF-1.3)
+    D2->>D1: FC 02 · 01 02 00 00 00 01 B9 CA
+    D1-->>D2: 01 02 01 01 60 48 (bit 0 = 1)
+    Note over D2: CRC OK · OK++ · Dispositivo1.Inputs.Pulsador = true (DF-2.13)
+    D2-->>D3: PublishResponse · DataChangeNotification (Boolean true, SourceTimestamp)
+    D3->>BR: DDATA spBv1.0/UNRaf_PdCI_2026/DDATA/EN01_Gateway/DEV01_ESP32_Slave<br/>Protobuf 39 B · seq 7 · Inputs/Pulsador (Boolean) = true
+    BR->>HA: DDATA (WSS)
+    Note over HA: seq esperado ✓ · actualizar indicador (DF-4.12)
+    end
+
+    rect rgb(242, 242, 242)
+    Note over Op,HA: Camino de COMANDO — el usuario fija el LED PWM en 128
+    Op->>HA: control deslizante = 128
+    HA->>BR: DCMD .../DCMD/EN01_Gateway/DEV01_ESP32_Slave<br/>Protobuf 37 B · Outputs/LedPWM (UInt16) = 128
+    BR->>D3: DCMD (TLS)
+    D3->>D2: WriteRequest ns=1#59;s=Dispositivo1.Outputs.LedPWM = UInt16 128
+    D2->>D1: FC 06 · 01 06 00 00 00 80 88 6A
+    D1-->>D2: eco 01 06 00 00 00 80 88 6A
+    Note over D1: HR 40001 = 128 → PWM GPIO21 (DF-1.17)
+    D2-->>D3: WriteResponse · Results[0] = Good (después del eco, ADR-015)
+    D2->>D1: FC 03 (sondeo) · 01 03 00 00 00 01 84 0A
+    D1-->>D2: 01 03 02 00 80 B9 E4
+    D2-->>D3: PublishResponse · LedPWM = 128 (estado real, no el pedido)
+    D3->>BR: DDATA · seq 8 · Outputs/LedPWM = 128
+    BR->>HA: DDATA (WSS)
+    Note over HA: la vista confirma 128
+    end

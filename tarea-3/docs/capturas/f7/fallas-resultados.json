@@ -1,0 +1,119 @@
+{
+  "fecha": "2026-11-13T00:11:04.633Z",
+  "commit": "8ada48c",
+  "fallas": {
+    "F-01": {
+      "id": "F-01",
+      "desc": "el esclavo no responde (simulador en silencio = sin alimentacion)",
+      "inyeccion": 1794528675329,
+      "deteccionMs": 2218,
+      "detalleDeteccion": "DDEATH seq=32 (web: dispositivo OBSOLETO)",
+      "recuperacionMs": 498,
+      "detalleRecuperacion": "DBIRTH seq=36 a los 471 ms; web EN LÍNEA",
+      "resultado": "OK"
+    },
+    "F-02": {
+      "id": "F-02",
+      "desc": "error de CRC (el simulador corrompe el CRC del 30 % de las respuestas)",
+      "inyeccion": 1794528681637,
+      "deteccionMs": 2521,
+      "detalleDeteccion": "NDATA Estado=CRC ERROR, CRC_ERROR=(otro NDATA)",
+      "recuperacionMs": 538,
+      "detalleRecuperacion": "NDATA Estado=DONE (el contador CRC_ERROR queda como historico)",
+      "resultado": "OK"
+    },
+    "F-03": {
+      "id": "F-03",
+      "desc": "Unit ID equivocado desde el Dashboard (1 -> 7) y correccion (7 -> 1)",
+      "inyeccion": 1794528688266,
+      "deteccionMs": 1557,
+      "detalleDeteccion": "DEVICE NOT REACHED -> DDEATH",
+      "recuperacionMs": 1424,
+      "detalleRecuperacion": "DBIRTH sin reiniciar nada",
+      "resultado": "OK"
+    },
+    "F-04": {
+      "id": "F-04",
+      "desc": "cae el servidor OPC UA (se detiene Node-RED)",
+      "inyeccion": 1794528695109,
+      "deteccionMs": 260,
+      "detalleDeteccion": "NDATA Status/OPCUA/Estado=ERROR + DDEATH; web: OPC UA en ERROR, MODBUS SIN DATOS",
+      "recuperacionMs": 3837,
+      "detalleRecuperacion": "reconexion del cliente con retroceso, OPC UA DONE, DBIRTH",
+      "resultado": "OK"
+    },
+    "F-05": {
+      "id": "F-05",
+      "desc": "cae el Edge Node (kill del proceso)",
+      "inyeccion": 1794528702850,
+      "deteccionMs": 244,
+      "detalleDeteccion": "NDEATH del broker (Will), bdSeq=0, coincide=true",
+      "recuperacionMs": 806,
+      "detalleRecuperacion": "NBIRTH seq=0 bdSeq=1, DBIRTH, web EN LINEA",
+      "resultado": "OK"
+    },
+    "F-06": {
+      "id": "F-06",
+      "desc": "se corta internet en el dispositivo 3 (corte silencioso en el proxy)",
+      "inyeccion": 1794528707477,
+      "deteccionMs": 17861,
+      "detalleDeteccion": "NDEATH por keepalive del broker a los 17861 ms (esperado ~15 s)",
+      "recuperacionMs": 3109,
+      "detalleRecuperacion": "NBIRTH bdSeq=2 Reconexiones=1",
+      "resultado": "OK"
+    },
+    "F-07": {
+      "id": "F-07",
+      "desc": "mensajes perdidos (Edge de prueba que salta un seq)",
+      "inyeccion": 1794528740356,
+      "deteccionMs": 176,
+      "detalleDeteccion": "la web detecto el salto y publico NCMD Rebirth",
+      "resultado": "OK",
+      "recuperacionMs": 3,
+      "detalleRecuperacion": "NBIRTH seq=0 tras el NCMD (Rebirths=1)"
+    },
+    "F-08": {
+      "id": "F-08",
+      "desc": "se cae la Host Application (se mata el navegador)",
+      "inyeccion": 1794528743715,
+      "deteccionMs": 32,
+      "detalleDeteccion": "STATE offline (Will) retenido=false",
+      "recuperacionMs": 669,
+      "detalleRecuperacion": "STATE online, Rebirth pedido al conectar, web EN LINEA",
+      "resultado": "OK"
+    },
+    "F-09": {
+      "id": "F-09",
+      "desc": "credenciales MQTT invalidas en la web",
+      "inyeccion": 1794528747952,
+      "deteccionMs": 541,
+      "detalleDeteccion": "semaforo MQTT: CREDENCIALES RECHAZADAS + aviso",
+      "resultado": "OK"
+    },
+    "F-10": {
+      "id": "F-10",
+      "desc": "esclavo desconocido (ID 17, 19200 8E1, otro mapa): descubrimiento desde el Dashboard",
+      "inyeccion": 1794528750506,
+      "deteccionMs": 2863,
+      "detalleDeteccion": "el maestro no comunica: DDEATH",
+      "recuperacionMs": 4082,
+      "detalleRecuperacion": "descubrimiento + Aplicar: Status/MODBUS/Estado=DONE con el esclavo nuevo, sin recompilar",
+      "resultado": "OK"
+    }
+  },
+  "latencias": {},
+  "ventanas": {},
+  "capturas": {
+    "web-modbus-done-opcua-done": "web-modbus-done-opcua-done.png",
+    "web-modbus-device-not-reached": "web-modbus-device-not-reached.png",
+    "web-modbus-crc-error": "web-modbus-crc-error.png",
+    "web-opcua-error": "web-opcua-error.png",
+    "web-opcua-done-recuperado": "web-opcua-done-recuperado.png",
+    "web-ndeath-nodo-obsoleto": "web-ndeath-nodo-obsoleto.png",
+    "web-recuperacion-1-corte": "web-recuperacion-1-corte.png",
+    "web-recuperacion-2-restablecido": "web-recuperacion-2-restablecido.png",
+    "web-rebirth-por-salto-de-seq": "web-rebirth-por-salto-de-seq.png",
+    "web-credenciales-rechazadas": "web-credenciales-rechazadas.png"
+  },
+  "violaciones": []
+}

@@ -1,0 +1,92 @@
+# Matriz de trazabilidad — consigna → artefacto → evidencia → informe
+
+> Se completa a medida que avanzan las fases. **Ningún requisito queda en "parcial" en la entrega.**
+> Antes de entregar, Claude Code debe releer el PDF de la consigna y verificar esta tabla línea por
+> línea. Es el control de calidad final del trabajo.
+
+Estados: ⬜ pendiente · 🟨 en curso · ✅ cumplido y con evidencia
+
+> **Nota F1 (2026-11-09).** ADR-010 decidido: el esclavo es MicroPython (fila 1.a, `crc16.py`). El servidor OPC UA de la fila 2.0 ya no es un nodo de la paleta sino `node-opcua` desde
+> function nodes (ADR-011). El cliente de la fila 2.2 es la v2 de la T2 (ADR-013).
+
+---
+
+## Consigna 1 — Comunicación Modbus entre dispositivo 1 y dispositivo 2
+
+| # | Requisito literal | Artefacto que lo cumple | Evidencia | Sección del informe | Estado |
+|---|---|---|---|---|---|
+| 1.0 | Dispositivo 1 = el esclavo de la Tarea Nº1 | `firmware/esclavo-modbus/` (HAL y mapa de la T1, protocolo propio) | Código + foto del montaje | 4.1 Dispositivo de campo | 🟨 código y pruebas en PC; falta banco |
+| 1.1 | Dispositivo 2 intercambia datos con las E/S del dispositivo 1 | Flow `modbus-master` + `lib/maestro.js` | Captura del Dashboard con valores vivos | 4.2 Maestro de borde | 🟨 PC ✅ (simulador con el stack del firmware) · banco ⬜ |
+| 1.2 | Usar el esquema de la trama Modbus para ubicar los datos | `docs/diccionario-de-datos.md` §1 | Tabla de direcciones | 5.1 Mapa de registros | ⬜ |
+| 1.3 | Definir nombre, tipo y dirección Modbus de cada E/S, reutilizables como métricas Sparkplug | `docs/diccionario-de-datos.md` | Tabla única de las tres capas | 5.1 | ⬜ |
+| 1.a | Conexión física RS-485 **con CRC generado y verificado en maestro y esclavo** | `firmware/esclavo-modbus/lib/modbus_slave/crc16.py` + `edge-nodered/lib/modbus.js` | Tests *golden* en CPython y JS; captura del sniffer | 6.1 CRC-16 y su implementación | 🟨 los mismos 23 vectores pasan en el esclavo y en el maestro; falta el sniffer en banco |
+| 1.b | Explicar intercambio de mensajes, rutinas comentadas y **todos** los campos de la trama | `docs/diagramas/secuencia-modbus.mmd` + informe | Decodificación byte a byte de una trama real | 6.2 Análisis de trama Modbus | ⬜ |
+| 1.c | Contador de peticiones aceptadas y con error en el maestro, **visible en todas las capas** | Contadores de `lib/maestro.js`, persistidos; panel de las cuatro capas | `capturas/f7/web-modbus-done-opcua-done.png` (los cuatro contadores en la web, vía OPC UA y Sparkplug) | 7.3 Observabilidad | ✅ (PC) · banco ⬜ |
+| 1.d | Maestro configurable en vivo para un esclavo que trae la cátedra | Dashboard de configuración + asistente de descubrimiento | Video o captura del ensayo contra el ESP32 #2 | 4.2.3 Configuración en runtime | 🟨 PC ✅ (descubrimiento y Aplicar desde el panel) · banco ⬜ |
+
+## Consigna 2 — OPC UA entre dispositivo 2 y dispositivo 3
+
+| # | Requisito | Artefacto | Evidencia | Informe | Estado |
+|---|---|---|---|---|---|
+| 2.0 | Dispositivo 2 = servidor; dispositivo 3 = cliente OPC UA | Flow `opcua-server` + `gateway-sparkplug/src/opcua_client.py` | [opcua-espacio-direcciones.md](opcua-espacio-direcciones.md) (generada con `tools/verificar_opcua.js`); captura de UaExpert **pendiente (manual)** | 4.3 Capa OPC UA | 🟨 servidor ✅ (PC) · cliente ⬜ |
+| 2.1 | Transmitir **el mismo paquete de datos** que en Modbus, incluido el estado de la comunicación Modbus | Nodos `Status.MODBUS.*` en el espacio de direcciones | Tabla de NodeIds ([opcua-espacio-direcciones.md](opcua-espacio-direcciones.md)) | 5.2 Modelo de información | ✅ (PC) |
+| 2.2 | Reutilizar el cliente OPC UA de la Tarea Nº2 | `gateway-sparkplug/src/opcua_client.py` | Diff respecto del original con las modificaciones justificadas | 4.3.2 Reutilización | ⬜ |
+| 2.3 | Mantener nombre y tipo de cada dato | Diccionario de datos | Tabla de las tres capas | 5.1 | ⬜ |
+| 2.a | Desarrollar la conexión física y programar los dispositivos | Diagrama de red + configuración IP | `ip addr`, `ping`, `ethtool` | 3.2 Capa física Ethernet | ⬜ |
+| 2.b | Explicar intercambio de mensajes y trama empleada | Diagrama de secuencia OPC UA · [seguridad-opcua.md](seguridad-opcua.md) §6 | `capturas/opcua-{None,Sign,SignAndEncrypt}.pcapng` (loopback de la PC, HEL→CLO); banco **pendiente** | 6.3 Análisis de trama OPC UA | 🟨 PC ✅ · banco ⬜ |
+
+## Consigna 3 — MQTT con Sparkplug B
+
+| # | Requisito | Artefacto | Evidencia | Informe | Estado |
+|---|---|---|---|---|---|
+| 3.0 | El cliente OPC UA actúa como Edge Node publicador | `src/sparkplug_edge_node.py` | `capturas/sparkplug-pc-observador.jsonl` (PC); MQTT Explorer contra la nube **pendiente** | 4.4 Edge Node | 🟨 PC ✅ |
+| 3.1 | Broker **no local**, el paquete va por internet | Broker en la nube | Captura del panel del broker + `traceroute` | 3.3 Infraestructura MQTT | ⬜ |
+| 3.2 | Página web como Host Application suscriptora | `hmi-web/` | `capturas/hmi-escritorio.png`, `hmi-celular.png`; `ui.test.js` en Chrome | 4.5 Host Application | 🟨 PC ✅ · nube ⬜ |
+| 3.3 | La web muestra el estado de entradas y salidas del dispositivo 1 | `hmi-web/app.js` | `capturas/hmi-escritorio.png` (datos sintéticos del Edge Node real) | 4.5 | 🟨 PC ✅ · cadena real ⬜ |
+| 3.4 | La web acciona la salida digital y varía la analógica mediante `DCMD` | Flujo DCMD → OPC UA Write → Modbus FC 05/06 | Edge Node → LED del esclavo verificado en la PC (8 DCMD, 149-223 ms); web → DCMD → CONFIRMADO verificado en Chrome (`ui.test.js`); video con la cadena real **pendiente** | 7.2 Camino de comando | 🟨 PC ✅ · cadena real ⬜ |
+| 3.5 | La web muestra `DEVICE NOT REACHED`, `CRC ERROR`, `DONE` | Métrica `Status/MODBUS/Estado` | `capturas/hmi-ddeath.png` (DEVICE NOT REACHED); los tres estados con `fake_edge_node` (`dnr`/`crc`/`ok`) | 7.3 | 🟨 PC ✅ |
+| 3.6 | La web muestra el estado OPC UA: `ERROR` o `DONE` | Métrica `Status/OPCUA/Estado` | Semáforo OPC UA; ambos estados con `fake_edge_node` (`opcua off/on`) | 7.3 | 🟨 PC ✅ |
+| 3.7 | Roles: dispositivo 3 = Edge Node, dispositivo 1 = Device, web = Host Application | Diagrama de roles Sparkplug | Diagrama | 4.4.1 | ⬜ |
+| 3.8 | Estructura de tópicos `spBv1.0/{group}/{type}/{node}[/{device}]`, **con identificadores justificados** | Diccionario §4 | Árbol de tópicos en MQTT Explorer | 5.3 Espacio de nombres | ⬜ |
+| 3.9 | Payload **Protobuf** según `sparkplug_b.proto`, nunca JSON propio | `proto/sparkplug_b.proto` (idéntico a Tahu, SHA-256 en `test_sparkplug.py`) | Volcado hexadecimal del payload + su decodificación | 6.4 Análisis de payload Sparkplug | 🟨 código ✅ · volcado ⬜ |
+| 3.10 | Ciclo de vida: `NBIRTH` con `seq=0`, `bdSeq`, `Node Control/Rebirth`; `DBIRTH`; `NDEATH` como Will; `NDATA`/`DDATA` ante cambio con `seq` 0–255; `DDEATH` y nuevo `DBIRTH` | `src/ciclo_vida.py` + `src/sparkplug_edge_node.py` | Sesión archivada con los 7 tipos, `seq` sin violaciones y 3 vueltas 255→0; `test_sistema.py` | 7.1 Ciclo de vida | 🟨 PC ✅ · nube ⬜ |
+| 3.11 | Estados de comunicación como métricas del Edge Node | ADR-006 | `NBIRTH`/`NDATA` con `Status/*` en la sesión archivada | 5.3 | ✅ (PC) |
+| 3.12 | La web publica `spBv1.0/STATE/{host_id}` retenido, JSON con `online` y `timestamp`, con `offline` como Will | `hmi-web/app.js` (STATE con el timestamp de su Will, ADR-024) | Registro de eventos: `STATE offline (retenido)` → `STATE online` | 7.1.2 | ✅ (PC) |
+| 3.13 | Ante salto de `seq` o datos sin BIRTH, la web pide Rebirth con `NCMD` | `hmi-web/sparkplug.js` | `ui.test.js`: salto de `seq` → NCMD → NBIRTH, contador web y Edge | 7.1.3 | ✅ (PC) |
+| 3.14 | Broker con MQTT 3.1.1/5.0, Last Will, retenidos y WSS; **documentar el nivel de seguridad** | ADR-005 | Tabla de usuarios y permisos por tópico | 8. Seguridad | ⬜ |
+| 3.b | Explicar, por cada tipo de mensaje, el tópico y los campos del payload (`timestamp`, `seq`, métricas con `name`, `datatype`, `value`) | Informe §6.4 | `capturas/f7/sparkplug-mensajes-decodificados.md`: un mensaje real de cada tipo + volcado hexadecimal campo por campo | 6.4 | ✅ (PC) |
+
+## Consigna 4 — Verificación del estado funcional y recuperación
+
+| # | Requisito | Artefacto | Evidencia | Informe | Estado |
+|---|---|---|---|---|---|
+| 4.1 | Informar la falla **y en qué parte se generó**, en tiempo real | Semáforo por capa en la web (color + ícono + texto) | Figuras 1-9 de `capturas/README.md`: cada estado de cada capa en la web; campaña F-01..F-10 (`resultados-pruebas.md`) | 7.3 | ✅ (PC) · banco ⬜ |
+| 4.2 | Aprovechar `NDEATH`/Last Will, `DDEATH` y los saltos de `seq` | `src/sparkplug_edge_node.py` + `hmi-web/` | NDEATH del broker y DDEATH en la sesión archivada; la web los marca OBSOLETO y pide Rebirth ante salto de `seq` (`ui.test.js`) | 7.1 | ✅ (PC) |
+| 4.3 | Reconexión automática: nueva sesión MQTT con `bdSeq` incrementado, `NBIRTH` con `seq=0`, `DBIRTH`, y la web se actualiza sola | Lógica de reconexión (ADR-022, ADR-023) | F-05 y F-06 en el banco virtual: `bdSeq`+1, NBIRTH `seq` 0, `Reconexiones`+1, web EN LÍNEA sola en 0,8 s y 3,1 s; Figuras 7a/7b; video **pendiente** | 7.4 Recuperación | ✅ (PC) · video ⬜ |
+| 4.4 | Verificar el tráfico con una herramienta externa que decodifique Sparkplug B e incluir capturas de BIRTH, DATA, CMD y DEATH | `tools/observador_sparkplug.py` (decodifica y verifica `seq`/`bdSeq`); MQTT Explorer contra la nube **pendiente** | `capturas/f7/sparkplug-*-observador.jsonl` + `sparkplug-mensajes-decodificados.md` | Anexo B | 🟨 PC ✅ · MQTT Explorer ⬜ |
+
+## Requisitos transversales
+
+| # | Requisito | Dónde | Estado |
+|---|---|---|---|
+| T.1 | Diagramas de flujo del maestro y de los esclavos | `docs/diagramas/flujo-*.mmd` + `.png` (F1) | 🟨 |
+| T.2 | Trazabilidad de código: cada fragmento referenciado a un bloque del diagrama | Etiquetas `[DF-1.x]` esclavo, `[DF-2.x]` maestro, `[DF-3.x]` Edge Node, `[DF-4.x]` Host App, definidas en F1 | 🟨 |
+| T.3 | Código comentado para que otro programador lo entienda | Todo el código | ⬜ |
+| T.4 | Librerías usadas: parámetros de configuración, funciones, tipos de argumentos y valores de retorno | Informe, anexo de librerías | ⬜ |
+| T.5 | Conexionado de **cada** bloque del circuito | Esquemáticos + fotos | ⬜ |
+| T.6 | Formato: PDF, Arial 11, interlineado 1,5, márgenes 3/2,5, justificado, APA 7 | `informe/` | ⬜ |
+| T.7 | Nombre `Apellido1_Apellido2_Apellido3_PdCI_T3_26.pdf` | Entrega | ⬜ |
+| T.8 | Se adjuntan códigos, simulaciones y diagramas | Paquete de entrega | ⬜ |
+| T.9 | Informe preliminar: explicación de la solución + diagrama de flujo + tipo de comunicación y orden de los datos en las tramas | `informe/Bevilacqua_Peralta_PdCI_T3_26_preliminar.pdf` (fuentes en el commit 658fa3a) | 🟨 generado, falta subirlo |
+| T.10 | Defensa de 12 minutos con los tres integrantes hablando | `defensa/guion-12min.md` | ⬜ |
+
+---
+
+## Verificación final (ejecutar antes de entregar)
+
+1. Releer el PDF de la consigna completo y marcar cada línea de esta matriz.
+2. Abrir el PDF generado y comprobar tipografía, márgenes, interlineado y justificado reales.
+3. Comprobar que cada captura del informe existe en `docs/capturas/` y está referenciada.
+4. Comprobar que cada referencia bibliográfica citada aparece en la lista y viceversa.
+5. Correr la suite de pruebas completa y pegar la salida en el anexo.
+6. Ensayar la demo de principio a fin, incluido el ensayo del esclavo desconocido (ADR-007).

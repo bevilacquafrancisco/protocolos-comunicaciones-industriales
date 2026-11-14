@@ -1,0 +1,27 @@
+/*
+ * estilo.css — estilo comun de los paneles del Dashboard (ui-template de alcance "site:style")
+ * Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-09 · v1.0
+ * Sobrio, azul marino y gris (estilo de documentos del grupo).
+ */
+.pdci-tabla th {
+  background: #1f3864;
+  color: #ffffff;
+  font-weight: 600;
+  text-align: left;
+  padding: 4px 8px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.pdci-tabla td {
+  padding: 2px 8px;
+  border-bottom: 1px solid #d9d9d9;
+  vertical-align: middle;
+}
+.pdci-tabla tbody tr:nth-child(even) td {
+  background: #f2f4f8;
+}
+code {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.85rem;
+}

@@ -1,0 +1,7 @@
+# Dispositivo 3 - dependencias de DESARROLLO y PRUEBA (no se instalan en la demo).
+-r requirements.txt
+grpcio-tools==1.84.0    # trae protoc: regenera src/sparkplug_b_pb2.py (README §3)
+grpcio==1.84.0          # dependencia de grpcio-tools; fijada (1.85.1 tenia menos de dos semanas)
+amqtt==0.12.1           # broker MQTT en Python SOLO para las pruebas (I-03: nunca en la demo)
+pytest==9.2.0
+pytest-asyncio==1.4.0

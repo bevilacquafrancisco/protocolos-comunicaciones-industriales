@@ -1,0 +1,5 @@
+# Archivos de terceros servidos por la pagina (generado por tools/copiar_vendor.js)
+
+vendor/mqtt.min.js  mqtt@5.16.1  sha256=75873d04a6400bbbac093b3602caf06f44ed92ee032925e1f4f21c03eba05a4e
+vendor/protobuf.min.js  protobufjs@8.8.1  sha256=54f9dc183a872e644ef1d038b3757f081f2cc7c3d3b504f00074235c72eda08f
+proto/sparkplug_b.proto  sparkplug_b.proto (Eclipse Tahu)@-  sha256=4432c5c483b7fb9732d0594c98a2e97dca5e517e39c5374a8b918d837f0b4a19

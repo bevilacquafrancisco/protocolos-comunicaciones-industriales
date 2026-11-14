@@ -1,0 +1,14 @@
+# Dispositivo 3 — nada de esto se versiona.
+# (git no admite comentarios al final de la linea: cada uno va en su propia linea)
+
+# certificado y CLAVE PRIVADA del cliente OPC UA, certificado del servidor
+pki/
+# bdSeq persistido (dato de ejecucion de cada maquina)
+estado/
+# registro JSONL de ejecucion (la evidencia elegida se copia a docs/capturas/)
+logs/
+# CA, clave y usuarios del broker de DESARROLLO
+.dev-broker/
+.venv/
+.pytest_cache/
+__pycache__/

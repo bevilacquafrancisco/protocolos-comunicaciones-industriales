@@ -1,0 +1,241 @@
+{
+  "descripcion": "Vectores golden del CRC-16/MODBUS (polinomio 0xA001 reflejado, valor inicial 0xFFFF). 'crc' es el valor del registro; en la trama viaja primero el byte bajo ('crc_en_cable_hex').",
+  "oraculos": [
+    "pymodbus 3.8.6 (FramerRTU.compute_CRC, convertido de orden de cable a valor)",
+    "tarea-1/herramientas/modbus_tramas.py (calcular_crc16)"
+  ],
+  "generado_por": "tarea-3/tools/generar_vectores_crc.py",
+  "generado_utc": "2026-11-09T19:58:10Z",
+  "vectores": [
+    {
+      "nombre": "vector_estandar",
+      "descripcion": "Cadena ASCII '123456789': vector de referencia del CRC-16/MODBUS",
+      "mensaje_hex": "31 32 33 34 35 36 37 38 39",
+      "longitud_trama": 11,
+      "crc": 19255,
+      "crc_hex": "0x4B37",
+      "crc_en_cable_hex": "37 4B",
+      "trama_hex": "31 32 33 34 35 36 37 38 39 37 4B"
+    },
+    {
+      "nombre": "fc01_peticion",
+      "descripcion": "Read Coils, ID 1, offset 0, 1 coil",
+      "mensaje_hex": "01 01 00 00 00 01",
+      "longitud_trama": 8,
+      "crc": 51965,
+      "crc_hex": "0xCAFD",
+      "crc_en_cable_hex": "FD CA",
+      "trama_hex": "01 01 00 00 00 01 FD CA"
+    },
+    {
+      "nombre": "fc01_respuesta",
+      "descripcion": "Read Coils: 1 byte de datos, bit 0 = 1",
+      "mensaje_hex": "01 01 01 01",
+      "longitud_trama": 6,
+      "crc": 18576,
+      "crc_hex": "0x4890",
+      "crc_en_cable_hex": "90 48",
+      "trama_hex": "01 01 01 01 90 48"
+    },
+    {
+      "nombre": "fc02_peticion",
+      "descripcion": "Read Discrete Inputs, ID 1, offset 0, 1 entrada",
+      "mensaje_hex": "01 02 00 00 00 01",
+      "longitud_trama": 8,
+      "crc": 51897,
+      "crc_hex": "0xCAB9",
+      "crc_en_cable_hex": "B9 CA",
+      "trama_hex": "01 02 00 00 00 01 B9 CA"
+    },
+    {
+      "nombre": "fc02_respuesta",
+      "descripcion": "Read Discrete Inputs: pulsador presionado",
+      "mensaje_hex": "01 02 01 01",
+      "longitud_trama": 6,
+      "crc": 18528,
+      "crc_hex": "0x4860",
+      "crc_en_cable_hex": "60 48",
+      "trama_hex": "01 02 01 01 60 48"
+    },
+    {
+      "nombre": "fc03_peticion",
+      "descripcion": "Read Holding Registers, ID 1, offset 0, 1 registro",
+      "mensaje_hex": "01 03 00 00 00 01",
+      "longitud_trama": 8,
+      "crc": 2692,
+      "crc_hex": "0x0A84",
+      "crc_en_cable_hex": "84 0A",
+      "trama_hex": "01 03 00 00 00 01 84 0A"
+    },
+    {
+      "nombre": "fc03_respuesta",
+      "descripcion": "Read Holding Registers: LED PWM = 128",
+      "mensaje_hex": "01 03 02 00 80",
+      "longitud_trama": 7,
+      "crc": 58553,
+      "crc_hex": "0xE4B9",
+      "crc_en_cable_hex": "B9 E4",
+      "trama_hex": "01 03 02 00 80 B9 E4"
+    },
+    {
+      "nombre": "fc04_peticion",
+      "descripcion": "Read Input Registers, ID 1, offset 0, 1 registro",
+      "mensaje_hex": "01 04 00 00 00 01",
+      "longitud_trama": 8,
+      "crc": 51761,
+      "crc_hex": "0xCA31",
+      "crc_en_cable_hex": "31 CA",
+      "trama_hex": "01 04 00 00 00 01 31 CA"
+    },
+    {
+      "nombre": "fc04_respuesta",
+      "descripcion": "Read Input Registers: potenciometro = 2047",
+      "mensaje_hex": "01 04 02 07 FF",
+      "longitud_trama": 7,
+      "crc": 16635,
+      "crc_hex": "0x40FB",
+      "crc_en_cable_hex": "FB 40",
+      "trama_hex": "01 04 02 07 FF FB 40"
+    },
+    {
+      "nombre": "fc05_peticion_on",
+      "descripcion": "Write Single Coil ON (0xFF00); la respuesta es el eco",
+      "mensaje_hex": "01 05 00 00 FF 00",
+      "longitud_trama": 8,
+      "crc": 14988,
+      "crc_hex": "0x3A8C",
+      "crc_en_cable_hex": "8C 3A",
+      "trama_hex": "01 05 00 00 FF 00 8C 3A"
+    },
+    {
+      "nombre": "fc05_peticion_off",
+      "descripcion": "Write Single Coil OFF (0x0000); la respuesta es el eco",
+      "mensaje_hex": "01 05 00 00 00 00",
+      "longitud_trama": 8,
+      "crc": 51917,
+      "crc_hex": "0xCACD",
+      "crc_en_cable_hex": "CD CA",
+      "trama_hex": "01 05 00 00 00 00 CD CA"
+    },
+    {
+      "nombre": "fc06_peticion",
+      "descripcion": "Write Single Register = 128; la respuesta es el eco",
+      "mensaje_hex": "01 06 00 00 00 80",
+      "longitud_trama": 8,
+      "crc": 27272,
+      "crc_hex": "0x6A88",
+      "crc_en_cable_hex": "88 6A",
+      "trama_hex": "01 06 00 00 00 80 88 6A"
+    },
+    {
+      "nombre": "fc06_peticion_255",
+      "descripcion": "Write Single Register = 255 (maximo del LED PWM)",
+      "mensaje_hex": "01 06 00 00 00 FF",
+      "longitud_trama": 8,
+      "crc": 35529,
+      "crc_hex": "0x8AC9",
+      "crc_en_cable_hex": "C9 8A",
+      "trama_hex": "01 06 00 00 00 FF C9 8A"
+    },
+    {
+      "nombre": "excepcion_01",
+      "descripcion": "Excepcion 01 ILLEGAL FUNCTION sobre FC 0x07",
+      "mensaje_hex": "01 87 01",
+      "longitud_trama": 5,
+      "crc": 12418,
+      "crc_hex": "0x3082",
+      "crc_en_cable_hex": "82 30",
+      "trama_hex": "01 87 01 82 30"
+    },
+    {
+      "nombre": "excepcion_02",
+      "descripcion": "Excepcion 02 ILLEGAL DATA ADDRESS sobre FC 04",
+      "mensaje_hex": "01 84 02",
+      "longitud_trama": 5,
+      "crc": 49602,
+      "crc_hex": "0xC1C2",
+      "crc_en_cable_hex": "C2 C1",
+      "trama_hex": "01 84 02 C2 C1"
+    },
+    {
+      "nombre": "excepcion_03",
+      "descripcion": "Excepcion 03 ILLEGAL DATA VALUE sobre FC 06",
+      "mensaje_hex": "01 86 03",
+      "longitud_trama": 5,
+      "crc": 24834,
+      "crc_hex": "0x6102",
+      "crc_en_cable_hex": "02 61",
+      "trama_hex": "01 86 03 02 61"
+    },
+    {
+      "nombre": "excepcion_04",
+      "descripcion": "Excepcion 04 SLAVE DEVICE FAILURE sobre FC 03",
+      "mensaje_hex": "01 83 04",
+      "longitud_trama": 5,
+      "crc": 62272,
+      "crc_hex": "0xF340",
+      "crc_en_cable_hex": "40 F3",
+      "trama_hex": "01 83 04 40 F3"
+    },
+    {
+      "nombre": "desconocido_fc03",
+      "descripcion": "Perfil DESCONOCIDO: ID 17, HR 0x0200, 2 registros",
+      "mensaje_hex": "11 03 02 00 00 02",
+      "longitud_trama": 8,
+      "crc": 9159,
+      "crc_hex": "0x23C7",
+      "crc_en_cable_hex": "C7 23",
+      "trama_hex": "11 03 02 00 00 02 C7 23"
+    },
+    {
+      "nombre": "difusion_fc06",
+      "descripcion": "Difusion (ID 0): Write Single Register, no genera respuesta",
+      "mensaje_hex": "00 06 00 00 00 40",
+      "longitud_trama": 8,
+      "crc": 60297,
+      "crc_hex": "0xEB89",
+      "crc_en_cable_hex": "89 EB",
+      "trama_hex": "00 06 00 00 00 40 89 EB"
+    },
+    {
+      "nombre": "longitud_minima",
+      "descripcion": "Trama de 4 bytes (2 de mensaje + 2 de CRC)",
+      "mensaje_hex": "01 07",
+      "longitud_trama": 4,
+      "crc": 57921,
+      "crc_hex": "0xE241",
+      "crc_en_cable_hex": "41 E2",
+      "trama_hex": "01 07 41 E2"
+    },
+    {
+      "nombre": "longitud_maxima",
+      "descripcion": "Trama de 256 bytes (254 de mensaje + 2 de CRC): limite RTU",
+      "mensaje_hex": "01 03 FA 0B 30 55 7A 9F C4 E9 0E 33 58 7D A2 C7 EC 11 36 5B 80 A5 CA EF 14 39 5E 83 A8 CD F2 17 3C 61 86 AB D0 F5 1A 3F 64 89 AE D3 F8 1D 42 67 8C B1 D6 FB 20 45 6A 8F B4 D9 FE 23 48 6D 92 B7 DC 01 26 4B 70 95 BA DF 04 29 4E 73 98 BD E2 07 2C 51 76 9B C0 E5 0A 2F 54 79 9E C3 E8 0D 32 57 7C A1 C6 EB 10 35 5A 7F A4 C9 EE 13 38 5D 82 A7 CC F1 16 3B 60 85 AA CF F4 19 3E 63 88 AD D2 F7 1C 41 66 8B B0 D5 FA 1F 44 69 8E B3 D8 FD 22 47 6C 91 B6 DB 00 25 4A 6F 94 B9 DE 03 28 4D 72 97 BC E1 06 2B 50 75 9A BF E4 09 2E 53 78 9D C2 E7 0C 31 56 7B A0 C5 EA 0F 34 59 7E A3 C8 ED 12 37 5C 81 A6 CB F0 15 3A 5F 84 A9 CE F3 18 3D 62 87 AC D1 F6 1B 40 65 8A AF D4 F9 1E 43 68 8D B2 D7 FC 21 46 6B 90 B5 DA FF 24 49 6E 93 B8 DD 02 27 4C 71 96 BB E0 05 2A 4F 74 99 BE E3 08 2D",
+      "longitud_trama": 256,
+      "crc": 45031,
+      "crc_hex": "0xAFE7",
+      "crc_en_cable_hex": "E7 AF",
+      "trama_hex": "01 03 FA 0B 30 55 7A 9F C4 E9 0E 33 58 7D A2 C7 EC 11 36 5B 80 A5 CA EF 14 39 5E 83 A8 CD F2 17 3C 61 86 AB D0 F5 1A 3F 64 89 AE D3 F8 1D 42 67 8C B1 D6 FB 20 45 6A 8F B4 D9 FE 23 48 6D 92 B7 DC 01 26 4B 70 95 BA DF 04 29 4E 73 98 BD E2 07 2C 51 76 9B C0 E5 0A 2F 54 79 9E C3 E8 0D 32 57 7C A1 C6 EB 10 35 5A 7F A4 C9 EE 13 38 5D 82 A7 CC F1 16 3B 60 85 AA CF F4 19 3E 63 88 AD D2 F7 1C 41 66 8B B0 D5 FA 1F 44 69 8E B3 D8 FD 22 47 6C 91 B6 DB 00 25 4A 6F 94 B9 DE 03 28 4D 72 97 BC E1 06 2B 50 75 9A BF E4 09 2E 53 78 9D C2 E7 0C 31 56 7B A0 C5 EA 0F 34 59 7E A3 C8 ED 12 37 5C 81 A6 CB F0 15 3A 5F 84 A9 CE F3 18 3D 62 87 AC D1 F6 1B 40 65 8A AF D4 F9 1E 43 68 8D B2 D7 FC 21 46 6B 90 B5 DA FF 24 49 6E 93 B8 DD 02 27 4C 71 96 BB E0 05 2A 4F 74 99 BE E3 08 2D E7 AF"
+    },
+    {
+      "nombre": "todo_ceros",
+      "descripcion": "Seis bytes en 0x00",
+      "mensaje_hex": "00 00 00 00 00 00",
+      "longitud_trama": 8,
+      "crc": 6912,
+      "crc_hex": "0x1B00",
+      "crc_en_cable_hex": "00 1B",
+      "trama_hex": "00 00 00 00 00 00 00 1B"
+    },
+    {
+      "nombre": "todo_unos",
+      "descripcion": "Seis bytes en 0xFF",
+      "mensaje_hex": "FF FF FF FF FF FF",
+      "longitud_trama": 8,
+      "crc": 37889,
+      "crc_hex": "0x9401",
+      "crc_en_cable_hex": "01 94",
+      "trama_hex": "FF FF FF FF FF FF 01 94"
+    }
+  ]
+}

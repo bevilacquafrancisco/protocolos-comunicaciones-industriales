@@ -1,0 +1,134 @@
+<!doctype html>
+<!--
+  index.html — Host Application Sparkplug B (Tarea Nº3, nivel 4)
+  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-12 · v1.0
+  Una sola pantalla: semáforo de las cuatro capas (I-05, siempre visible), dispositivo 1,
+  controles (DCMD) y registro de eventos. Lógica: sparkplug.js (núcleo) y app.js (vista + MQTT).
+  CSP: sin scripts ni estilos en línea; solo conexiones WSS (o ws:// a localhost para desarrollo).
+  Dos excepciones medidas (ADR-025): 'unsafe-eval' porque protobuf.js genera sus codificadores
+  con new Function al cargar sparkplug_b.proto, y worker-src blob: porque mqtt.js corre sus
+  temporizadores en un Worker (una pestaña en segundo plano frena los temporizadores comunes y
+  vencería el keepalive). Lo que llega del broker se escribe siempre con textContent, nunca como
+  HTML: la vía de inyección que 'unsafe-eval' agravaría no existe.
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-eval'; worker-src blob:; style-src 'self'; connect-src 'self' wss: ws://127.0.0.1:* ws://localhost:*; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>PdCI T3 · Host Application</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="cabecera">
+    <h1>PdCI T3 · Host Application <span class="sub">Sparkplug B</span></h1>
+    <p class="ids" id="ids">—</p>
+  </header>
+
+  <div id="fatal" class="fatal" role="alert" hidden></div>
+  <div id="aviso" class="aviso" role="status" aria-live="polite" hidden></div>
+
+  <main>
+    <!-- [DF-4.12] Semáforo por capa: color + ícono + texto (el color solo no es accesible) -->
+    <section class="semaforo" aria-label="Estado de las cuatro capas">
+      <article class="capa" id="capa-modbus" data-nivel="obsoleto">
+        <h2><span class="icono" aria-hidden="true">◌</span> MODBUS</h2>
+        <p class="estado" id="modbus-estado">DESCONOCIDO</p>
+        <dl class="contadores">
+          <div><dt>OK</dt><dd id="modbus-ok">—</dd></div>
+          <div><dt>CRC_ERROR</dt><dd id="modbus-crc">—</dd></div>
+          <div><dt>TIMEOUT</dt><dd id="modbus-timeout">—</dd></div>
+          <div><dt>EXCEPTION</dt><dd id="modbus-exception">—</dd></div>
+        </dl>
+      </article>
+      <article class="capa" id="capa-opcua" data-nivel="obsoleto">
+        <h2><span class="icono" aria-hidden="true">◌</span> OPC UA</h2>
+        <p class="estado" id="opcua-estado">DESCONOCIDO</p>
+        <p class="detalle">Sesión del dispositivo 3 con el dispositivo 2</p>
+      </article>
+      <article class="capa" id="capa-mqtt" data-nivel="error">
+        <h2><span class="icono" aria-hidden="true">✖</span> MQTT</h2>
+        <p class="estado" id="mqtt-estado">DESCONECTADO</p>
+        <dl class="contadores">
+          <div><dt>Reconexiones web</dt><dd id="mqtt-reconexiones">0</dd></div>
+          <div><dt>Reconexiones Edge</dt><dd id="mqtt-reconexiones-edge">—</dd></div>
+        </dl>
+      </article>
+      <article class="capa" id="capa-sparkplug" data-nivel="obsoleto">
+        <h2><span class="icono" aria-hidden="true">◌</span> SPARKPLUG</h2>
+        <p class="estado" id="spb-estado">NODO DESCONOCIDO</p>
+        <dl class="contadores">
+          <div><dt>Dispositivo</dt><dd id="spb-disp">DESCONOCIDO</dd></div>
+          <div><dt>bdSeq</dt><dd id="spb-bdseq">—</dd></div>
+          <div><dt>seq</dt><dd id="spb-seq">—</dd></div>
+          <div><dt>Rebirths pedidos (web)</dt><dd id="spb-rebirths">0</dd></div>
+          <div><dt>Rebirths (Edge)</dt><dd id="spb-rebirths-edge">—</dd></div>
+        </dl>
+      </article>
+    </section>
+
+    <!-- Dispositivo 1 -->
+    <section class="panel" aria-labelledby="t-disp">
+      <h2 id="t-disp">Dispositivo 1 · <span id="disp-vigencia" class="vigencia">DESCONOCIDO</span></h2>
+      <div class="variables">
+        <div class="variable" id="v-pulsador">
+          <h3>Pulsador</h3>
+          <p class="valor" id="pulsador-valor">—</p>
+          <p class="meta" id="pulsador-meta">sin BIRTH</p>
+        </div>
+        <div class="variable" id="v-pote">
+          <h3>Potenciómetro</h3>
+          <p class="valor"><span id="pote-crudo">—</span> <span class="unidad">/ 4095</span></p>
+          <p class="valor-2"><span id="pote-pct">—</span> %</p>
+          <meter id="pote-medidor" min="0" max="100" value="0" aria-label="Potenciómetro en porcentaje"></meter>
+          <p class="meta" id="pote-meta">sin BIRTH</p>
+        </div>
+        <div class="variable" id="v-led">
+          <h3>LED digital</h3>
+          <p class="valor" id="led-valor">—</p>
+          <p class="meta" id="led-meta">sin BIRTH</p>
+        </div>
+        <div class="variable" id="v-pwm">
+          <h3>LED PWM</h3>
+          <p class="valor"><span id="pwm-valor">—</span> <span class="unidad">/ 255</span></p>
+          <meter id="pwm-medidor" min="0" max="255" value="0" aria-label="LED PWM"></meter>
+          <p class="meta" id="pwm-meta">sin BIRTH</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- [DF-4.14] Controles: publican DCMD; el estado mostrado es SIEMPRE el confirmado -->
+    <section class="panel" aria-labelledby="t-ctrl">
+      <h2 id="t-ctrl">Controles</h2>
+      <div class="control">
+        <button type="button" id="btn-led" class="conmutador" role="switch" aria-checked="false" disabled>
+          LED digital: <span id="btn-led-texto">—</span>
+        </button>
+        <p class="comando" id="cmd-led" data-estado="ninguno">Sin comandos</p>
+      </div>
+      <div class="control">
+        <label for="pwm">LED PWM (0-255): <output id="pwm-pedido" for="pwm">—</output></label>
+        <input type="range" id="pwm" min="0" max="255" step="1" value="0" disabled>
+        <p class="comando" id="cmd-pwm" data-estado="ninguno">Sin comandos</p>
+      </div>
+      <p class="nota">El conmutador y los valores muestran lo <strong>confirmado</strong> por el dispositivo
+        (DDATA), no lo pedido.</p>
+    </section>
+
+    <!-- Registro de eventos -->
+    <section class="panel registro" aria-labelledby="t-log">
+      <h2 id="t-log">Eventos</h2>
+      <ol id="eventos" class="eventos"></ol>
+    </section>
+  </main>
+
+  <script src="vendor/mqtt.min.js"></script>
+  <script src="vendor/protobuf.min.js"></script>
+  <script src="config.js"></script>
+  <script src="sparkplug.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Tarea 3: los scripts que corren en Linux o en la Raspberry Pi conservan LF aunque el
+# repositorio se clone en Windows: un retorno de carro (CR) al final de "set -euo pipefail"
+# hace fallar a bash en la primera linea del script.
+*.sh text eol=lf
+*.py text eol=lf
+
+# El sparkplug_b.proto es una copia byte a byte del oficial de Eclipse Tahu: su SHA-256 se
+# verifica en las pruebas del dispositivo 3 y de la web.
+*.proto text eol=lf
+
+# Unidades systemd y plantillas de entorno que se usan en la Raspberry Pi: un retorno de carro (CR) al final de un
+# valor de EnvironmentFile se vuelve parte del valor (el hash OPC UA dejaria de coincidir).
+*.service text eol=lf
+*.ejemplo text eol=lf

@@ -1,0 +1,39 @@
+%% flujo-servidor-opcua.mmd — Dispositivo 2 · servidor OPC UA en Node-RED (function node O1)
+%% Cada bloque [DF-5.x] se cita en lib/servidor_opcua.js y en funciones/opcua-server/O1_*.js.
+%% node-opcua 2.160.0 desde un function node (ADR-011, ADR-019) · escritura confirmada por eco (ADR-015)
+%% Seguridad: tres endpoints, usuario scrypt, lista de confianza sin aceptación automática (ADR-009)
+flowchart TD
+    A(["[DF-5.1] On Start de O1<br/>gestor de certificados: own/ trusted/ rejected/<br/>sin aceptación automática · certificado propio si falta"])
+    A --> B["[DF-5.2] Crear OPCUAServer<br/>endpoints None · Basic256Sha256 Sign · Basic256Sha256 SignAndEncrypt<br/>anónimo (lee) + usuario/contraseña scrypt (lee y escribe)<br/>ns=1 = urn:unraf:pdci:t3 · Dispositivo1/{Inputs,Outputs,Status}<br/>valores iniciales: BadWaitingForInitialData"]
+    B --> OK{"¿Arrancó?<br/>(puerto 4840 libre,<br/>PKI legible)"}
+    OK -- No --> ERR["Capa OPCUA = ERROR en el panel (I-05)<br/>estado rojo del nodo · no reintenta solo"]
+    OK -- Sí --> R(["REPOSO: esperar mensaje<br/>o servicio de un cliente"])
+
+    R -- "valor del maestro<br/>(link de M1)" --> V["[DF-5.3] Publicar valor<br/>calidad good → Good · bad → UncertainLastUsableValue<br/>SourceTimestamp = instante de la lectura MODBus<br/>variable fuera del diccionario → Dispositivo1/Mapa (DF-5.5)"]
+    R -- "estado del maestro" --> E["[DF-5.3] Status.MODBUS.*<br/>Estado · OK · CRC_ERROR · TIMEOUT · EXCEPTION<br/>UltimaTramaTx/Rx · LatenciaMs"]
+    V --> R
+    E --> R
+
+    R -- "WriteRequest de un cliente" --> W1{"node-opcua valida:<br/>¿tipo, AccessLevel, rol<br/>y EURange correctos?"}
+    W1 -- No --> W2["Responder sin tocar el bus<br/>BadTypeMismatch · BadNotWritable ·<br/>BadUserAccessDenied · BadOutOfRange"]
+    W1 -- Sí --> W3["[DF-5.4] maestro.escribir(nombre, valor)<br/>encola FC 05 (coil) o FC 06 (registro)<br/>el WriteResponse queda pendiente"]
+    W3 --> W4{"¿El esclavo devolvió<br/>el eco correcto?"}
+    W4 -- Sí --> W5["Value = valor pedido · Good<br/>escriturasOk++"]
+    W4 -- No --> W6["Value SIN cambios<br/>TIMEOUT · CRC · trama mala → BadCommunicationError<br/>excepción → BadDeviceFailure · fuera del mapa → BadNodeIdUnknown<br/>escriturasRechazadas++"]
+    W2 --> R
+    W5 --> R
+    W6 --> R
+
+    R -- "tick de 1 s" --> S{"[DF-5.6] ¿Último dato del<br/>maestro hace menos de 5 s?"}
+    S -- Sí --> S1["Status.OPCUA.Estado = DONE"]
+    S -- No --> S2["Status.OPCUA.Estado = ERROR"]
+    S1 --> S3["capa OPCUA del panel: sesiones, suscripciones,<br/>rechazos de seguridad, escrituras"]
+    S2 --> S3
+    S3 --> R
+
+    R -- "OpenSecureChannel Sign/SignAndEncrypt<br/>con certificado desconocido" --> C1["[DF-5.7] Rechazar: BadSecurityChecksFailed<br/>certificado → rejected/"]
+    C1 --> R
+    R -- "Confiar / Revocar (panel, por huella SHA-1)" --> C2["[DF-5.7] trustCertificate / rejectCertificate<br/>aplica en vivo, sin reiniciar"]
+    C2 --> R
+
+    R -- "On Stop (Deploy o cierre)" --> F(["Cerrar sesiones y liberar el puerto 4840"])
