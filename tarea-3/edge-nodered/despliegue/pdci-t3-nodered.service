@@ -1,0 +1,43 @@
+# =============================================================================
+# pdci-t3-nodered.service — Tarea 3 · dispositivo 2 (Raspberry Pi)
+# Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-14 · v1.0
+#
+# Node-RED 4.1.16 ejecutado DESDE edge-nodered/node_modules (version fijada en package-lock.json),
+# con el settings.js del trabajo: maestro MODBus + servidor OPC UA + Dashboard.
+# Es el mismo modo de arranque que el banco virtual, que es el camino probado (F7).
+#
+# Instalacion: docs/puesta-en-marcha/05-raspberry-software.md §5
+#   sudo cp despliegue/pdci-t3-nodered.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now pdci-t3-nodered
+#
+# Supone: usuario 'pdci' y el codigo en /home/pdci/pdci-t3 (si cambia, ajustar las rutas).
+# =============================================================================
+[Unit]
+Description=PdCI T3 - dispositivo 2: Node-RED (maestro MODBus RTU + servidor OPC UA)
+Documentation=file:///home/pdci/pdci-t3/docs/puesta-en-marcha/README.md
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pdci
+Group=pdci
+# El adaptador USB-RS485 (/dev/ttyUSB0) pertenece al grupo dialout
+SupplementaryGroups=dialout
+WorkingDirectory=/home/pdci/pdci-t3/edge-nodered
+# Secretos y rutas: hash de la clave OPC UA, carpeta de datos. Permisos 600, fuera del repositorio.
+EnvironmentFile=/etc/pdci-t3-nodered.env
+ExecStart=/usr/bin/node --max-old-space-size=512 node_modules/node-red/red.js --settings settings.js
+# SIGINT: Node-RED ejecuta los "On Stop" (cierra el puerto serie y el servidor OPC UA) antes de salir
+KillSignal=SIGINT
+TimeoutStopSec=20
+Restart=on-failure
+RestartSec=5
+
+# Endurecimiento: Node-RED no necesita mas privilegios ni escribir fuera de /home/pdci
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

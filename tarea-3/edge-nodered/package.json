@@ -16,11 +16,11 @@
   "dependencies": {
     "@flowfuse/node-red-dashboard": "1.33.0",
     "node-opcua": "2.160.0",
+    "node-red": "4.1.16",
     "node-red-node-serialport": "2.0.3"
   },
   "devDependencies": {
-    "jest": "30.5.0",
-    "node-red": "4.1.16"
+    "jest": "30.5.0"
   },
   "jest": {
     "testEnvironment": "node",

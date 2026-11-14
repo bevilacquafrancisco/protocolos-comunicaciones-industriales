@@ -32,6 +32,7 @@ banco** con el conversor USB-RS485, el ESP32 y la Raspberry Pi (§7), y el recor
 | `generar_flujos.js` | Genera `flows/*.json` (uno por flow) y el `flows.json` que carga Node-RED |
 | `flows/` | `modbus-master.json`, `opcua-server.json`, `dashboard-config.json`, `estadisticas.json`, `dashboard-base.json` |
 | `settings.js` | Configuración de Node-RED (módulos propios, contexto en archivo, seguridad) |
+| `despliegue/` | Unidad systemd `pdci-t3-nodered.service` y plantilla de `/etc/pdci-t3-nodered.env` para la Raspberry Pi |
 | `test/` | Jest: protocolo, maestro, configuración, flows e integración con el simulador |
 
 **Los `flows/*.json` no se editan en el editor de Node-RED**: se cambia el `.js` o el `.vue`
@@ -77,28 +78,46 @@ inyectables al arrancar (`--falla crc --prob 0.3`) o en vivo, escribiendo en su 
 
 ## 4. Instalación en la Raspberry Pi
 
-1. Node-RED con el script oficial de la Raspberry Pi (instala Node.js LTS y el servicio).
-2. En la carpeta de datos de Node-RED (`~/.node-red`):
-   `npm install @flowfuse/node-red-dashboard@1.33.0 node-red-node-serialport@2.0.3 node-opcua@2.160.0`
-3. Copiar `tarea-3/edge-nodered/` a la placa y generar los flows **en la placa**, apuntando a la
-   carpeta de datos: `PDCI_T3_USERDIR=$HOME/.node-red node generar_flujos.js`.
-4. Arrancar con este `settings.js`:
-   `node-red --settings ~/pdci-t3/edge-nodered/settings.js --userDir ~/.node-red`
-   (o editar el servicio). Usuario en el grupo `dialout` para abrir `/dev/ttyUSB0`.
-5. Acceso: por defecto Node-RED escucha **solo en 127.0.0.1**. Desde la notebook, por túnel SSH
-   (como en la T2): `ssh -L 1880:127.0.0.1:1880 usuario@rpi`. Para exponerlo en la LAN,
-   `PDCI_T3_UI_HOST=0.0.0.0` **y** usuarios con hash bcrypt (`npx node-red admin hash-pw`) en
-   `PDCI_T3_ADMIN_USUARIO/HASH` y `PDCI_T3_UI_USUARIO/HASH`: sin ellos `settings.js` se niega a
-   arrancar. Un maestro MODBus abierto en la red dejaría escribir salidas de campo a cualquiera.
+El procedimiento completo, con cada verificación, está en
+[docs/puesta-en-marcha/05-raspberry-software.md](../docs/puesta-en-marcha/05-raspberry-software.md).
+Este es el resumen:
 
-6. Servidor OPC UA: generar el hash (`node tools/generar_hash_opcua.js`) y definir
-   `PDCI_T3_OPCUA_USUARIO` y `PDCI_T3_OPCUA_HASH` en el entorno del servicio (plantilla:
-   `tarea-3/.env.example`). El primer arranque crea la PKI y el certificado de aplicación; para
-   confiar en un cliente, panel *lista de confianza* ([seguridad-opcua.md](../docs/seguridad-opcua.md) §4).
-   Un cambio en `lib/` exige **reiniciar Node-RED**: un Deploy no recarga `functionGlobalContext`.
+1. El código se copia con `git archive` de un commit (no con `scp -r`).
+2. `npm ci --omit=dev` en `edge-nodered`: instala **Node-RED 4.1.16** y los nodos con las versiones del
+   lockfile.
+3. Los flujos se generan con `PDCI_T3_USERDIR=/home/pdci/.pdci-t3 node generar_flujos.js`.
+4. Se instala el servicio
+   [despliegue/pdci-t3-nodered.service](despliegue/pdci-t3-nodered.service), con los secretos en
+   `/etc/pdci-t3-nodered.env` (plantilla
+   [despliegue/pdci-t3-nodered.env.ejemplo](despliegue/pdci-t3-nodered.env.ejemplo)).
 
-La configuración aplicada desde el Dashboard se guarda en `~/.node-red/pdci-t3-config.json`
-(escritura atómica) y los contadores, en el contexto `archivo`: ambos sobreviven a un reinicio.
+**Node-RED se ejecuta desde `edge-nodered/node_modules`, no con el instalador global.**
+
+- Es el mismo modo de arranque que el banco virtual (F7), que es el camino probado.
+- La versión anterior de esta sección proponía Node-RED global con los módulos en `~/.node-red`.
+  **No arrancaba**: `settings.js` resuelve `require('node-opcua')` desde su propia carpeta, y
+  `~/.node-red/node_modules` no está en ese camino. Por eso `node-red` pasó de `devDependencies` a
+  `dependencies`.
+
+**Datos fuera del código.** `PDCI_T3_USERDIR` (`~/.pdci-t3`) guarda:
+
+- `flows.json`;
+- la PKI OPC UA (con la clave privada);
+- la configuración aplicada desde el Dashboard (`pdci-t3-config.json`, escritura atómica);
+- los contadores (contexto `archivo`).
+
+Reemplazar el código no cambia el certificado que los clientes ya confiaron.
+
+**[SEC]**
+
+- Node-RED escucha **solo en 127.0.0.1**: se entra por túnel SSH,
+  `ssh -L 1880:127.0.0.1:1880 pdci@rpi-pdci-t3.local`.
+- Para exponerlo en la LAN, `settings.js` exige `PDCI_T3_UI_HOST` **y** usuarios con hash bcrypt
+  (`PDCI_T3_ADMIN_USUARIO/HASH`, `PDCI_T3_UI_USUARIO/HASH`). Un maestro MODBus abierto en la red dejaría
+  escribir salidas de campo a cualquiera.
+- El puerto OPC UA 4840 se abre con `ufw` solo en `eth0`.
+
+Un cambio en `lib/` exige **reiniciar el servicio**: un Deploy no recarga `functionGlobalContext`.
 
 ## 5. Operación (Dashboard)
 
