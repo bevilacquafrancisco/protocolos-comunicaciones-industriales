@@ -14,7 +14,7 @@ Revisión contra el código de las Tareas 1 y 2 ([analisis-t1.md](analisis-t1.md
 | 002 | **Aceptado; se activó la consecuencia** | La T1 usa `umodbus`: el stack del esclavo se reescribe |
 | 003 | Aceptado | Confirmado: es decisión defendida en la T1. `Potenciometro_pct` declarada en el diccionario |
 | 004 | Aceptado | Fundamento reforzado con la medición de la T2 (en PC) |
-| 005 | Aceptado | Sin cambios |
+| 005 | **Aceptado con corrección** | El broker sí; el mínimo privilegio por tópico **no** se puede en el plan gratuito → ADR-026 |
 | 006 | Aceptado | Sin cambios |
 | 007 | Aceptado | Sin cambios; depende de ADR-010 |
 | 008 | Aceptado | Sin cambios |
@@ -35,6 +35,7 @@ Revisión contra el código de las Tareas 1 y 2 ([analisis-t1.md](analisis-t1.md
 | 023 | Aceptado (F5) | Reconexión OPC UA y MQTT con retroceso exponencial 1-30 s |
 | 024 | Aceptado (F6) | Host Application: núcleo puro, cliente MQTT por conexión, bibliotecas en `vendor/` |
 | 025 | Aceptado (F6) | CSP con `'unsafe-eval'` (protobuf.js) y `worker-src blob:` (mqtt.js), medido |
+| 026 | Aceptado (puesta en marcha) | HiveMQ Serverless: un permiso por credencial; STATE opcional en el Edge Node; riesgo residual medido |
 
 ---
 
@@ -653,6 +654,72 @@ proporcional al riesgo). `ui.test.js` verifica que la consola no tenga errores, 
 
 **Consecuencias.** Si la consigna permitiera generar el código en build, B es la mejora: elimina
 `'unsafe-eval'` sin cambiar el núcleo.
+
+---
+
+## ADR-026 — Permisos reales del broker gratuito: un filtro por credencial *(Aceptado, puesta en marcha; corrige el ADR-005)*
+
+**Contexto.** El ADR-005 eligió HiveMQ Cloud Serverless (gratuito) y propuso tres usuarios con
+permisos por tópico diferenciados (mínimo privilegio). Al redactar la puesta en marcha se verificó la
+documentación oficial vigente ("Access Management Options per Cloud Plan", docs.hivemq.com,
+consultada el 2026-11-14), y dice lo siguiente:
+
+- En Serverless se asigna **un permiso por credencial**. Un permiso es *Publish Only*, *Subscribe
+  Only* o *Publish and Subscribe*.
+- **No hay roles**. Los roles, que agrupan varios permisos, son de Starter en adelante, que es pago.
+- Si el permiso admite un filtro de tópico propio o aplica a `#`, la página se contradice. Se
+  verifica en la consola el día del alta (paso 02 de la puesta en marcha).
+- Los cambios de permisos tardan **hasta 5 minutos** en aplicarse, por caché.
+
+Con un solo filtro no se puede escribir la tabla del ADR-005. El Edge Node, por ejemplo, publica `N*`
+y `D*` y se suscribe a NCMD, DCMD y `STATE`. En EMQX Serverless, la alternativa del ADR-005, tampoco
+se encontró ACL por usuario documentada en el plan gratuito.
+
+**Consecuencia sobre el código, encontrada por esto.** El Edge Node se suscribía a NCMD, DCMD y STATE
+en un solo SUBSCRIBE y abortaba si **cualquiera** era rechazado. Con un permiso limitado al grupo, el
+broker rechaza `spBv1.0/STATE/...` y el nodo **no habría arrancado nunca** en el banco. Corregido: NCMD
+y DCMD son obligatorios; STATE es opcional salvo con `--esperar-host` (Sparkplug 3.0 §5.3). Lo cubre
+`gateway-sparkplug/tests/test_permisos_broker.py`, con el broker de desarrollo en el perfil
+`serverless`, y la prueba falla sin la corrección (verificado).
+
+**Opciones**
+
+| Opción | Mínimo privilegio | Costo | Trabajo |
+|---|---|---|---|
+| **A. HiveMQ Serverless con un permiso por usuario** | Parcial (abajo) | Gratis | Mínimo |
+| B. HiveMQ Starter con roles | Completo (tabla del ADR-005) | Pago (consultar el precio vigente en hivemq.com/pricing) | Bajo |
+| C. Mosquitto propio en una VM en la nube con `acl_file` | Completo | Gratis en una capa *always free*; ~USD 4-6/mes en un VPS básico | Alto: instalar, TLS (Let's Encrypt), WSS, mantener |
+
+**Decisión.** A para el banco y la defensa. Las credenciales son las siguientes:
+
+| Usuario | Permiso | Filtro |
+|---|---|---|
+| `edge_node` | Publish and Subscribe | `spBv1.0/UNRaf_PdCI_2026/#` (si la consola no admite filtro: `#`) |
+| `host_app` | Publish and Subscribe | `spBv1.0/#` (necesita publicar STATE y CMD, y suscribirse al grupo) |
+| `observador` | Subscribe Only | `spBv1.0/#` (si la consola no admite filtro: `#`) |
+
+El broker de desarrollo reproduce este perfil (`tools/broker_dev.py --acl serverless`) y el de
+mínimo privilegio (`--acl minimo`).
+
+**Fundamento.** I-03 exige un broker en internet, y el presupuesto del TP es cero. Aun sin ACL fino,
+tres credenciales separadas sirven: cada una se rota sin tocar las otras, el observador no puede
+publicar y el broker registra quién se conecta. El riesgo residual se acota en las capas siguientes
+(defensa en profundidad):
+
+- un DCMD falso pasa por la validación del Edge Node (métrica escribible, tipo, rango, tamaño) y por
+  la del servidor OPC UA (EURange, roles);
+- un NBIRTH falso solo engaña a la vista: no acciona nada en el campo.
+
+**Consecuencias**
+
+- **Riesgo residual, medido** (`test_permisos_broker.py`). Con la clave de la web, que es pública de
+  hecho, se puede publicar un NBIRTH falso en el perfil `serverless` y no en `minimo`. R-08 sube de
+  impacto.
+- **La prueba W-1 del README de `hmi-web` cambia.** Con Serverless, "host_app no puede publicar
+  NBIRTH" **no** se cumple. Se reemplaza por "observador no puede publicar".
+- **Si el TP pasara a producción**, la opción es B o C. En el informe se muestra el `acl_file` de C,
+  que es el mínimo privilegio completo, como la configuración de referencia
+  (`docs/puesta-en-marcha/02-broker-mqtt.md` §6).
 
 ---
 

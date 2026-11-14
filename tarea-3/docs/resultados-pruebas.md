@@ -91,6 +91,24 @@ en la Figura 10.
 
 ---
 
+## Puesta en marcha · 2026-11-14 · Revisión del despliegue antes del banco
+
+Al escribir el procedimiento de puesta en marcha (`docs/puesta-en-marcha/`), se recorrió cada paso
+contra el código y contra la documentación oficial del broker. Aparecieron cuatro defectos que **no**
+se habían visto en la PC, porque solo se manifiestan en el despliegue real:
+
+| # | Hallazgo | Clase | Corrección | Verificación |
+|---|---|---|---|---|
+| D-1 | **El broker gratuito no admite permisos por tópico.** HiveMQ Cloud Serverless da un permiso por credencial y no tiene roles (documentación oficial). El Edge Node abortaba ante **cualquier** SUBACK rechazado, y con el permiso limitado al grupo, el rechazo de `STATE` impedía que arrancara en el banco | Defecto del sistema (latente) | STATE pasa a ser opcional, salvo con `--esperar-host`; ADR-026 | `test_permisos_broker.py` con el perfil `serverless` del broker de desarrollo: **falla sin la corrección y pasa con ella** (verificado con `git stash`) |
+| D-2 | `edge-nodered/README.md` §4 proponía Node-RED global con los módulos en `~/.node-red`. **No arrancaba**: `settings.js` resuelve `node-opcua` desde su carpeta | Defecto de documentación | `node-red` pasa a `dependencies`; Node-RED se ejecuta desde `edge-nodered/node_modules` (el camino del banco virtual); unidad systemd versionada | Lockfile: solo cambian las marcas `dev` (sin versiones distintas). 179/179 en Jest |
+| D-3 | `inyectar-fallas.sh` en `MODO=banco` detenía un servicio `nodered` (el de la T3 es `pdci-t3-nodered`), ejecutaba `sudo` por SSH sin terminal, y usaba `pkill` e `ip link`, que no existen en Git Bash de Windows | Defecto de la herramienta | Nombre del servicio, `ssh -t`, `matar_proc` e `interfaz` según el sistema operativo | `matar_proc` probado en Windows: termina solo el proceso señuelo |
+| D-4 | Las unidades systemd y las plantillas de entorno podían llegar a la placa con CRLF: un `\r` final en `EnvironmentFile` cambia el hash OPC UA | Riesgo de despliegue | `.gitattributes`: `*.service` y `*.ejemplo` con LF | `git check-attr eol`: `lf` |
+
+Suites al cierre: firmware TODO OK · `edge-nodered` 179/179 · `gateway-sparkplug` **61/61** (+3 de
+permisos) · `hmi-web` 16/16.
+
+---
+
 ## Pendiente con hardware
 
 El banco real (ESP32, RS-485, Raspberry Pi, broker en la nube) repite **las mismas** pruebas con

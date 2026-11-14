@@ -27,7 +27,7 @@ Sin disparador medible, un riesgo no está gestionado.
 | R-11 | Citar números de la T2 que no tienen evidencia en el repositorio | 2 | 2 | 4 | Informe |
 | R-13 | ~~Biblioteca Sparkplug B para Python~~ **Cerrado 2026-11-12** (contingencia adoptada) | — | — | 0 | — |
 | R-03 | `node-opcua` no corre en la imagen de la Raspberry Pi del laboratorio | 1 | 3 | 3 | F4 |
-| R-08 | Credenciales MQTT expuestas en el navegador (mitigado: usuario `host_app` restringido, F6) | 3 | 1 | 3 | Nube |
+| R-08 | Credenciales MQTT expuestas en el navegador; en el plan gratuito, sin ACL por tópico (ADR-026) | 3 | 2 | **6** | Nube |
 | R-12 | Restaurar mal la microSD del laboratorio | 1 | 3 | 3 | F3-F4 |
 | R-15 | Erratas de la consigna mal interpretadas (nombre de archivo, criterios) | 2 | 1 | 2 | Entrega |
 | R-16 | `serial in` deja de recibir tras reabrir el puerto con `serial control` | 2 | 3 | **6** | F3-banco |
@@ -183,9 +183,17 @@ Sin disparador medible, un riesgo no está gestionado.
 
 ### R-08 — Credenciales MQTT en el navegador
 
-Ya tratado en ADR-005 (tres usuarios con privilegio mínimo por tópico). P = 3 (es inevitable en una
-web estática), I = 1 con la mitigación aplicada. **Disparador:** el usuario `host_app` puede publicar
-fuera de `STATE`, `NCMD` y `DCMD` → corregir las ACL del broker.
+**Actualizado el 2026-11-14 (ADR-026).** El mínimo privilegio por tópico del ADR-005 **no** se
+puede en HiveMQ Cloud Serverless: hay un permiso por credencial y no hay roles. Con la clave de la
+web, que es pública de hecho, se puede publicar en todo `spBv1.0/#`, incluido un NBIRTH falso
+(medido en `test_permisos_broker.py`). Se mantiene P = 3 y sube a I = 2: puede engañar a la vista,
+pero no accionar el campo, porque cada DCMD lo vuelven a validar el Edge Node y el servidor OPC UA.
+
+| | |
+|---|---|
+| **Mitigación** | Tres credenciales separadas y rotables; `observador` solo puede suscribirse; validación de comandos en dos capas |
+| **Disparador** | Llevar el sistema más allá del TP, o que el tribunal pida mínimo privilegio real |
+| **Contingencia** | HiveMQ Starter con roles, o Mosquitto propio con `acl_file` (ADR-026, opciones B y C) |
 
 ### R-15 — Erratas de la consigna
 

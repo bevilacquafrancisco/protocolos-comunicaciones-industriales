@@ -24,14 +24,16 @@ verificación en banco ([firmware/README.md](firmware/README.md), [edge-nodered/
 | Documento | Para qué |
 |---|---|
 | [consigna/Tarea_3_Integrador_V26.pdf](consigna/Tarea_3_Integrador_V26.pdf) | Enunciado |
+| [docs/puesta-en-marcha/README.md](docs/puesta-en-marcha/README.md) | **Puesta en marcha del banco de laboratorio**, paso a paso (01 a 10): materiales, broker, ESP32, Raspberry Pi, bus, notebook, web, verificación de cada consigna y cierre |
 | [docs/diccionario-de-datos.md](docs/diccionario-de-datos.md) | **Fuente única de verdad**: nombres, tipos, direcciones MODBus, NodeIds y métricas |
-| [docs/decisiones-adr.md](docs/decisiones-adr.md) | Decisiones de arquitectura (ADR-001 a 014) y su estado |
+| [docs/decisiones-adr.md](docs/decisiones-adr.md) | Decisiones de arquitectura (ADR-001 a 026) y su estado |
 | [docs/riesgos.md](docs/riesgos.md) | Registro de riesgos con disparadores de contingencia |
 | [docs/analisis-t1.md](docs/analisis-t1.md) | Qué se reutiliza y qué se reescribe de la Tarea Nº1 |
 | [docs/analisis-t2.md](docs/analisis-t2.md) | Qué se reutiliza de la Tarea Nº2 y qué mediciones se pueden citar |
 | [docs/spike-nodered-opcua.md](docs/spike-nodered-opcua.md) | Por qué el dispositivo 2 es Node-RED + node-opcua y cómo se delimitan las tramas |
 | [docs/matriz-trazabilidad.md](docs/matriz-trazabilidad.md) | Consigna → artefacto → evidencia → sección del informe |
 | [docs/plan-de-pruebas.md](docs/plan-de-pruebas.md) | Verificación y validación, inyección de fallas |
+| [docs/mediciones.md](docs/mediciones.md) · [docs/resultados-pruebas.md](docs/resultados-pruebas.md) | Mediciones de la cadena completa y registro de cada ejecución de prueba |
 
 ## Estructura
 

@@ -9,7 +9,7 @@ El dispositivo tiene dos piezas:
 - Un **Edge Node Sparkplug B 3.0**. Publica esos nodos en un broker MQTT en la nube (I-03) y lleva
   los comandos de la Host Application hasta el LED del ESP32.
 
-**Estado.** Todo lo que sigue se probó en la PC: pasan las 58 pruebas, más una sesión real de punta
+**Estado.** Todo lo que sigue se probó en la PC: pasan las 61 pruebas, más una sesión real de punta
 a punta contra Node-RED, el servidor OPC UA en SignAndEncrypt y el simulador del esclavo. Quedan
 dos cosas pendientes, y son manuales (§8):
 
@@ -32,7 +32,7 @@ dos cosas pendientes, y son manuales (§8):
 | `tools/traer_certificado_servidor.py` | Trae el certificado del servidor OPC UA. Lo guarda solo si la huella coincide con la del panel |
 | `tools/observador_sparkplug.py` | Suscriptor de solo lectura. Decodifica, **verifica `seq` y `bdSeq`** y archiva en JSONL |
 | `tools/host_comandos.py` | NCMD Rebirth y DCMD, como los envía la web |
-| `tools/broker_dev.py` | Broker de **desarrollo** (amqtt) con TLS, usuarios y un WebSocket opcional para la web. **Nunca** se usa en la demo (I-03) |
+| `tools/broker_dev.py` | Broker de **desarrollo** (amqtt) con TLS, usuarios, un WebSocket opcional para la web, y `--acl serverless` o `--acl minimo` para reproducir los permisos del broker real (ADR-026). **Nunca** se usa en la demo (I-03) |
 | `tools/fake_edge_node.py` | Edge Node **real** con datos sintéticos, para desarrollar la web (F6). Comandos por teclado: `dnr`, `ok`, `crc`, `opcua off` y `on`, `saltar` (salto de `seq`), `escrituras falla` y `ok`, `matar` |
 | `tests/` | pytest: diccionario, codec, máquina de estados, cliente OPC UA y sistema completo |
 
@@ -145,7 +145,7 @@ tipo y valor. Cada Write OPC UA ocupa otra línea con su StatusCode.
 ## 7. Pruebas
 
 ```bash
-.venv/bin/python -m pytest              # 58 pruebas, ~16 s
+.venv/bin/python -m pytest              # 61 pruebas, ~18 s
 .venv/bin/python -m pytest -m "not red" # sin red: diccionario, codec y máquina de estados (0,5 s)
 ```
 
@@ -156,6 +156,7 @@ tipo y valor. Cada Write OPC UA ocupa otra línea con su StatusCode.
 | `test_ciclo_vida.py` | NBIRTH con `seq` = 0, `bdSeq`, Rebirth sin alias y las cuatro capas. DBIRTH. DATA solo ante cambio y solo con alias. Un único `seq` para NDATA y DDATA en 600 mensajes. DDEATH y DBIRTH. Reconexión. `bdSeq` persistido, con 255→0. Rebirth. DCMD por alias y por nombre, más 9 casos de rechazo. STATE |
 | `test_opcua_client.py` | Servidor asyncua real: 10 ítems, un Write que vuelve por la suscripción, escritura sobre un nodo de solo lectura, caída del servidor y reconexión con retroceso 1 s → 2 s |
 | `test_sistema.py` | **El Edge Node como subproceso** contra un broker TLS y un servidor OPC UA. Recorre el ciclo de vida completo, incluido el **corte del broker** (`bdSeq`+1, `Reconexiones`=1) y el **kill** (NDEATH emitido por el broker con el `bdSeq` que corresponde). Al final verifica que el observador **no registró violaciones** |
+| `test_permisos_broker.py` | Los **permisos reales del broker** (ADR-026): con el perfil `serverless`, el Edge Node publica aunque se le rechace la suscripción a STATE (falla sin la corrección, verificado). Además, la clave de la web puede publicar un NBIRTH falso con `serverless` y no con `minimo` |
 
 Las pruebas del núcleo se validaron con mutación: `seq` módulo 257 y `Reconexiones` sin incrementar
 se detectan las dos.

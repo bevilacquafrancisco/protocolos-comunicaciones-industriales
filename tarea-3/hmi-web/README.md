@@ -131,7 +131,7 @@ Recibe estos comandos por teclado:
 
 | # | Prueba | Criterio |
 |---|---|---|
-| W-1 | Contra el broker en la nube (WSS 8884) con el usuario `host_app` restringido (ADR-005) | Conecta. Publicar en `.../NBIRTH/...` con ese usuario **falla** |
+| W-1 | Contra el broker en la nube (WSS 8884) con el usuario `host_app` (ADR-026) | Conecta y opera. En HiveMQ Serverless este usuario **sí** puede publicar fuera de STATE, NCMD y DCMD, porque no hay ACL por tópico: es el riesgo residual documentado, y no un fallo de la prueba. Con `observador`, cualquier publicación **falla** |
 | W-2 | En un celular real, por la red del aula o con datos móviles (R-06) | Se lee sin zoom y los controles responden |
 | W-3 | Cadena completa: ESP32 → Raspberry Pi → dispositivo 3 → nube → web | Pulsador y potenciómetro en vivo. El LED responde al conmutador (E2E-01 a E2E-04) |
 | W-4 | Cortar la red del dispositivo 3 | NDEATH a los ~15 s (keepalive 10 s × 1,5): todo OBSOLETO. Al volver, todo EN LÍNEA sin tocar la web (I-10) |
