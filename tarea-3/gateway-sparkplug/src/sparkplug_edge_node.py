@@ -278,9 +278,17 @@ class EdgeNode:
             # QoS 1 para NCMD (tck-id-message-flow-edge-node-ncmd-subscribe) y DCMD.
             _, mid = cliente.subscribe([(t.de("NCMD"), 1), (t.de("DCMD"), 1), (t.state(), 1)])
             _, _, codigos = await self._esperar("suback", TIMEOUT_CONNACK_S)
-            if any(c.is_failure for c in codigos):
-                # Un SUBACK 0x80 = el broker no autoriza ese topico (ACL mal configurada).
-                raise PermissionError(f"SUBACK rechazado: {[str(c) for c in codigos]}")
+            # SUBACK 0x80 = el broker no autoriza ese topico. NCMD y DCMD son obligatorios (sin ellos no
+            # hay Rebirth ni comandos). STATE es OPCIONAL salvo con --esperar-host (Sparkplug 3.0 §5.3):
+            # un broker con un solo filtro por credencial (HiveMQ Cloud Serverless, ADR-026) puede no
+            # cubrirlo, y eso no debe impedir que el nodo publique.
+            if codigos[0].is_failure or codigos[1].is_failure:
+                raise PermissionError(f"SUBACK rechazado para NCMD/DCMD: {[str(c) for c in codigos]}")
+            if len(codigos) > 2 and codigos[2].is_failure:
+                if self.nucleo._esperar_host:
+                    raise PermissionError("SUBACK rechazado para STATE y --esperar-host lo necesita")
+                _log.warning("el broker no autoriza %s: se sigue sin conocer el STATE de la Host Application", t.state())
+                self.registro.anotar("aviso", t.state(), b"", tipo="SUBACK", detalle="suscripcion a STATE rechazada")
             self._cliente = cliente
             self.conexiones += 1
             self._publicar(self.nucleo.al_conectar())          # NBIRTH (+ DBIRTH)

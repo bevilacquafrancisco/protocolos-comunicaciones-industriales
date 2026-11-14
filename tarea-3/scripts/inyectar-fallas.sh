@@ -19,7 +19,7 @@
 #
 # Variables (MODO=banco):
 #   RPI_SSH   usuario@ip de la Raspberry Pi (dispositivo 2), p. ej. pi@192.168.10.1
-#   IFACE     interfaz del dispositivo 3 hacia internet (F-06), p. ej. wlan0
+#   IFACE     interfaz del dispositivo 3 hacia internet (F-06): "Wi-Fi" en Windows, wlan0 en Linux
 #   T3_ENV    .env del dispositivo 3 (por defecto tarea-3/.env)
 #
 # Se ejecuta desde cualquier carpeta; en Windows, con Git Bash.
@@ -33,6 +33,28 @@ CMD="$RUN/cmd"
 GW="$T3/gateway-sparkplug"
 if [ -x "$GW/.venv/bin/python" ]; then PY="$GW/.venv/bin/python"; else PY="$GW/.venv/Scripts/python.exe"; fi
 T3_ENV="${T3_ENV:-$T3/.env}"
+
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) WINDOWS=1 ;; *) WINDOWS=0 ;; esac
+
+# Termina sin aviso (kill -9) los procesos cuya linea de comandos contiene el patron. En Windows
+# (Git Bash no trae pkill) se hace con PowerShell sobre la linea de comandos de cada proceso.
+matar_proc() {
+    if [ "$WINDOWS" = 1 ]; then
+        powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '$1' -and \$_.CommandLine -notmatch 'CimInstance' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }"
+    else
+        pkill -9 -f "$1" || true
+    fi
+}
+
+# Baja o sube la interfaz de red del dispositivo 3 (F-06). Requiere administrador.
+interfaz() {   # interfaz down|up
+    if [ "$WINDOWS" = 1 ]; then
+        local verbo; [ "$1" = down ] && verbo=Disable-NetAdapter || verbo=Enable-NetAdapter
+        powershell.exe -NoProfile -Command "$verbo -Name '$IFACE' -Confirm:\$false"
+    else
+        sudo ip link set "$IFACE" "$1"
+    fi
+}
 
 pausa()   { printf '\n  >> %s\n' "$*"; }
 paso()    { printf '  [%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
@@ -106,17 +128,17 @@ f_F03() {   # Unit ID equivocado (siempre desde el Dashboard: es lo que se evalu
 f_F04() {   # cae el servidor OPC UA
     if [ "$1" = inyectar ]; then
         if [ "$MODO" = pc ]; then enviar matar nodered
-        else : "${RPI_SSH:?definir RPI_SSH=usuario@ip}"; ssh "$RPI_SSH" sudo systemctl stop nodered; fi
+        else : "${RPI_SSH:?definir RPI_SSH=usuario@ip}"; ssh -t "$RPI_SSH" sudo systemctl stop pdci-t3-nodered; fi
         pausa "Esperado: OPC UA = ERROR, MODBUS = SIN DATOS (no un DONE viejo), DDEATH."
     else
-        if [ "$MODO" = pc ]; then enviar iniciar nodered; else ssh "$RPI_SSH" sudo systemctl start nodered; fi
+        if [ "$MODO" = pc ]; then enviar iniciar nodered; else ssh -t "$RPI_SSH" sudo systemctl start pdci-t3-nodered; fi
         pausa "Esperado: el cliente reconecta solo (retroceso 1-30 s), OPC UA = DONE, DBIRTH."
     fi
 }
 
 f_F05() {   # cae el Edge Node
     if [ "$1" = inyectar ]; then
-        if [ "$MODO" = pc ]; then enviar matar edge; else pkill -9 -f sparkplug_edge_node.py && paso "kill -9 del Edge Node"; fi
+        if [ "$MODO" = pc ]; then enviar matar edge; else matar_proc sparkplug_edge_node.py; paso "kill -9 del Edge Node"; fi
         pausa "Esperado: el BROKER publica el NDEATH (Will) al instante; la web: NODO OBSOLETO."
     else
         if [ "$MODO" = pc ]; then enviar iniciar edge
@@ -128,12 +150,12 @@ f_F05() {   # cae el Edge Node
 f_F06() {   # se corta internet en el dispositivo 3
     if [ "$1" = inyectar ]; then
         if [ "$MODO" = pc ]; then enviar proxy cortar
-        else : "${IFACE:?definir IFACE (p. ej. wlan0)}"
+        else : "${IFACE:?definir IFACE (p. ej. Wi-Fi en Windows, wlan0 en Linux)}"
             confirmar "Se baja la interfaz $IFACE de ESTA maquina (si es la del SSH, se pierde la sesion). ¿Seguir?" || return 0
-            sudo ip link set "$IFACE" down; fi
+            interfaz down; fi
         pausa "Esperado: ~15 s (keepalive 10 s x 1,5) -> el broker publica el NDEATH; la web: NODO OBSOLETO."
     else
-        if [ "$MODO" = pc ]; then enviar proxy restaurar; else sudo ip link set "$IFACE" up; fi
+        if [ "$MODO" = pc ]; then enviar proxy restaurar; else interfaz up; fi
         pausa "Esperado: reconexion sola: bdSeq + 1, Reconexiones + 1, NBIRTH, DBIRTH, web EN LINEA."
     fi
 }
@@ -142,14 +164,14 @@ f_F07() {   # mensajes perdidos: salto de seq desde un Edge de prueba
     if [ "$1" = inyectar ]; then
         if [ "$MODO" = pc ]; then enviar saltar-seq
         else
-            pkill -9 -f sparkplug_edge_node.py || true
+            matar_proc sparkplug_edge_node.py
             ( sleep 8; echo saltar; sleep 3600 ) | "$PY" "$GW/tools/fake_edge_node.py" --env "$T3_ENV" > "$GW/logs/fake.out" 2>&1 &
             paso "Edge de prueba lanzado; salta un seq a los 8 s"
         fi
         pausa "Esperado (a los ~8 s): la web avisa 'Salto de seq', publica NCMD Rebirth (contador + 1) y llega un NBIRTH."
     else
         if [ "$MODO" = pc ]; then enviar volver-edge
-        else pkill -f fake_edge_node.py || true; f_F05 restaurar; fi
+        else matar_proc fake_edge_node.py; f_F05 restaurar; fi
     fi
 }
 

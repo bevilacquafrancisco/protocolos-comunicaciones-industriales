@@ -97,7 +97,31 @@ def escribir_usuarios(ruta: Path, credenciales: dict[str, str]) -> None:
     ruta.write_text("".join(f"{u}:{hasher.hash(c)}\n" for u, c in credenciales.items()), encoding="utf-8")
 
 
-def configuracion(puerto: int, pki: dict[str, Path], usuarios: Path, puerto_ws: int | None = None):
+_G, _N, _H = "spBv1.0/UNRaf_PdCI_2026", "EN01_Gateway", "HA01_WebDashboard"
+
+#: Permisos por usuario que puede reproducir el broker de desarrollo (ADR-026). Cada perfil es
+#: {usuario: (filtros para publicar, filtros para suscribirse)}.
+PERFILES_ACL = {
+    # Lo maximo que permite HiveMQ Cloud Serverless (plan gratuito): UN permiso por credencial, con
+    # UN filtro (docs.hivemq.com, "Access Management Options per Cloud Plan"). Es el perfil del banco.
+    "serverless": {
+        "edge_node": ([f"{_G}/#"], [f"{_G}/#"]),               # Publish and Subscribe: el grupo
+        "host_app": (["spBv1.0/#"], ["spBv1.0/#"]),            # Publish and Subscribe: necesita STATE
+        "observador": ([], ["spBv1.0/#"]),                     # Subscribe Only
+    },
+    # Minimo privilegio del ADR-005: requiere roles (HiveMQ Starter) o un Mosquitto con acl_file.
+    "minimo": {
+        "edge_node": ([f"{_G}/+/{_N}", f"{_G}/+/{_N}/#"],
+                      [f"{_G}/NCMD/{_N}", f"{_G}/DCMD/{_N}/#", "spBv1.0/STATE/#"]),
+        "host_app": ([f"spBv1.0/STATE/{_H}", f"{_G}/NCMD/{_N}", f"{_G}/DCMD/{_N}/#"],
+                     [f"{_G}/#", f"spBv1.0/STATE/{_H}"]),
+        "observador": ([], ["spBv1.0/#"]),
+    },
+}
+
+
+def configuracion(puerto: int, pki: dict[str, Path], usuarios: Path, puerto_ws: int | None = None,
+                  acl: str | None = None):
     """
     Configuracion de amqtt: un listener TLS (Edge Node) y, si se pide, uno WebSocket para la
     Host Application web. El WebSocket va SIN TLS y SOLO en 127.0.0.1: el navegador no confia
@@ -111,13 +135,21 @@ def configuracion(puerto: int, pki: dict[str, Path], usuarios: Path, puerto_ws: 
     construir la configuracion, cuando esa copia ya se hizo.
     """
     from amqtt.contexts import BrokerConfig, ListenerConfig, ListenerType   # solo desarrollo
+    plugins = {
+        "amqtt.plugins.authentication.AnonymousAuthPlugin": {"allow_anonymous": False},
+        "amqtt.plugins.authentication.FileAuthPlugin": {"password_file": str(usuarios)},
+    }
+    if acl:
+        perfil = PERFILES_ACL[acl]
+        plugins["amqtt.plugins.topic_checking.TopicAccessControlListPlugin"] = {
+            "publish_acl": {u: pub for u, (pub, _) in perfil.items()},
+            # amqtt 0.12.1: su Config solo tiene "acl" para suscripciones (subscribe-acl no es un campo).
+            "acl": {u: sub for u, (_, sub) in perfil.items()},
+        }
     cfg = BrokerConfig.from_dict({
         "listeners": {"default": {"type": "tcp", "bind": f"127.0.0.1:{puerto}", "ssl": True,
                                   "certfile": str(pki["cert"]), "keyfile": str(pki["clave"])}},
-        "plugins": {
-            "amqtt.plugins.authentication.AnonymousAuthPlugin": {"allow_anonymous": False},
-            "amqtt.plugins.authentication.FileAuthPlugin": {"password_file": str(usuarios)},
-        },
+        "plugins": plugins,
     })
     if puerto_ws:
         cfg.listeners["ws"] = ListenerConfig(type=ListenerType.WS, bind=f"127.0.0.1:{puerto_ws}", ssl=False)
@@ -134,9 +166,11 @@ class BrokerDesarrollo:
         credenciales (dict[str, str]): usuario -> clave en claro (solo desarrollo).
     """
 
-    def __init__(self, carpeta: Path, puerto: int, credenciales: dict[str, str], puerto_ws: int | None = None):
+    def __init__(self, carpeta: Path, puerto: int, credenciales: dict[str, str], puerto_ws: int | None = None,
+                 acl: str | None = None):
         self.puerto = puerto
         self.puerto_ws = puerto_ws
+        self.acl = acl
         self.credenciales = credenciales
         self._pki = generar_pki(carpeta)
         self.ca = self._pki["ca"]
@@ -152,7 +186,7 @@ class BrokerDesarrollo:
         self._hilo.start()
 
         async def _arrancar():
-            self._broker = Broker(configuracion(self.puerto, self._pki, self._usuarios, self.puerto_ws))
+            self._broker = Broker(configuracion(self.puerto, self._pki, self._usuarios, self.puerto_ws, self.acl))
             await self._broker.start()
 
         asyncio.run_coroutine_threadsafe(_arrancar(), self._loop).result(timeout=15)
@@ -165,7 +199,7 @@ class BrokerDesarrollo:
         async def _ciclo():
             await self._broker.shutdown()
             await asyncio.sleep(pausa_s)
-            self._broker = Broker(configuracion(self.puerto, self._pki, self._usuarios, self.puerto_ws))
+            self._broker = Broker(configuracion(self.puerto, self._pki, self._usuarios, self.puerto_ws, self.acl))
             await self._broker.start()
 
         asyncio.run_coroutine_threadsafe(_ciclo(), self._loop).result(timeout=30 + pausa_s)
@@ -184,12 +218,14 @@ def main() -> None:
     parser.add_argument("--carpeta", type=Path, default=Path(".dev-broker"))
     parser.add_argument("--puerto", type=int, default=8883)
     parser.add_argument("--puerto-ws", type=int, default=None, help="WebSocket sin TLS en 127.0.0.1 (para la web)")
+    parser.add_argument("--acl", choices=sorted(PERFILES_ACL), default=None,
+                        help="permisos por usuario: 'serverless' (como HiveMQ Cloud gratuito) o 'minimo' (ADR-005)")
     args = parser.parse_args()
     credenciales = {}
     for usuario in USUARIOS_POR_DEFECTO:
         variable = f"DEV_MQTT_CLAVE_{usuario.split('_')[0].upper()}"
         credenciales[usuario] = os.environ.get(variable) or secrets.token_urlsafe(12)
-    broker = BrokerDesarrollo(args.carpeta, args.puerto, credenciales, args.puerto_ws).iniciar()
+    broker = BrokerDesarrollo(args.carpeta, args.puerto, credenciales, args.puerto_ws, args.acl).iniciar()
     print(f"broker de desarrollo en mqtts://127.0.0.1:{args.puerto}  CA: {broker.ca.resolve()}")
     if args.puerto_ws:
         print(f"WebSocket para la web: ws://127.0.0.1:{args.puerto_ws}/mqtt")
