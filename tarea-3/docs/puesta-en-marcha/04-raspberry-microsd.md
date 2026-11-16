@@ -66,7 +66,7 @@ Sin el respaldo verificado, **no** se pasa al §2.
 | Wi-Fi | SSID y clave del **punto de acceso del celular** | La Wi-Fi de la facultad suele tener portal cautivo |
 | País de la Wi-Fi | `AR` | Fija el dominio regulatorio. **Sin él, la Wi-Fi arranca bloqueada** (*rfkill*) |
 | Zona horaria / teclado | `America/Argentina/Cordoba` / `latam` | |
-| SSH | Habilitado, **solo con clave pública**: pegar el contenido de `id_ed25519.pub` (01 §3) | **[SEC]** Sin contraseña por la red |
+| SSH | Habilitado, **solo con clave pública**: pegar el contenido de `id_ed25519_pdci_t3.pub` (01 §3) | **[SEC]** Sin contraseña por la red |
 
 3. Grabar y esperar la verificación.
 
@@ -81,7 +81,8 @@ PS> ssh pdci@rpi-pdci-t3.local
 ```
 
 Responder `yes` a la huella la primera vez. Si `.local` no resuelve (mDNS bloqueado), buscar la IP en
-la lista de dispositivos del celular y usar `ssh pdci@<ip>`.
+la lista de dispositivos del celular y usar `ssh -i $env:USERPROFILE\.ssh\id_ed25519_pdci_t3 pdci@<ip>`.
+La entrada de `~/.ssh/config` (01 §3) no cubre esa IP, por eso va el `-i`.
 
 3. Actualizar el sistema y comprobar la placa:
 

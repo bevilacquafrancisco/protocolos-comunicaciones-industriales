@@ -96,7 +96,7 @@ es gratuito).
 | Clave del usuario MQTT `host_app` | Consola de HiveMQ (02) | `hmi-web/config.js` (ignorado por git) | Navegador. **Es pública de hecho** (ADR-005, ADR-026) |
 | Clave del usuario MQTT `observador` | Consola de HiveMQ (02) | `tarea-3/.env` y MQTT Explorer | Observador, MQTT Explorer |
 | Clave del usuario OPC UA `operador` | La elige el equipo (05 §4) | Hash scrypt en `/etc/pdci-t3-nodered.env` (Raspberry); en claro en `tarea-3/.env` (notebook) | Servidor OPC UA (hash); Edge Node (clave) |
-| Clave privada SSH | Notebook (01 §3) | `C:\Users\<usuario>\.ssh\id_ed25519` | Solo la notebook |
+| Clave privada SSH (solo para el TP) | Notebook (01 §3) | `C:\Users\<usuario>\.ssh\id_ed25519_pdci_t3` | Solo la notebook |
 | Claves privadas OPC UA | Se generan solas en el primer arranque | `~/.pdci-t3/opcua-pki` (Raspberry) y `gateway-sparkplug/pki` (notebook) | Servidor y cliente |
 
 ## 5. Qué cumple cada etapa
