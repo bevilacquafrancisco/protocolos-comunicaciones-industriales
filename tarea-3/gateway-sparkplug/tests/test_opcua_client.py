@@ -15,7 +15,7 @@ pytestmark = pytest.mark.red
 
 
 def test_retroceso_exponencial_con_tope():
-    assert [espera_reintento(i) for i in range(1, 9)] == [1, 2, 4, 8, 16, 30, 30, 30]
+    assert [espera_reintento(i) for i in range(1, 9)] == [1, 2, 4, 5, 5, 5, 5, 5]      # ADR-029: tope 5 s
 
 
 async def esperar(condicion, timeout=10.0):

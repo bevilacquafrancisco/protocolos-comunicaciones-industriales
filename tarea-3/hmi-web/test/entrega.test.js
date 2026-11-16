@@ -21,6 +21,26 @@ test('vendor/ y proto/ identicos a las versiones fijadas (npm run vendor)', () =
     for (const [nombre, version] of Object.entries(pkg)) assert.match(version, /^\d+\.\d+\.\d+$/, `${nombre} sin version exacta`);
 });
 
+test('sitio para GitHub Pages: solo la lista blanca, config.js sin claves, y exige wss:// (ADR-029)', () => {
+    const { armarSitio } = require('../tools/armar_sitio');
+    const os = require('node:os');
+    const salida = fs.mkdtempSync(path.join(os.tmpdir(), 'pdci-sitio-'));
+    try {
+        const archivos = armarSitio(salida, { HMI_BROKER_URL: 'wss://broker.ejemplo:8084/mqtt' });
+        const { PERMITIDOS } = require('../tools/servir');
+        assert.deepEqual(archivos, [...new Set(PERMITIDOS.values())].sort());
+        assert.ok(!fs.existsSync(path.join(salida, 'package.json')) && !fs.existsSync(path.join(salida, 'tools')));
+        const config = fs.readFileSync(path.join(salida, 'config.js'), 'utf8');
+        assert.match(config, /wss:\/\/broker\.ejemplo:8084\/mqtt/);
+        assert.doesNotMatch(config, /"(clave|password|pass)"\s*:/i, 'el sitio no lleva ningún campo de clave');
+        assert.throws(() => armarSitio(salida, { HMI_BROKER_URL: 'ws://broker.ejemplo:8083/mqtt' }), /wss/);
+        assert.throws(() => armarSitio(salida, {}), /HMI_BROKER_URL/);
+        assert.throws(() => armarSitio(salida, { HMI_BROKER_URL: 'wss://b:8084/mqtt', HMI_CLAVE: 'x' }), /no lleva claves/);
+    } finally {
+        fs.rmSync(salida, { recursive: true, force: true });
+    }
+});
+
 test('el servidor entrega solo la lista blanca, con cabeceras de seguridad', async () => {
     const s = crearServidor(RAIZ, { config: 'window.PDCI_CONFIG = null;' });
     await new Promise((r) => s.listen(0, '127.0.0.1', r));

@@ -65,6 +65,7 @@ cumplir todas las consignas del TP integrador. Se parte de lo siguiente:
 | 08 | [Host Application](08-host-application.md) | Laboratorio | 15 min | La web, en la notebook y en el celular, muestra todo EN LÍNEA y acciona el LED |
 | 09 | [Verificación integral y consignas](09-verificacion-y-consignas.md) | Laboratorio | 2-3 h | Cada consigna con su evidencia guardada en `docs/capturas/banco/` |
 | 10 | [Cierre y problemas frecuentes](10-cierre-y-problemas.md) | Laboratorio | 20 min | La microSD del laboratorio restaurada y la evidencia copiada |
+| **11** | [**Actualización v2 y arranque rápido**](11-actualizacion-y-arranque.md) | Cualquier red | 40 min la primera vez, 5 min después | **Con el banco ya armado una vez:** cargar la v2 y levantar todo en cualquier Wi-Fi |
 
 Las etapas 01, 02 y 03 se hacen **antes** del día de laboratorio. El 05 también, si se usa una microSD
 propia (ver 04 §1). Así, en el laboratorio solo queda lo que necesita el banco armado.

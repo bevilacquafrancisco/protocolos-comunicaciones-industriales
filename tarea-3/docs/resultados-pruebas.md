@@ -137,6 +137,32 @@ permisos) · `hmi-web` 16/16.
 
 ---
 
+## Preparación para la defensa · 2026-11-16 · ADR-029
+
+| Suite | Resultado |
+|---|---|
+| Firmware (CPython) | `TODO OK`: `prueba_config.py` 38 verificaciones (+9: registro de perfil, eco antes del cambio, excepción 03) |
+| `edge-nodered` (Jest) | 179/179, con los flujos regenerados |
+| `gateway-sparkplug` (pytest) | 62/62 (retroceso OPC UA 1, 2, 4, 5, 5…) |
+| `hmi-web` (`node:test`) | **25/25**: + sitio de GitHub Pages sin claves; la página en Chrome ahora verifica la alarma del bus, la del cable (sin acusar al bus) y las dos recuperaciones |
+
+- **Defecto de la prueba:** el chequeo "sin claves" del sitio fallaba con el comentario del propio
+  `config.js` ("SIN claves"). Ahora busca un **campo** de clave, no la palabra.
+- **Defecto del script:** `banco.ps1 verificar` no detectaba la falla de SSH, porque PowerShell no
+  convierte el código de salida de un programa externo en excepción, y calculaba un desfase de
+  −1,79·10¹² ms. Ahora revisa `$LASTEXITCODE`.
+- **Hallazgo de la prueba en seco, con el banco desconectado:** `ping 192.168.10.1` respondía. La
+  placa Ethernet de la notebook había perdido la IP fija (10 §4 de la versión anterior la borraba),
+  así que el paquete salía por la Wi-Fi de casa y contestaba otro equipo con esa dirección. Por eso
+  `verificar` comprueba primero que la ruta a la Raspberry salga **por Ethernet**, y la IP fija pasa
+  a ser permanente (ADR-029).
+
+**Pendiente con hardware:** desenchufar y volver a enchufar el cable Ethernet y el bus RS-485,
+cronometrando la alarma y la recuperación (11 §5); el cambio de perfil del ESP32 desde el Dashboard
+seguido del descubrimiento; el sitio publicado en GitHub Pages, abierto desde un celular en otra red.
+
+---
+
 ## Pendiente con hardware
 
 El banco real (ESP32, RS-485, Raspberry Pi, broker en la nube) repite **las mismas** pruebas con

@@ -62,6 +62,7 @@
         tramas: [], selTrama: null, ultimoTxTs: null,
         notificaciones: [], selNodo: 'Dispositivo1.Inputs.Potenciometro',
         ultimoComando: null, confirmaciones: new Map(), lectura: null,
+        alarmas: new Map(), recuperadas: [],          // [DF-4.17] id -> desde (ms); recuperaciones recientes
         version: { mensajes: 0, tramas: 0, notificaciones: 0 }, dibujado: {},
     };
 
@@ -804,9 +805,59 @@
         }));
     }
 
+    // ---------------------------------------------------------------- alarmas [DF-4.17]
+    /**
+     * Cada alarma: cuando esta activa, que se ve y que revisar. Se evaluan en orden de la cadena
+     * y se suprimen las que son CONSECUENCIA de otra (sin OPC UA no se sabe nada del bus).
+     * La recuperacion es automatica en todos los casos (I-10): la alarma solo informa.
+     */
+    const ALARMAS = [
+        { id: 'mqtt', titulo: 'Broker MQTT', activa: () => red.estado !== 'CONECTADO',
+            que: 'Esta página perdió la conexión con el broker. Reintenta sola (1, 2, 4… 30 s).' },
+        { id: 'nodo', titulo: 'Edge Node', activa: (e) => red.estado === 'CONECTADO' && e.nodo === V.OBSOLETO,
+            que: 'El Edge Node se desconectó del broker (NDEATH). Revisar su ventana en la notebook y su internet: al volver publica un NBIRTH nuevo.' },
+        { id: 'opcua', titulo: 'Enlace OPC UA · cable Ethernet', activa: (e) => e.nodo === V.EN_LINEA && e.opcua === 'error',
+            que: 'Sin sesión OPC UA entre la notebook y la Raspberry. Revisar el cable Ethernet y el servicio de Node-RED. La sesión se retoma sola (reintento cada 5 s como máximo).' },
+        { id: 'modbus', titulo: 'Bus RS-485 · ESP32', activa: (e) => e.nodo === V.EN_LINEA && !e.opcuaCaido && vigente(e.est) && e.est.valor === 'DEVICE NOT REACHED',
+            que: 'El ESP32 no responde. Revisar A, B y GND del bus, la alimentación del ESP32, o si cambió de perfil (Unit ID y baud). El maestro sigue preguntando y se recupera solo.' },
+        { id: 'crc', titulo: 'Calidad del bus RS-485', activa: (e) => e.nodo === V.EN_LINEA && !e.opcuaCaido && vigente(e.est) && e.est.valor === 'CRC ERROR',
+            que: 'Llegan tramas con error de CRC: ruido en el bus, falta de GND común o del pull-up de RO.' },
+    ];
+
+    function evaluarAlarmas(e) {
+        const ahora = Date.now();
+        for (const a of ALARMAS) {
+            const desde = vista.alarmas.get(a.id);
+            if (a.activa(e) && desde === undefined) {
+                vista.alarmas.set(a.id, ahora);
+                registrar('error', `ALARMA · ${a.titulo}: ${a.que}`);
+            } else if (!a.activa(e) && desde !== undefined) {
+                vista.alarmas.delete(a.id);
+                const s = Math.round((ahora - desde) / 1000);
+                vista.recuperadas.unshift({ id: a.id, titulo: a.titulo, t: ahora, duracion: s });
+                registrar('info', `RECUPERADO · ${a.titulo}, solo, después de ${s} s`);
+            }
+        }
+        vista.recuperadas = vista.recuperadas.filter((r) => ahora - r.t < 20000 && !vista.alarmas.has(r.id));
+        const items = [];
+        for (const a of ALARMAS) {
+            const desde = vista.alarmas.get(a.id);
+            if (desde === undefined) continue;
+            items.push(el('li', { className: 'al-on' }, el('b', { texto: `✖ ${a.titulo}` }),
+                el('span', { className: 'cuando', texto: `desde ${hora(desde)} · ${edad(desde)}` }), el('span', { className: 'que', texto: a.que })));
+        }
+        for (const r of vista.recuperadas) {
+            items.push(el('li', { className: 'al-ok' }, el('b', { texto: `✔ ${r.titulo}: RECUPERADO` }),
+                el('span', { className: 'cuando', texto: `a las ${hora(r.t)}, después de ${r.duracion} s de falla, sin intervención` })));
+        }
+        $('alarmas-lista').replaceChildren(...items);
+        $('alarmas').hidden = items.length === 0;
+    }
+
     function dibujar() {
         if (!host || red.fase !== 'operando') return;
         const e = estados();
+        evaluarAlarmas(e);
         dibujarCapas(e);
         if (pestana === 'general') dibujarGeneral(e);
         else if (pestana === 'modbus') { dibujarModbus(); dibujarEstadisticaModbus(); }

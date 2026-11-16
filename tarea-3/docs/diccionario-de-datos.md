@@ -188,6 +188,14 @@ distingue Sparkplug B de "MQTT con JSON", y es el argumento central de la defens
 
 ---
 
+### Registro de configuración del esclavo (ADR-029)
+
+No es una E/S del proceso: no viaja a OPC UA ni a Sparkplug B, y el maestro no lo sondea.
+
+| Registro | Tabla y offset | FC | Valores | Efecto |
+|---|---|---|---|---|
+| `Config/Perfil` | Holding Register `0x0F00` (Modicon 43841), en **los dos** perfiles | 03 / 06 | 1 = DISPOSITIVO_1 · 2 = DESCONOCIDO (otro valor → excepción 03) | El esclavo responde el eco y después se reinicia con ese perfil. No se guarda: reiniciar el ESP32 vuelve al perfil de arranque |
+
 ## 5. Parámetros del enlace serie
 
 ### 5.1 Preajustes del maestro

@@ -172,17 +172,25 @@ eventos: ${(await txt('eventos')).slice(0, 600)}`);
             assert.equal(await txt('modbus-estado'), 'DEVICE NOT REACHED');
             assert.equal(await pagina.$eval('#capa-modbus', (e) => e.dataset.nivel), 'error');
             assert.equal(await pagina.$eval('#btn-led', (e) => e.disabled), true, 'sin dispositivo no se comanda');
+            // [DF-4.17] ADR-029: alarma del bus con su causa probable
+            await hasta(() => /Bus RS-485 · ESP32/.test(document.getElementById('alarmas-lista').textContent));
+            await capturar('7-alarma-bus');
             comando('ok');
             await hasta(() => document.getElementById('disp-vigencia').textContent === 'EN LÍNEA');
+            await hasta(() => /Bus RS-485 · ESP32: RECUPERADO/.test(document.getElementById('alarmas-lista').textContent));
 
-            // 5b. F-04: cae OPC UA -> la capa OPC UA en ERROR y MODBUS como SIN DATOS (no un DONE viejo)
+            // 5b. F-04 / cable Ethernet: cae OPC UA -> la capa OPC UA en ERROR y MODBUS como SIN DATOS
             comando('opcua off');
             await hasta(() => document.getElementById('capa-opcua').dataset.nivel === 'error');
             assert.equal(await pagina.$eval('#capa-modbus', (e) => e.dataset.nivel), 'obsoleto');
             assert.match(await txt('modbus-estado'), /SIN DATOS/);
+            const alarmas = await txt('alarmas-lista');
+            assert.match(alarmas, /Enlace OPC UA · cable Ethernet/);
+            assert.doesNotMatch(alarmas, /✖ Bus RS-485/, 'sin OPC UA no se acusa al bus: es consecuencia, no causa');
             comando('opcua on');
             await hasta(() => document.getElementById('capa-modbus').dataset.nivel === 'ok'
                 && document.getElementById('disp-vigencia').textContent === 'EN LÍNEA');
+            await hasta(() => /cable Ethernet: RECUPERADO/.test(document.getElementById('alarmas-lista').textContent));
 
             // 6. Celular: una columna, sin desplazamiento horizontal, controles de al menos 44 px
             await pagina.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
