@@ -147,9 +147,12 @@ hace lo siguiente:
 
 | Línea | Significado |
 |---|---|
+| `[warn] Projects disabled` | Normal: la función *Projects* de Node-RED está apagada a propósito |
+| `[warn] Using unencrypted credentials` | Normal: `credentialSecret: false` en `settings.js`. Los flujos **no** guardan credenciales (los secretos van por `/etc/pdci-t3-nodered.env`), y así no se depende de una clave autogenerada que se perdería al regrabar la microSD |
 | `certificado de aplicacion creado: /home/pdci/.pdci-t3/opcua-pki/own/certs/servidor_pdci_t3.pem` | Solo en el primer arranque (F4) |
-| `servidor OPC UA en opc.tcp://<ip>:4840 (... endpoint(s) de red)` | El servidor escucha |
+| `servidor OPC UA en opc.tcp://<ip>:4840 (... endpoint(s) de red)` | El servidor escucha. Puede aparecer unos segundos después de `Started flows`: si no está, volver a mirar el log |
 | `serial port /dev/ttyUSB0 error` | **Esperado** hasta conectar el adaptador (06) |
+| Con el adaptador ya conectado: `opened` → `closed` → `opened` | **Esperado**: el nodo serie abre el puerto con su configuración inicial, y M1 lo reabre con la configuración guardada del maestro (`serial control`, I-04) |
 | `Status.OPCUA.Estado = ERROR` | **Esperado**: todavía no hay datos del esclavo |
 
 ```bash
