@@ -125,12 +125,12 @@ PS> cd gateway-sparkplug; .venv\Scripts\python -m pytest -q; cd ..
 PS> cd hmi-web; npm test; cd ..
 ```
 
-| Suite | Resultado esperado (2026-11-14) |
+| Suite | Resultado esperado (2026-11-16) |
 |---|---|
 | Firmware del esclavo (CPython) | `TODO OK`: 169 verificaciones (35 + 48 + 57 + 29) |
 | `edge-nodered` (Jest) | 179 de 179 |
-| `gateway-sparkplug` (pytest) | 61 de 61 |
-| `hmi-web` (`node:test`, incluye la página en Chrome) | 16 de 16 |
+| `gateway-sparkplug` (pytest) | 62 de 62 |
+| `hmi-web` (`node:test`, incluye la página en Chrome) | 24 de 24 |
 
 Si una suite falla en la notebook del banco y no en otra, la diferencia está en el entorno: versión de
 Python o de Node, o un puerto ocupado. Hay que resolverlo acá y no en el laboratorio.

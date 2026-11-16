@@ -47,6 +47,10 @@ from metrics import NOMBRE_BDSEQ, NOMBRE_REBIRTH, ConjuntoMetricas, Metrica
 ESTADO_NO_ALCANZADO = "DEVICE NOT REACHED"
 #: Status/OPCUA/Estado (docs/diccionario-de-datos.md §2).
 OPCUA_DONE, OPCUA_ERROR = "DONE", "ERROR"
+#: Diagnostico del enlace MODBus (ADR-028): cambia con CADA transaccion, como los contadores, asi que
+#: se agrupa con ellos en el NDATA periodico. Sin esto saldria un NDATA por notificacion OPC UA.
+METRICAS_DIAGNOSTICO = frozenset({"Status/MODBUS/UltimaTramaTx", "Status/MODBUS/UltimaTramaRx",
+                                  "Status/MODBUS/LatenciaMs"})
 #: Un CMD mas grande se descarta sin decodificar: el payload legitimo mas grande (dos salidas)
 #: ocupa menos de 100 bytes; 16 KiB acota la memoria ante un publicador malicioso (STRIDE: DoS).
 MAXIMO_BYTES_CMD = 16 * 1024
@@ -236,11 +240,12 @@ class NucleoEdgeNode:
     @staticmethod
     def _agrupable(m: Metrica) -> bool:
         """
-        Contadores MODBus (UInt32 leidos por OPC UA): cambian ~16 veces por segundo con el sondeo
-        de 250 ms, y se agrupan en un NDATA por periodo (ADR-021). Los estados (String) y los
-        contadores internos se publican al instante: son eventos que el operador debe ver ya.
+        Contadores MODBus (UInt32 leidos por OPC UA) y diagnostico del enlace (ultima trama TX/RX y
+        latencia, ADR-028): cambian ~16 veces por segundo con el sondeo de 250 ms, y se agrupan en
+        un NDATA por periodo (ADR-021). Los estados (String) y los contadores internos se publican
+        al instante: son eventos que el operador debe ver ya.
         """
-        return m.ambito == "nodo" and m.origen == "opcua" and m.tipo == "UInt32"
+        return m.ambito == "nodo" and m.origen == "opcua" and (m.tipo == "UInt32" or m.nombre in METRICAS_DIAGNOSTICO)
 
     # ------------------------------------------------------------------ disponibilidad [DF-3.7]
     def dispositivo_disponible(self) -> bool:

@@ -1,7 +1,7 @@
 /**
  * ui.test.js — la PAGINA real en Chrome (sin cabeza) contra el broker de desarrollo y el
  * fake_edge_node (que usa el Edge Node real del dispositivo 3 con datos sinteticos).
- * Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-12 · v1.0
+ * Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-12 · v2.0 (2026-11-16: ingreso, pestañas, ADR-028)
  *
  * Requiere: Chrome instalado (o CHROME_PATH) y el venv de gateway-sparkplug. Si falta alguno,
  * la prueba se SALTEA (no falla): las del nucleo (sparkplug.test.js) corren igual.
@@ -60,8 +60,9 @@ test('Host Application en el navegador: BIRTH, comando confirmado, salto de seq,
             procesos.push(fake);
             const comando = (c) => fake.stdin.write(c + '\n');
 
-            const config = `window.PDCI_CONFIG = Object.freeze({ url: 'ws://127.0.0.1:${puertoWs}/mqtt', usuario: 'host_app',
-                clave: '${CLAVES.host}', grupo: 'UNRaf_PdCI_2026', nodo: 'EN01_Gateway', dispositivo: 'DEV01_ESP32_Slave',
+            // ADR-028: config.js SIN clave; usuario y clave se escriben en la pantalla de ingreso
+            const config = `window.PDCI_CONFIG = Object.freeze({ url: 'ws://127.0.0.1:${puertoWs}/mqtt',
+                grupo: 'UNRaf_PdCI_2026', nodo: 'EN01_Gateway', dispositivo: 'DEV01_ESP32_Slave',
                 hostId: 'HA01_WebDashboard' });`;
             servidor = crearServidor(RAIZ, { config });
             await new Promise((r) => servidor.listen(0, '127.0.0.1', r));
@@ -76,6 +77,26 @@ test('Host Application en el navegador: BIRTH, comando confirmado, salto de seq,
             await pagina.goto(url, { waitUntil: 'load' });
             const txt = (id) => pagina.$eval(`#${id}`, (e) => e.textContent.trim());
             const hasta = (fn, arg, ms = 20000) => pagina.waitForFunction(fn, { timeout: ms }, arg);
+            const capturas = process.env.HMI_CAPTURAS;          // carpeta opcional para revisar la vista
+            const capturar = async (nombre) => { if (capturas) await pagina.screenshot({ path: path.join(capturas, `${nombre}.png`), fullPage: true }); };
+            const ingresar = async (usuario, clave) => {
+                await pagina.$eval('#usuario', (e) => { e.value = ''; });
+                await pagina.type('#usuario', usuario);
+                await pagina.$eval('#clave', (e) => { e.value = ''; });
+                await pagina.type('#clave', clave);
+                await pagina.click('#btn-entrar');
+            };
+
+            // 0. [DF-4.0] Ingreso: config.js no tiene clave; una clave equivocada se rechaza (F-09)
+            assert.equal(await pagina.$eval('#app', (e) => e.hidden), true, 'sin ingresar no se ve la aplicación');
+            await capturar('0-ingreso');
+            await ingresar('host_app', 'clave-equivocada');
+            await hasta(() => !document.getElementById('login-error').hidden);
+            assert.match(await txt('login-error'), /incorrectos|rechaz/);
+            await ingresar('host_app', CLAVES.host);
+            await hasta(() => !document.getElementById('app').hidden);
+            assert.equal(await txt('usuario-actual'), 'host_app');
+            assert.equal(await pagina.$eval('#clave', (e) => e.value), '', 'la clave no queda en el formulario');
 
             // 1. La web se anuncia (STATE), pide BIRTH y queda todo EN LINEA
             await hasta(() => document.getElementById('spb-estado').textContent === 'NODO EN LÍNEA'
@@ -99,6 +120,33 @@ eventos: ${(await txt('eventos')).slice(0, 600)}`);
             await hasta(() => document.getElementById('cmd-led').dataset.estado === 'confirmado');
             assert.equal(await pagina.$eval('#btn-led', (e) => e.getAttribute('aria-checked')), 'true');
             assert.match(await txt('led-valor'), /ENCENDIDO/);
+
+            // 2b. ADR-028: recorrido del comando (FC 05 reconstruida con su CRC) y medicion de tiempos
+            await hasta(() => /CONFIRMADO/.test(document.getElementById('rec-pasos').textContent));
+            assert.match(await txt('rec-pasos'), /01050000FF008C3A/, 'la FC 05 reconstruida, con CRC');
+            assert.match(await txt('rec-pasos'), /CAPTURADO.*RECONSTRUIDO/s);
+            const tramos = await txt('tiempos-tramos');
+            assert.match(tramos, /T4 − T0\d+ ms/, 'latencia total medida con un solo reloj');
+            await capturar('1-general');
+
+            // 2c. Pestana MODBus: trama real del NDATA de diagnostico, decodificada, y el CRC paso a paso
+            await pagina.click('#t-modbus');
+            await hasta(() => document.querySelectorAll('#tramas-lista .fi').length > 0);
+            await hasta(() => /✔ coincide/.test(document.getElementById('crc-resultado').textContent));
+            assert.equal(await pagina.$$eval('#crc-pasos tr', (f) => f.length), 6, 'un paso por byte de la petición');
+            await capturar('2-modbus');
+
+            // 2d. OPC UA (atributos del nodo) y Sparkplug (payload byte por byte)
+            await pagina.click('#t-opcua');
+            assert.match(await txt('ua-attrs'), /ns=1;s=Dispositivo1\.Inputs\.Potenciometro/);
+            await capturar('3-opcua');
+            await pagina.click('#t-sparkplug');
+            await hasta(() => document.querySelectorAll('#spb-bytes .by').length > 0);
+            assert.match(await txt('spb-filas'), /tag: campo 1 \(timestamp\)/);
+            await capturar('4-sparkplug');
+            await pagina.click('#t-guia');
+            await capturar('5-guia');
+            await pagina.click('#t-general');
 
             // 3. Comando que el dispositivo no confirma -> SIN CONFIRMAR, y el valor mostrado no cambia
             comando('escrituras falla');
@@ -138,12 +186,25 @@ eventos: ${(await txt('eventos')).slice(0, 600)}`);
 
             // 6. Celular: una columna, sin desplazamiento horizontal, controles de al menos 44 px
             await pagina.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+            // Pasar a modo celular RECARGA la pagina: la clave vivia solo en memoria (ADR-028), asi
+            // que se vuelve a pedir. Es el comportamiento buscado; se ingresa de nuevo.
+            await pagina.waitForSelector('#usuario');
+            await hasta(() => !document.getElementById('login').hidden);
+            await ingresar('host_app', CLAVES.host);
+            await hasta(() => document.getElementById('disp-vigencia').textContent === 'EN LÍNEA');
             await esperar(300);
             const movil = await pagina.evaluate(() => ({
                 desborde: document.documentElement.scrollWidth - document.documentElement.clientWidth,
                 alto: document.getElementById('btn-led').getBoundingClientRect().height }));
             assert.ok(movil.desborde <= 0, `desplazamiento horizontal de ${movil.desborde} px`);
             assert.ok(movil.alto >= 44, `conmutador de ${movil.alto} px (WCAG 2.5.5 pide 44)`);
+            await capturar('6-celular');
+            for (const t of ['modbus', 'opcua', 'sparkplug', 'guia', 'general']) {      // ninguna pestana desborda
+                await pagina.click(`#t-${t}`);
+                await esperar(150);
+                const d = await pagina.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+                assert.ok(d <= 0, `pestaña ${t}: desplazamiento horizontal de ${d} px en el celular`);
+            }
 
             // 7. Se mata el Edge Node -> el broker publica el NDEATH -> todo OBSOLETO
             comando('matar');

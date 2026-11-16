@@ -9,7 +9,7 @@ El dispositivo tiene dos piezas:
 - Un **Edge Node Sparkplug B 3.0**. Publica esos nodos en un broker MQTT en la nube (I-03) y lleva
   los comandos de la Host Application hasta el LED del ESP32.
 
-**Estado.** Todo lo que sigue se probó en la PC: pasan las 61 pruebas, más una sesión real de punta
+**Estado.** Todo lo que sigue se probó en la PC: pasan las 62 pruebas, más una sesión real de punta
 a punta contra Node-RED, el servidor OPC UA en SignAndEncrypt y el simulador del esclavo. Quedan
 dos cosas pendientes, y son manuales (§8):
 
@@ -156,6 +156,7 @@ tipo y valor. Cada Write OPC UA ocupa otra línea con su StatusCode.
 | `test_ciclo_vida.py` | NBIRTH con `seq` = 0, `bdSeq`, Rebirth sin alias y las cuatro capas. DBIRTH. DATA solo ante cambio y solo con alias. Un único `seq` para NDATA y DDATA en 600 mensajes. DDEATH y DBIRTH. Reconexión. `bdSeq` persistido, con 255→0. Rebirth. DCMD por alias y por nombre, más 9 casos de rechazo. STATE |
 | `test_opcua_client.py` | Servidor asyncua real: 10 ítems, un Write que vuelve por la suscripción, escritura sobre un nodo de solo lectura, caída del servidor y reconexión con retroceso 1 s → 2 s |
 | `test_sistema.py` | **El Edge Node como subproceso** contra un broker TLS y un servidor OPC UA. Recorre el ciclo de vida completo, incluido el **corte del broker** (`bdSeq`+1, `Reconexiones`=1) y el **kill** (NDEATH emitido por el broker con el `bdSeq` que corresponde). Al final verifica que el observador **no registró violaciones** |
+| `test_ciclo_vida.py` (diagnóstico) | Las métricas de diagnóstico MODBus (`UltimaTramaTx/Rx`, `LatenciaMs`, ADR-028) viajan **agrupadas** en el NDATA periodico, con el último par TX/RX; un cambio de estado sigue saliendo al instante |
 | `test_permisos_broker.py` | Los **permisos del broker** (ADR-026, ADR-027): con el perfil `un_filtro`, el Edge Node publica aunque se le rechace la suscripción a STATE (falla sin la corrección, verificado). Además, la clave de la web puede publicar un NBIRTH falso con `un_filtro` y **no** con `minimo`, que es el perfil del broker del banco |
 
 Las pruebas del núcleo se validaron con mutación: `seq` módulo 257 y `Reconexiones` sin incrementar

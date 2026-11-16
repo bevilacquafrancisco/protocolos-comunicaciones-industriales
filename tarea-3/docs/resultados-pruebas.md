@@ -117,6 +117,26 @@ permisos) · `hmi-web` 16/16.
 
 ---
 
+## Host Application v2 · 2026-11-16 · ADR-028
+
+| Suite | Resultado |
+|---|---|
+| `gateway-sparkplug` (pytest) | **62/62** (+1: tramas de diagnóstico agrupadas en el NDATA) |
+| `hmi-web` (`node:test`) | **24/24**: núcleo 12, decodificación y modelo 9, entrega 2, página en Chrome 1 |
+
+- **CRC-16 de `tramas.js`** contra cuatro tramas reales del sistema: `84 0A` y `B8 44` (banco,
+  2026-11-16), `31 CA` (diccionario) y `B9 E4` (verificación OPC UA). Las cuatro coinciden byte a byte.
+- **`modelo.js` contra la fuente de verdad**: la primera corrida falló porque el lector de la prueba
+  partía `\|` dentro de una celda del diccionario. Fue un **defecto de la prueba**, y se corrigió.
+- **Página en Chrome**: la primera corrida falló en la vista de celular (conmutador de 0 px). Al
+  pasar a modo celular, Puppeteer recarga la página y la clave, que solo vive en memoria, se pierde.
+  Es el **comportamiento buscado** (ADR-028). La prueba ahora vuelve a ingresar, y además verifica
+  que ninguna de las cinco pestañas desborde en 390 px.
+- **Revisión visual** de las capturas de cada pestaña: se corrigieron una columna FC que partía el
+  número, palabras cortadas en tablas angostas, la abreviatura del broker y los Float con 14 decimales.
+
+---
+
 ## Pendiente con hardware
 
 El banco real (ESP32, RS-485, Raspberry Pi, broker en la nube) repite **las mismas** pruebas con

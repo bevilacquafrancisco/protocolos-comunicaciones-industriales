@@ -37,6 +37,7 @@ Revisión contra el código de las Tareas 1 y 2 ([analisis-t1.md](analisis-t1.md
 | 025 | Aceptado (F6) | CSP con `'unsafe-eval'` (protobuf.js) y `worker-src blob:` (mqtt.js), medido |
 | 026 | **Superado por ADR-027** (2026-11-16) | HiveMQ Serverless: un permiso por credencial. Queda vigente la corrección del código (STATE opcional en el Edge Node) |
 | 027 | Aceptado (puesta en marcha, 2026-11-16) | EMQX Cloud Serverless: HiveMQ Serverless ya no se vende; se recupera el mínimo privilegio del ADR-005 |
+| 028 | Aceptado (2026-11-16) | Host Application v2: ingreso con usuario y clave del broker, tramas MODBus reales por Sparkplug, lo no capturable se muestra reconstruido y rotulado |
 
 ---
 
@@ -785,6 +786,47 @@ todos los usuarios, que convierte la autorización en lista blanca, y diez regla
   renombrado: `un_filtro` (antes `serverless`).
 - **Lección de proceso.** Antes de adoptar un servicio externo se consulta también su página de ciclo
   de vida o de fin de servicio. Queda como defecto D-5 en `resultados-pruebas.md`.
+
+## ADR-028 — Host Application v2: ingreso sin secretos en la página, tramas reales y reconstrucción rotulada *(Aceptado, 2026-11-16)*
+
+**Contexto.** La web de la v1 mostraba el estado y accionaba las salidas, pero no explicaba la cadena:
+ni el modelo de datos MODBus, ni el espacio de direcciones OPC UA, ni cómo viajan las tramas, el CRC o
+los tiempos. Además, para publicarla con un enlace propio (sin depender de la IP de la notebook),
+`config.js` no puede llevar la clave: el navegador lo descarga, y la clave queda pública (R-08).
+
+Hay tres preguntas de diseño:
+
+1. **¿De dónde salen las tramas MODBus reales?** El servidor OPC UA ya expone
+   `Status.MODBUS.UltimaTramaTx`, `UltimaTramaRx` y `LatenciaMs` (diccionario §2), pero no viajaban por
+   Sparkplug.
+2. **¿Cómo se autentica la página sin un secreto en sus archivos?**
+3. **¿Qué se muestra de los tramos que el navegador no puede ver?** La sesión OPC UA va cifrada entre
+   las placas, y la trama FC 05/06 del comando ocurre en el bus.
+
+**Opciones y decisión**
+
+| Pregunta | Opciones | Decisión | Por qué |
+|---|---|---|---|
+| 1 | (a) Métricas Sparkplug de nodo con alias 15-17 · (b) un tópico propio con las tramas · (c) mostrar solo tramas calculadas | **(a)**, agrupadas en el NDATA periódico como los contadores (ADR-021) | (b) rompe Sparkplug: todo viaja en métricas. (c) no es evidencia. Las tramas cambian ~16 veces por segundo; sin agrupar, cada notificación OPC UA sería un NDATA |
+| 2 | (a) Clave en `config.js` (v1) · (b) usuario y clave pedidos al entrar, solo en memoria · (c) backend con tokens de vida corta | **(b)** | (a) la publica. (c) es lo correcto en producción, pero agrega un servidor que el TP no necesita. Con (b) cada persona tiene su usuario del broker con el ACL de la Host Application (ADR-027), revocable por separado |
+| 3 | (a) Omitirlos · (b) mostrarlos reconstruidos, rotulados **RECONSTRUIDO** frente a **CAPTURADO** | **(b)** | Es la única forma de explicar el recorrido completo de un comando sin inventar evidencia: lo capturado son bytes que llegaron; lo reconstruido se calcula con el mismo mapa y el mismo CRC, y se dice |
+
+**Medición de tiempos.** El comando guarda cinco marcas: T0 (envío), T1 (eco del DCMD que devuelve el
+broker), T2 (SourceTimestamp OPC UA, reloj de la Raspberry), T3 (timestamp del payload, reloj del Edge
+Node) y T4 (confirmación). **Solo son exactas las restas entre marcas del mismo reloj**: T1 − T0 y T4 − T0.
+Los tramos intermedios restan relojes distintos y la página lo dice junto a cada número.
+
+**Consecuencias**
+
+- Diccionario: 3 métricas de nodo nuevas (alias 15-17). En el Edge Node, `_agrupable` las incluye.
+  Node-RED no cambia: los nodos ya existían.
+- El Edge Node hay que reiniciarlo en el banco para que tome el diccionario nuevo.
+- Tráfico: el NDATA de 1 Hz crece unos 60 bytes por segundo. Es menor que la cuota de EMQX (ADR-027).
+- R-08 baja a 1: no hay clave en la página. Hay que **cambiar la clave de `host_app`**, que estuvo en
+  el `config.js` de la v1, y crear un usuario por profesor (puesta en marcha 02 §3.2).
+- `modelo.js` duplica datos del diccionario para la página estática; `hmi-web/test/tramas.test.js`
+  falla si se desincronizan (I-06).
+- Recargar la página pide la clave otra vez. Es el comportamiento buscado.
 
 ---
 

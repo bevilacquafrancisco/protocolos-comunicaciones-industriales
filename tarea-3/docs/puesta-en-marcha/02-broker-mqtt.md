@@ -132,6 +132,10 @@ Qué impide cada fila, para la defensa:
   hacer pasar por el Edge Node. Solo publica su STATE y los comandos.
 - `observador` no puede publicar nada.
 
+**Un usuario por persona (ADR-028).** La página pide usuario y contraseña al entrar, así que cada
+profesor puede tener su propio usuario, por ejemplo `prof_apellido`, con **las mismas cuatro reglas que
+`host_app`**. Se revoca uno sin tocar a los demás, y el broker registra quién se conectó.
+
 Si la consola no deja elegir *Publish & Subscribe* en una regla, se cargan dos reglas para ese tópico,
 una de cada tipo.
 

@@ -1,11 +1,14 @@
 %% flujo-host-app.mmd — Host Application Sparkplug B (página web)
 %% Cada bloque [DF-4.x] se cita en el comentario JSDoc de la función que lo implementa
-%% (hmi-web/sparkplug.js: núcleo sin DOM ni MQTT · hmi-web/app.js: vista y conexión).
+%% (hmi-web/sparkplug.js: núcleo sin DOM ni MQTT · hmi-web/app.js: vista y conexión ·
+%%  hmi-web/tramas.js: decodificación para la vista). v2 2026-11-16: DF-4.0, DF-4.15 y DF-4.16 (ADR-028).
 %% Requisitos I-08 (STATE, Rebirth) e I-05 (estadística de las cuatro capas)
 flowchart TD
     A(["[DF-4.1] Inicio<br/>cargar sparkplug_b.proto con protobuf.js<br/>toda métrica DESCONOCIDA (sin BIRTH: no válida)"])
-    A --> B["[DF-4.2] CONNECT por WSS · usuario host_app · clean session<br/>cliente NUEVO por conexión · Will: STATE/HA01_WebDashboard<br/>{online: false, timestamp T} · retenido · QoS 1"]
-    B -- "Falla o se corta" --> RX["[DF-4.13] Semáforo MQTT en rojo<br/>todo lo mostrado pasa a OBSOLETO<br/>comandos pendientes: SIN CONFIRMAR<br/>reintento con retroceso 1, 2, 4… 30 s"]
+    A --> ING["[DF-4.0] Ingreso: usuario y contraseña del broker<br/>solo en memoria · nunca en config.js"]
+    ING --> B["[DF-4.2] CONNECT por WSS · usuario y clave ingresados · clean session<br/>cliente NUEVO por conexión · Will: STATE/HA01_WebDashboard<br/>{online: false, timestamp T} · retenido · QoS 1"]
+    B -- "Antes de entrar: CONNACK 4/5 o sin red" --> ING
+    B -- "Ya operando: se corta" --> RX["[DF-4.13] Semáforo MQTT en rojo<br/>todo lo mostrado pasa a OBSOLETO<br/>comandos pendientes: SIN CONFIRMAR<br/>reintento con retroceso 1, 2, 4… 30 s"]
     RX --> B
     B -- "CONNACK" --> C["[DF-4.3] Suscribir spBv1.0/UNRaf_PdCI_2026/# y el STATE propio<br/>recién con el SUBACK: STATE {online: true, timestamp T}<br/>retenido · QoS 1 · sin BIRTH vigente → NCMD Rebirth"]
     C --> M(["[DF-4.4] Esperar mensaje"])
@@ -23,6 +26,8 @@ flowchart TD
     S -- Sí --> U["[DF-4.12] Aplicar: alias → métrica del BIRTH<br/>(alias desconocido → Rebirth) · DBIRTH: EN LÍNEA · DDEATH: OBSOLETO<br/>DDATA con el valor pedido → comando CONFIRMADO<br/>semáforo por capa: color + ícono + texto"]
     NB --> U
     ND1 --> U
-    U --> M
-    M -- "El usuario acciona una salida" --> CMD["[DF-4.14] Solo con el dispositivo EN LÍNEA:<br/>DCMD por alias (103 LedDigital · 104 LedPWM), sin seq, QoS 0<br/>comando ENVIADO · la vista NO cambia<br/>5 s sin DDATA → SIN CONFIRMAR"]
+    U --> CAP["[DF-4.15] Para las pestañas: guardar el mensaje (bytes reales),<br/>la trama MODBus del NDATA de diagnóstico, la notificación OPC UA<br/>reconstruida y, si confirma un comando, su DDATA"]
+    CAP --> TIM["[DF-4.16] Marcas de tiempo del comando:<br/>T0 envío · T1 eco del broker · T2 SourceTimestamp · T3 payload · T4 confirmación<br/>exactas solo las restas de un mismo reloj"]
+    TIM --> M
+    M -- "El usuario acciona una salida" --> CMD["[DF-4.14] Solo con el dispositivo EN LÍNEA:<br/>DCMD por alias (103 LedDigital · 104 LedPWM), sin seq, QoS 0<br/>comando ENVIADO (marca T0) · la vista NO cambia<br/>5 s sin DDATA → SIN CONFIRMAR"]
     CMD --> M

@@ -1,15 +1,15 @@
 <!doctype html>
 <!--
-  index.html — Host Application Sparkplug B (Tarea Nº3, nivel 4)
-  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-12 · v1.0
-  Una sola pantalla: semáforo de las cuatro capas (I-05, siempre visible), dispositivo 1,
-  controles (DCMD) y registro de eventos. Lógica: sparkplug.js (núcleo) y app.js (vista + MQTT).
+  index.html — Host Application Sparkplug B (Tarea Nº3, nivel 4) · v2
+  Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-12 · v2.0 (2026-11-16, ADR-028)
+  Ingreso con usuario y contraseña del broker (no hay claves en la página), barra de las cuatro
+  capas siempre visible (I-05) y cinco pestañas: Panel general, MODBus RTU, OPC UA,
+  MQTT · Sparkplug B y Guía. Lógica: sparkplug.js (núcleo), tramas.js (decodificación),
+  modelo.js (modelo estático) y app.js (vista + MQTT).
   CSP: sin scripts ni estilos en línea; solo conexiones WSS (o ws:// a localhost para desarrollo).
   Dos excepciones medidas (ADR-025): 'unsafe-eval' porque protobuf.js genera sus codificadores
   con new Function al cargar sparkplug_b.proto, y worker-src blob: porque mqtt.js corre sus
-  temporizadores en un Worker (una pestaña en segundo plano frena los temporizadores comunes y
-  vencería el keepalive). Lo que llega del broker se escribe siempre con textContent, nunca como
-  HTML: la vía de inyección que 'unsafe-eval' agravaría no existe.
+  temporizadores en un Worker. Lo que llega del broker se escribe siempre con textContent.
 -->
 <html lang="es">
 <head>
@@ -23,112 +23,550 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="cabecera">
-    <h1>PdCI T3 · Host Application <span class="sub">Sparkplug B</span></h1>
-    <p class="ids" id="ids">—</p>
-  </header>
 
+<!-- ============================ [DF-4.0] INGRESO ============================ -->
+<div id="login" class="lw">
+  <form id="form-login" class="lc" autocomplete="on" novalidate>
+    <svg class="logo" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><rect width="44" height="44" rx="12" fill="#0B2545"></rect><path d="M11 30 L18 21 L24 26 L33 14" fill="none" stroke="#5FD3A0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="33" cy="14" r="3" fill="#9CC0FF"></circle></svg>
+    <h1>Host Application · Sparkplug B</h1>
+    <p>Tablero de operación de la cadena MODBus RTU → OPC UA → MQTT / Sparkplug B. TP Nº3 · Protocolos de Comunicaciones Industriales · UNRaf.</p>
+    <div class="fld"><label for="usuario">Usuario</label><input id="usuario" name="username" autocomplete="username" required></div>
+    <div class="fld"><label for="clave">Contraseña</label><input id="clave" name="password" type="password" autocomplete="current-password" required></div>
+    <button type="submit" id="btn-entrar" class="btn pri ancho">Conectar al broker</button>
+    <p id="login-estado" class="login-estado" role="status" aria-live="polite"></p>
+    <p id="login-error" class="err-t" role="alert" hidden></p>
+    <div class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg><span>Usuario y contraseña del broker MQTT. Viajan cifrados (TLS) y <b>no se guardan</b>: se pierden al cerrar o recargar la página.</span></div>
+    <p class="muted chico">Broker: <span id="login-broker" class="mono">—</span></p>
+  </form>
+</div>
+
+<!-- ============================ APLICACIÓN ============================ -->
+<div id="app" hidden>
+<header class="top">
+  <div class="wrap top-in">
+    <div class="brand">
+      <svg width="36" height="36" viewBox="0 0 44 44" aria-hidden="true"><rect width="44" height="44" rx="11" fill="#1F5BD6"></rect><path d="M11 30 L18 21 L24 26 L33 14" fill="none" stroke="#7CE3B5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <div><h1 class="brand-t">Host Application <span>Sparkplug B</span></h1><p class="brand-s" id="ids">—</p></div>
+    </div>
+    <div class="top-r">
+      <span class="chipu"><span class="av" id="usuario-inicial" aria-hidden="true">?</span><span id="usuario-actual">—</span></span>
+      <button type="button" id="btn-salir" class="btn ghost sm">Salir</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
   <div id="fatal" class="fatal" role="alert" hidden></div>
   <div id="aviso" class="aviso" role="status" aria-live="polite" hidden></div>
 
-  <main>
-    <!-- [DF-4.12] Semáforo por capa: color + ícono + texto (el color solo no es accesible) -->
-    <section class="semaforo" aria-label="Estado de las cuatro capas">
-      <article class="capa" id="capa-modbus" data-nivel="obsoleto">
-        <h2><span class="icono" aria-hidden="true">◌</span> MODBUS</h2>
-        <p class="estado" id="modbus-estado">DESCONOCIDO</p>
-        <dl class="contadores">
-          <div><dt>OK</dt><dd id="modbus-ok">—</dd></div>
-          <div><dt>CRC_ERROR</dt><dd id="modbus-crc">—</dd></div>
-          <div><dt>TIMEOUT</dt><dd id="modbus-timeout">—</dd></div>
-          <div><dt>EXCEPTION</dt><dd id="modbus-exception">—</dd></div>
-        </dl>
-      </article>
-      <article class="capa" id="capa-opcua" data-nivel="obsoleto">
-        <h2><span class="icono" aria-hidden="true">◌</span> OPC UA</h2>
-        <p class="estado" id="opcua-estado">DESCONOCIDO</p>
-        <p class="detalle">Sesión del dispositivo 3 con el dispositivo 2</p>
-      </article>
-      <article class="capa" id="capa-mqtt" data-nivel="error">
-        <h2><span class="icono" aria-hidden="true">✖</span> MQTT</h2>
-        <p class="estado" id="mqtt-estado">DESCONECTADO</p>
-        <dl class="contadores">
-          <div><dt>Reconexiones web</dt><dd id="mqtt-reconexiones">0</dd></div>
-          <div><dt>Reconexiones Edge</dt><dd id="mqtt-reconexiones-edge">—</dd></div>
-        </dl>
-      </article>
-      <article class="capa" id="capa-sparkplug" data-nivel="obsoleto">
-        <h2><span class="icono" aria-hidden="true">◌</span> SPARKPLUG</h2>
-        <p class="estado" id="spb-estado">NODO DESCONOCIDO</p>
-        <dl class="contadores">
-          <div><dt>Dispositivo</dt><dd id="spb-disp">DESCONOCIDO</dd></div>
-          <div><dt>bdSeq</dt><dd id="spb-bdseq">—</dd></div>
-          <div><dt>seq</dt><dd id="spb-seq">—</dd></div>
-          <div><dt>Rebirths pedidos (web)</dt><dd id="spb-rebirths">0</dd></div>
-          <div><dt>Rebirths (Edge)</dt><dd id="spb-rebirths-edge">—</dd></div>
-        </dl>
-      </article>
-    </section>
+  <!-- [DF-4.12] Las cuatro capas, en todas las pestañas (I-05). Color + texto: el color solo no es accesible -->
+  <section class="strip" aria-label="Estado de las cuatro capas">
+    <article class="lay" id="capa-modbus" data-nivel="obsoleto">
+      <div class="lay-h"><h2 class="lay-n">MODBUS RTU</h2><span class="badge" id="modbus-tag">—</span></div>
+      <p class="lay-e" id="modbus-estado">DESCONOCIDO</p>
+      <div class="kv"><span>OK</span><b id="modbus-ok">—</b></div>
+      <div class="kv"><span>CRC_ERROR</span><b id="modbus-crc">—</b></div>
+      <div class="kv"><span>TIMEOUT</span><b id="modbus-timeout">—</b></div>
+      <div class="kv"><span>EXCEPTION</span><b id="modbus-exception">—</b></div>
+    </article>
+    <article class="lay" id="capa-opcua" data-nivel="obsoleto">
+      <div class="lay-h"><h2 class="lay-n">OPC UA</h2><span class="badge" id="opcua-tag">—</span></div>
+      <p class="lay-e" id="opcua-estado">DESCONOCIDO</p>
+      <div class="kv"><span>Sesión</span><b>dispositivo 3 → 2</b></div>
+      <div class="kv"><span>Seguridad</span><b>SignAndEncrypt</b></div>
+      <div class="kv"><span>Latencia MODBus</span><b id="opcua-latencia">—</b></div>
+    </article>
+    <article class="lay" id="capa-mqtt" data-nivel="error">
+      <div class="lay-h"><h2 class="lay-n">MQTT</h2><span class="badge" id="mqtt-tag">—</span></div>
+      <p class="lay-e" id="mqtt-estado">DESCONECTADO</p>
+      <div class="kv"><span>Broker</span><b id="mqtt-broker">—</b></div>
+      <div class="kv"><span>Reconexiones web</span><b id="mqtt-reconexiones">0</b></div>
+      <div class="kv"><span>Reconexiones Edge</span><b id="mqtt-reconexiones-edge">—</b></div>
+    </article>
+    <article class="lay" id="capa-sparkplug" data-nivel="obsoleto">
+      <div class="lay-h"><h2 class="lay-n">SPARKPLUG B</h2><span class="badge" id="spb-tag">—</span></div>
+      <p class="lay-e" id="spb-estado">NODO DESCONOCIDO</p>
+      <div class="kv"><span>Dispositivo</span><b id="spb-disp">DESCONOCIDO</b></div>
+      <div class="kv"><span>bdSeq · seq</span><b><span id="spb-bdseq">—</span> · <span id="spb-seq">—</span></b></div>
+      <div class="kv"><span>Rebirths (web · Edge)</span><b><span id="spb-rebirths">0</span> · <span id="spb-rebirths-edge">—</span></b></div>
+    </article>
+  </section>
 
-    <!-- Dispositivo 1 -->
-    <section class="panel" aria-labelledby="t-disp">
-      <h2 id="t-disp">Dispositivo 1 · <span id="disp-vigencia" class="vigencia">DESCONOCIDO</span></h2>
-      <div class="variables">
-        <div class="variable" id="v-pulsador">
-          <h3>Pulsador</h3>
-          <p class="valor" id="pulsador-valor">—</p>
-          <p class="meta" id="pulsador-meta">sin BIRTH</p>
-        </div>
-        <div class="variable" id="v-pote">
-          <h3>Potenciómetro</h3>
-          <p class="valor"><span id="pote-crudo">—</span> <span class="unidad">/ 4095</span></p>
-          <p class="valor-2"><span id="pote-pct">—</span> %</p>
-          <meter id="pote-medidor" min="0" max="100" value="0" aria-label="Potenciómetro en porcentaje"></meter>
-          <p class="meta" id="pote-meta">sin BIRTH</p>
-        </div>
-        <div class="variable" id="v-led">
-          <h3>LED digital</h3>
-          <p class="valor" id="led-valor">—</p>
-          <p class="meta" id="led-meta">sin BIRTH</p>
-        </div>
-        <div class="variable" id="v-pwm">
-          <h3>LED PWM</h3>
-          <p class="valor"><span id="pwm-valor">—</span> <span class="unidad">/ 255</span></p>
-          <meter id="pwm-medidor" min="0" max="255" value="0" aria-label="LED PWM"></meter>
-          <p class="meta" id="pwm-meta">sin BIRTH</p>
-        </div>
+  <nav class="tabs" role="tablist" aria-label="Secciones">
+    <button type="button" class="tab" role="tab" id="t-general" data-tab="general" aria-controls="p-general">Panel general<small>Operación en vivo</small></button>
+    <button type="button" class="tab" role="tab" id="t-modbus" data-tab="modbus" aria-controls="p-modbus">MODBus RTU<small>Campo · nivel 1-2</small></button>
+    <button type="button" class="tab" role="tab" id="t-opcua" data-tab="opcua" aria-controls="p-opcua">OPC UA<small>Borde · nivel 2-3</small></button>
+    <button type="button" class="tab" role="tab" id="t-sparkplug" data-tab="sparkplug" aria-controls="p-sparkplug">MQTT · Sparkplug B<small>Nube · nivel 3-4</small></button>
+    <button type="button" class="tab" role="tab" id="t-guia" data-tab="guia" aria-controls="p-guia">Guía del sistema<small>Qué es cada tablero</small></button>
+  </nav>
+
+  <!-- ============================ PANEL GENERAL ============================ -->
+  <div id="p-general" class="panel" role="tabpanel" aria-labelledby="t-general">
+    <section class="sec card" aria-labelledby="h-cadena">
+      <h2 id="h-cadena">Cadena de comunicación en vivo</h2>
+      <p class="lead">Cada dato recorre cinco equipos y cuatro protocolos. El color de cada tramo dice si ese enlace está transportando datos ahora.</p>
+      <div class="chain">
+        <div class="node"><div class="mono-badge">D1</div><div class="lvl">Nivel 0/1 · campo</div><div class="nm">ESP32</div><div class="rl">Esclavo MODBus RTU · <span id="n-d1-uid">Unit ID 1</span></div><span class="badge" id="n-d1">—</span></div>
+        <div class="link" id="l-1"><span class="lt">RS-485 · MODBus RTU</span><span class="bar"></span><span class="ls" id="l-1-det">—</span></div>
+        <div class="node"><div class="mono-badge">D2</div><div class="lvl">Nivel 2 · borde</div><div class="nm">Raspberry Pi 4</div><div class="rl">Node-RED · maestro MODBus + servidor OPC UA</div><span class="badge" id="n-d2">—</span></div>
+        <div class="link" id="l-2"><span class="lt">Ethernet · OPC UA</span><span class="bar"></span><span class="ls" id="l-2-det">—</span></div>
+        <div class="node"><div class="mono-badge">D3</div><div class="lvl">Nivel 3 · pasarela</div><div class="nm">Notebook</div><div class="rl">Cliente OPC UA + Edge Node Sparkplug B</div><span class="badge" id="n-d3">—</span></div>
+        <div class="link" id="l-3"><span class="lt">Internet · MQTT</span><span class="bar"></span><span class="ls" id="l-3-det">—</span></div>
+        <div class="node"><div class="mono-badge">BK</div><div class="lvl">Nube</div><div class="nm">Broker MQTT</div><div class="rl" id="n-bk-host">—</div><span class="badge" id="n-bk">—</span></div>
+        <div class="link" id="l-4"><span class="lt">Internet · WSS</span><span class="bar"></span><span class="ls" id="l-4-det">—</span></div>
+        <div class="node"><div class="mono-badge">HA</div><div class="lvl">Nivel 4 · usuario</div><div class="nm">Este navegador</div><div class="rl">Host Application · STATE</div><span class="badge" id="n-ha">—</span></div>
       </div>
     </section>
 
-    <!-- [DF-4.14] Controles: publican DCMD; el estado mostrado es SIEMPRE el confirmado -->
-    <section class="panel" aria-labelledby="t-ctrl">
-      <h2 id="t-ctrl">Controles</h2>
-      <div class="control">
-        <button type="button" id="btn-led" class="conmutador" role="switch" aria-checked="false" disabled>
-          LED digital: <span id="btn-led-texto">—</span>
-        </button>
-        <p class="comando" id="cmd-led" data-estado="ninguno">Sin comandos</p>
-      </div>
-      <div class="control">
-        <label for="pwm">LED PWM (0-255): <output id="pwm-pedido" for="pwm">—</output></label>
-        <input type="range" id="pwm" min="0" max="255" step="1" value="0" disabled>
-        <p class="comando" id="cmd-pwm" data-estado="ninguno">Sin comandos</p>
-      </div>
-      <p class="nota">El conmutador y los valores muestran lo <strong>confirmado</strong> por el dispositivo
-        (DDATA), no lo pedido.</p>
+    <div class="sec split">
+      <section class="main card" aria-labelledby="h-d1">
+        <div class="fila-t"><h2 id="h-d1">Dispositivo 1 · ESP32 (esclavo MODBus)</h2><span class="badge" id="disp-vigencia">DESCONOCIDO</span></div>
+        <p class="lead">Valores <b>confirmados</b> por el dispositivo (DDATA). Debajo de cada uno, su nombre en las tres capas: es el mismo dato con el mismo tipo (I-06).</p>
+        <div class="grid2">
+          <div class="io" id="v-pulsador">
+            <div class="io-h"><span class="io-n">Pulsador</span><span class="age" id="pulsador-meta">sin BIRTH</span></div>
+            <div class="io-v" id="pulsador-valor">—</div>
+            <div class="age">GPIO 18 · activo en bajo</div>
+            <div class="trace"><span class="tr m">MODBus · DI 10001 · FC 02</span><span class="tr o">OPC UA · Inputs.Pulsador</span><span class="tr s">Sparkplug · alias 101 · Boolean</span></div>
+          </div>
+          <div class="io" id="v-pote">
+            <div class="io-h"><span class="io-n">Potenciómetro</span><span class="age" id="pote-meta">sin BIRTH</span></div>
+            <div class="io-v"><span id="pote-crudo">—</span> <small>/ 4095 · <span id="pote-pct">—</span> %</small></div>
+            <div class="meter"><div id="pote-barra"></div></div>
+            <div class="age">GPIO 34 · ADC de 12 bits</div>
+            <div class="trace"><span class="tr m">MODBus · IR 30001 · FC 04</span><span class="tr o">OPC UA · Inputs.Potenciometro</span><span class="tr s">Sparkplug · alias 102 · UInt16</span></div>
+          </div>
+          <div class="io" id="v-led">
+            <div class="io-h"><span class="io-n">LED digital</span><span class="age" id="led-meta">sin BIRTH</span></div>
+            <div class="io-v" id="led-valor">—</div>
+            <div class="age">GPIO 19</div>
+            <div class="trace"><span class="tr m">MODBus · Coil 00001 · FC 01/05</span><span class="tr o">OPC UA · Outputs.LedDigital</span><span class="tr s">Sparkplug · alias 103 · Boolean</span></div>
+          </div>
+          <div class="io" id="v-pwm">
+            <div class="io-h"><span class="io-n">LED PWM</span><span class="age" id="pwm-meta">sin BIRTH</span></div>
+            <div class="io-v"><span id="pwm-valor">—</span> <small>/ 255</small></div>
+            <div class="meter"><div id="pwm-barra"></div></div>
+            <div class="age">GPIO 21 · 1000 Hz</div>
+            <div class="trace"><span class="tr m">MODBus · HR 40001 · FC 03/06</span><span class="tr o">OPC UA · Outputs.LedPWM</span><span class="tr s">Sparkplug · alias 104 · UInt16</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- [DF-4.14] Controles: publican DCMD; el estado mostrado es SIEMPRE el confirmado -->
+      <section class="side card" aria-labelledby="h-ctl">
+        <h2 id="h-ctl">Controles</h2>
+        <p class="lead">Cada acción publica un <b>DCMD</b>. El control cambia recién cuando vuelve el DDATA que lo confirma.</p>
+        <div class="ctl">
+          <button type="button" id="btn-led" class="switch" role="switch" aria-checked="false" disabled>
+            <span class="sw-t"><b>LED digital</b><span id="btn-led-texto">—</span></span><span class="sw" aria-hidden="true"><i></i></span>
+          </button>
+          <p class="comando" id="cmd-led" data-estado="ninguno">Sin comandos</p>
+        </div>
+        <div class="ctl">
+          <label for="pwm">LED PWM · <output id="pwm-pedido" for="pwm" class="mono">—</output> / 255</label>
+          <input type="range" id="pwm" min="0" max="255" step="1" value="0" disabled>
+          <div class="fila-t"><p class="comando" id="cmd-pwm" data-estado="ninguno">Sin comandos</p><button type="button" id="btn-pwm" class="btn pri sm" disabled>Aplicar</button></div>
+        </div>
+        <p id="ctl-bloqueados" class="badge warn multilinea">Controles bloqueados: el dispositivo no está EN LÍNEA y su estado real es desconocido.</p>
+      </section>
+    </div>
+
+    <section class="sec card" aria-labelledby="h-rec">
+      <div class="fila-t"><h2 id="h-rec">Recorrido del último comando, capa por capa</h2><span class="badge" id="rec-cabecera">esperando un comando</span></div>
+      <p class="lead">Cómo baja una acción por la cadena y cómo vuelve la confirmación. Los bytes <b>capturados</b> son los que viajaron de verdad; los <b>reconstruidos</b> se calculan en esta página, porque ese tramo va cifrado o no llega hasta acá.</p>
+      <p id="rec-vacio" class="muted">Todavía no se envió ningún comando. Probá el LED digital o el PWM.</p>
+      <ol class="steps" id="rec-pasos"></ol>
     </section>
 
-    <!-- Registro de eventos -->
-    <section class="panel registro" aria-labelledby="t-log">
-      <h2 id="t-log">Eventos</h2>
+    <!-- [DF-4.16] Medición de tiempos (ADR-028) -->
+    <section class="sec card" aria-labelledby="h-tiempos">
+      <h2 id="h-tiempos">Cómo se miden los tiempos</h2>
+      <p class="lead">Cada mensaje lleva <b>marcas de tiempo</b> (ms desde 1970, UTC) puestas por equipos distintos. Restar dos marcas da la duración de ese tramo, pero solo es exacto si las dos las puso <b>el mismo reloj</b>.</p>
+      <div class="split">
+        <div class="main">
+          <div class="tbl"><table>
+            <thead><tr><th>Marca</th><th>Qué pasó</th><th>Reloj</th><th>Valor</th></tr></thead>
+            <tbody id="tiempos-marcas">
+              <tr><td colspan="4" class="muted">Se completa con el próximo comando.</td></tr>
+            </tbody>
+          </table></div>
+          <div class="tbl tbl-sep"><table>
+            <thead><tr><th>Tramo</th><th>Cálculo</th><th>Resultado</th><th>Exactitud</th></tr></thead>
+            <tbody id="tiempos-tramos"></tbody>
+          </table></div>
+          <div class="barra-t" id="tiempos-barra" aria-hidden="true" hidden></div>
+        </div>
+        <div class="side">
+          <h3>La lógica, paso a paso</h3>
+          <ol class="lista">
+            <li><b>T0</b>: al tocar el control, esta página guarda la hora de su reloj y publica el DCMD.</li>
+            <li><b>T1</b>: la página está suscripta al grupo, así que el broker le devuelve su propio DCMD. T1 − T0 es la <b>ida y vuelta página ↔ broker</b>.</li>
+            <li><b>T2</b>: el maestro lee el valor nuevo en el ESP32. El servidor OPC UA lo marca con su <b>SourceTimestamp</b> (reloj de la Raspberry), y el Edge Node lo copia como timestamp de la métrica.</li>
+            <li><b>T3</b>: el Edge Node arma el DDATA y pone el timestamp del payload (reloj de la notebook).</li>
+            <li><b>T4</b>: llega el DDATA con el valor pedido: el comando queda CONFIRMADO.</li>
+            <li><b>T4 − T0</b> es la latencia de punta a punta. Es exacta: T0 y T4 los mide el mismo reloj.</li>
+            <li>Los tramos intermedios restan marcas de <b>relojes distintos</b>. Valen si los equipos están sincronizados por NTP; si un tramo da negativo, los relojes están desfasados, no es que el mensaje llegó antes de salir.</li>
+            <li>La <b>latencia MODBus</b> la mide el maestro con un solo reloj: desde el fin de la transmisión de la petición hasta la respuesta completa. Incluye el conversor USB (1-16 ms).</li>
+          </ol>
+          <p class="muted chico">Referencia en la PC, con todos los relojes iguales: la confirmación tardó una mediana de 192 ms (docs/mediciones.md §1.2).</p>
+        </div>
+      </div>
+      <h3 class="sub">Lectura: del campo a esta pantalla</h3>
+      <p class="lead" id="lectura-texto">Se completa cuando cambie el potenciómetro o el pulsador.</p>
+    </section>
+
+    <section class="sec card" aria-labelledby="h-ev">
+      <h2 id="h-ev">Eventos</h2>
       <ol id="eventos" class="eventos"></ol>
     </section>
-  </main>
+  </div>
 
-  <script src="vendor/mqtt.min.js"></script>
-  <script src="vendor/protobuf.min.js"></script>
-  <script src="config.js"></script>
-  <script src="sparkplug.js"></script>
-  <script src="app.js"></script>
+  <!-- ============================ MODBUS ============================ -->
+  <div id="p-modbus" class="panel" role="tabpanel" aria-labelledby="t-modbus" hidden>
+    <section class="sec card">
+      <h2>MODBus RTU · campo (niveles 0/1 → 2)</h2>
+      <p class="lead">Protocolo maestro-esclavo por sondeo sobre RS-485. El maestro (Raspberry Pi, Node-RED) pregunta; el esclavo (ESP32) solo responde. El CRC-16 se calcula con código propio en los dos extremos (I-01).</p>
+      <div class="facts">
+        <div class="fact"><b>MAESTRO</b>Raspberry Pi 4 · Node-RED · /dev/ttyUSB0</div>
+        <div class="fact"><b>ESCLAVO</b>ESP32 #1 · MicroPython · Unit ID 1</div>
+        <div class="fact"><b>MEDIO FÍSICO</b>RS-485 half-duplex · MAX485</div>
+        <div class="fact"><b>ENLACE (por defecto)</b>9600 bps · 8N1 · 11 bits/carácter</div>
+        <div class="fact"><b>SILENCIO t3,5</b>4,010 ms a 9600 bps</div>
+        <div class="fact"><b>SONDEO</b>4 transacciones cada 250 ms</div>
+        <div class="fact"><b>TIMEOUT</b>300 ms · 1 reintento</div>
+        <div class="fact"><b>AUSENCIA → DDEATH</b>2000 ms</div>
+      </div>
+      <p class="muted chico">Valores por defecto (diccionario §5). El maestro se reconfigura en vivo desde el Dashboard de Node-RED (I-04); el Unit ID real se ve en cada trama.</p>
+    </section>
+
+    <section class="sec card">
+      <h2>Estructura genérica de una trama RTU</h2>
+      <p class="lead">No hay bytes de inicio ni de fin: la trama la delimita un silencio de al menos 3,5 caracteres.</p>
+      <div class="frame">
+        <div class="fseg sil"><b>Silencio</b><span>≥ t3,5 (4,01 ms)</span></div>
+        <div class="fseg addr"><b>Dirección</b><span>1 byte · Unit ID 1–247 (0 = difusión)</span></div>
+        <div class="fseg fc"><b>Función</b><span>1 byte · qué hacer (FC). Bit 7 en 1 = excepción</span></div>
+        <div class="fseg data"><b>Datos</b><span>0 a 252 bytes · dirección, cantidad, valores, o cantidad de bytes + datos</span></div>
+        <div class="fseg crc"><b>CRC-16</b><span>2 bytes · byte bajo primero</span></div>
+        <div class="fseg sil"><b>Silencio</b><span>≥ t3,5</span></div>
+      </div>
+      <div class="legend"><span><span class="by addr">01</span>dirección</span><span><span class="by fc">03</span>función</span><span><span class="by data">00 00</span>datos: dirección o valor</span><span><span class="by data2">00 01</span>datos: cantidad o conteo</span><span><span class="by crc">84 0A</span>CRC</span></div>
+    </section>
+
+    <div class="sec grid2">
+      <section class="card">
+        <h2>Modelo de datos MODBus</h2>
+        <p class="lead">Cuatro tablas, cada una con su tipo de dato, su acceso y sus funciones. El dispositivo 1 usa el offset 0 de cada tabla.</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Tabla</th><th>Ref.</th><th>Dato</th><th>Acceso</th><th>FC</th><th>Variable</th></tr></thead>
+          <tbody>
+            <tr><td><b>Coils</b></td><td class="mono">0xxxx</td><td>1 bit</td><td>Lectura/escritura</td><td class="mono">01 · 05</td><td>Outputs/LedDigital</td></tr>
+            <tr><td><b>Discrete Inputs</b></td><td class="mono">1xxxx</td><td>1 bit</td><td>Solo lectura</td><td class="mono">02</td><td>Inputs/Pulsador</td></tr>
+            <tr><td><b>Input Registers</b></td><td class="mono">3xxxx</td><td>16 bits</td><td>Solo lectura</td><td class="mono">04</td><td>Inputs/Potenciometro</td></tr>
+            <tr><td><b>Holding Registers</b></td><td class="mono">4xxxx</td><td>16 bits</td><td>Lectura/escritura</td><td class="mono">03 · 06</td><td>Outputs/LedPWM</td></tr>
+          </tbody></table></div>
+      </section>
+      <section class="card">
+        <h2>Funciones asociadas</h2>
+        <p class="lead">Las funciones que usa el sistema y el formato de sus datos (entre paréntesis, bytes).</p>
+        <div class="tbl"><table>
+          <thead><tr><th>FC</th><th>Nombre</th><th>Datos de la petición</th><th>Datos de la respuesta</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">01</td><td>Read Coils</td><td>dirección (2) · cantidad (2)</td><td>nº de bytes (1) · bits</td></tr>
+            <tr><td class="mono">02</td><td>Read Discrete Inputs</td><td>dirección (2) · cantidad (2)</td><td>nº de bytes (1) · bits</td></tr>
+            <tr><td class="mono">03</td><td>Read Holding Registers</td><td>dirección (2) · cantidad (2)</td><td>nº de bytes (1) · registros</td></tr>
+            <tr><td class="mono">04</td><td>Read Input Registers</td><td>dirección (2) · cantidad (2)</td><td>nº de bytes (1) · registros</td></tr>
+            <tr><td class="mono">05</td><td>Write Single Coil</td><td>dirección (2) · FF00 = ON, 0000 = OFF</td><td>eco de la petición</td></tr>
+            <tr><td class="mono">06</td><td>Write Single Register</td><td>dirección (2) · valor (2)</td><td>eco de la petición</td></tr>
+            <tr><td class="mono">8x</td><td>Excepción</td><td>—</td><td>código (1): 01 función · 02 dirección · 03 valor · 04 falla</td></tr>
+          </tbody></table></div>
+      </section>
+    </div>
+
+    <section class="sec card">
+      <h2>Mapa de direcciones del dispositivo 1</h2>
+      <p class="lead">Fuente de verdad: docs/diccionario-de-datos.md. El valor es el último confirmado por Sparkplug.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Variable</th><th>Señal física</th><th>Tabla</th><th>Ref.</th><th>Offset</th><th>FC lect. / escr.</th><th>Tipo</th><th>Rango</th><th>Valor</th></tr></thead>
+        <tbody id="mapa-modbus"></tbody></table></div>
+    </section>
+
+    <section class="sec split">
+      <div class="main card">
+        <div class="fila-t"><h2>Tramas en vivo</h2><span class="badge info" id="tramas-fuente">esperando NDATA</span></div>
+        <p class="lead">Última petición y respuesta del maestro, publicadas por el Edge Node una vez por segundo (Status/MODBUS/UltimaTrama*, ADR-028). El maestro hace unas 16 por segundo: acá se ve <b>una muestra</b>, no todas.</p>
+        <div class="feed" id="tramas-lista"></div>
+      </div>
+      <div class="side card">
+        <h2>Decodificación</h2>
+        <p class="lead" id="trama-titulo">Elegí una transacción.</p>
+        <h3>Petición (TX · maestro → esclavo)</h3>
+        <div class="bytes" id="trama-tx"></div>
+        <div class="tbl tbl-sep"><table><tbody id="trama-tx-filas"></tbody></table></div>
+        <h3 class="sub">Respuesta (RX · esclavo → maestro)</h3>
+        <div class="bytes" id="trama-rx"></div>
+        <div class="tbl tbl-sep"><table><tbody id="trama-rx-filas"></tbody></table></div>
+        <p id="trama-sin-rx" class="badge err multilinea" hidden>Sin respuesta dentro del tiempo de espera → TIMEOUT</p>
+      </div>
+    </section>
+
+    <!-- CRC: la logica, sin codigo -->
+    <section class="sec card" aria-labelledby="h-crc">
+      <h2 id="h-crc">Cómo se calcula y se verifica el CRC-16</h2>
+      <p class="lead">El CRC (verificación por redundancia cíclica) es un resumen de 16 bits de la trama. El emisor lo calcula y lo agrega al final; el receptor lo vuelve a calcular y compara. Si un solo bit cambió en el cable, el resultado no coincide y la trama se descarta.</p>
+      <div class="split">
+        <div class="side">
+          <h3>El algoritmo</h3>
+          <ol class="lista">
+            <li>Se parte de un registro de 16 bits cargado con <b>0xFFFF</b>.</li>
+            <li>Para cada byte de la trama (dirección, función y datos, sin el CRC): se hace <b>XOR</b> del byte con la parte baja del registro.</li>
+            <li>Se repite <b>8 veces</b>, una por bit: se mira el bit menos significativo, se desplaza el registro un lugar a la derecha y, <b>si ese bit era 1</b>, se hace XOR con <b>0xA001</b> (el polinomio 0x8005 con sus bits invertidos).</li>
+            <li>Al terminar todos los bytes, el registro es el CRC. Viaja <b>byte bajo primero</b>: 0x0A84 se transmite como <span class="mono">84 0A</span>.</li>
+            <li><b>Verificación:</b> el receptor recalcula sobre lo que llegó. Propiedad útil: el CRC calculado sobre la trama <b>entera</b>, datos más CRC, da <b>0x0000</b> si no hubo errores.</li>
+          </ol>
+          <h3 class="sub">Dónde está implementado</h3>
+          <div class="tbl"><table><tbody>
+            <tr><td><b>Maestro</b></td><td>Raspberry Pi · edge-nodered/lib/modbus.js: calcula el CRC de cada petición y verifica el de cada respuesta</td></tr>
+            <tr><td><b>Esclavo</b></td><td>ESP32 · firmware/esclavo-modbus/lib/modbus_slave/crc16.py: verifica cada petición y calcula el de la respuesta</td></tr>
+            <tr><td><b>Pruebas</b></td><td>Los dos se prueban con los mismos vectores fijos (golden), calculados con una implementación independiente</td></tr>
+            <tr><td><b>Esta página</b></td><td>Lo recalcula solo para explicarlo y verificar la trama que llegó por Sparkplug: no participa del enlace</td></tr>
+          </tbody></table></div>
+        </div>
+        <div class="main">
+          <h3>Cálculo paso a paso sobre la última petición real</h3>
+          <div class="bytes" id="crc-trama"></div>
+          <div class="tbl tbl-sep"><table>
+            <thead><tr><th>#</th><th>Byte</th><th>Registro antes</th><th>Tras el XOR</th><th>Tras 8 desplazamientos</th></tr></thead>
+            <tbody id="crc-pasos"></tbody></table></div>
+          <p class="resultado" id="crc-resultado">—</p>
+          <details class="detalle">
+            <summary>Ver los 8 desplazamientos del primer byte</summary>
+            <div class="tbl tbl-sep"><table>
+              <thead><tr><th>Paso</th><th>Bit menos significativo</th><th>Acción</th><th>Registro</th></tr></thead>
+              <tbody id="crc-detalle"></tbody></table></div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec card">
+      <h2>Estadística de la capa MODBus</h2>
+      <div class="grid4" id="mb-stats"></div>
+    </section>
+  </div>
+
+  <!-- ============================ OPC UA ============================ -->
+  <div id="p-opcua" class="panel" role="tabpanel" aria-labelledby="t-opcua" hidden>
+    <section class="sec card">
+      <h2>OPC UA · borde (nivel 2 → 3)</h2>
+      <p class="lead">Cliente-servidor sobre un cable Ethernet directo. El servidor (Raspberry Pi) expone el mismo paquete de datos que MODBus, con su estado; el cliente (Edge Node) se suscribe y escribe los comandos.</p>
+      <div class="facts">
+        <div class="fact"><b>SERVIDOR</b>node-opcua 2.160.0 · Node-RED</div>
+        <div class="fact"><b>ENDPOINT</b><span class="mono">opc.tcp://192.168.10.1:4840</span></div>
+        <div class="fact"><b>CLIENTE</b>asyncua · Edge Node (dispositivo 3)</div>
+        <div class="fact"><b>SEGURIDAD</b>Basic256Sha256 · SignAndEncrypt</div>
+        <div class="fact"><b>USUARIO</b>operador (escribe) · anónimo (solo lee)</div>
+        <div class="fact"><b>NAMESPACE</b>ns=1 · urn:unraf:pdci:t3</div>
+        <div class="fact"><b>SUSCRIPCIÓN</b>Publishing 100 ms · KeepAlive 10 · Lifetime 300</div>
+      </div>
+    </section>
+
+    <section class="sec split">
+      <div class="side card">
+        <h2>Espacio de direcciones</h2>
+        <p class="lead">Modelo de información del servidor. Elegí un nodo para ver sus atributos.</p>
+        <div class="tree" id="ua-arbol"></div>
+      </div>
+      <div class="main card">
+        <h2>Atributos del nodo</h2>
+        <p class="lead" id="ua-attr-lead">—</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Atributo</th><th>Valor</th></tr></thead>
+          <tbody id="ua-attrs"></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="sec card">
+      <h2>Nodos variables</h2>
+      <p class="lead">Los 14 nodos del servidor, verificados con tools/verificar_opcua.js. Los de Outputs se escriben solo con el usuario operador. Los valores llegan por las métricas Sparkplug del mismo nombre.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>NodeId</th><th>DataType</th><th>AccessLevel</th><th>EURange</th><th>Valor</th></tr></thead>
+        <tbody id="ua-nodos"></tbody></table></div>
+    </section>
+
+    <section class="sec card">
+      <h2>Estructura genérica de un mensaje OPC UA binario</h2>
+      <p class="lead">UA TCP + Secure Conversation. En SignAndEncrypt solo el encabezado viaja en claro: el resto va cifrado (AES-256-CBC) y firmado.</p>
+      <div class="frame">
+        <div class="fseg hdr"><b>Encabezado</b><span>MessageType 3 B (HEL, ACK, OPN, MSG, CLO, ERR) · ChunkType 1 B (F, C, A) · MessageSize 4 B</span></div>
+        <div class="fseg sch"><b>Canal seguro</b><span>SecureChannelId 4 B · TokenId 4 B</span></div>
+        <div class="fseg seqh"><b>Secuencia</b><span>SequenceNumber 4 B · RequestId 4 B</span></div>
+        <div class="fseg body"><b>Cuerpo</b><span>TypeId (NodeId del servicio, p. ej. 673 = WriteRequest) · RequestHeader · parámetros</span></div>
+        <div class="fseg sig"><b>Relleno + firma</b><span>Padding · firma HMAC-SHA256</span></div>
+      </div>
+      <div class="enc">En SignAndEncrypt, desde «Secuencia» hasta «Relleno + firma» va cifrado: Wireshark ve el tamaño, no el contenido. Por eso esta página no muestra tramas OPC UA capturadas: la sesión está entre las placas y va cifrada. La captura real se hace con Wireshark en el cable (puesta en marcha 09 §3).</div>
+    </section>
+
+    <div class="sec grid2">
+      <section class="card">
+        <h2>Servicios que usa el sistema</h2>
+        <div class="tbl"><table>
+          <thead><tr><th>Servicio</th><th>TypeId</th><th>Para qué</th></tr></thead>
+          <tbody>
+            <tr><td>OpenSecureChannel</td><td class="mono">446</td><td>Negocia las claves del canal (mensaje OPN)</td></tr>
+            <tr><td>CreateSession · ActivateSession</td><td class="mono">461 · 467</td><td>Sesión con el usuario operador</td></tr>
+            <tr><td>CreateSubscription</td><td class="mono">787</td><td>Publishing 100 ms, KeepAlive 10, Lifetime 300</td></tr>
+            <tr><td>CreateMonitoredItems</td><td class="mono">751</td><td>13 ítems · Sampling 100 ms · Queue 1</td></tr>
+            <tr><td>Publish</td><td class="mono">826 · 829</td><td>Notificaciones de cambio (DataChange)</td></tr>
+            <tr><td>Write</td><td class="mono">673 · 676</td><td>Comandos sobre Outputs; responde con el eco MODBus (ADR-015)</td></tr>
+            <tr><td>Read</td><td class="mono">631 · 634</td><td>Lecturas puntuales y verificación</td></tr>
+          </tbody></table></div>
+      </section>
+      <section class="card">
+        <h2>Secuencia de una sesión</h2>
+        <ol class="steps">
+          <li class="step ok"><span class="n">1</span><div class="b"><span class="t">HEL → ACK</span><div class="d">Acuerdo de tamaños de buffer, sin seguridad.</div></div></li>
+          <li class="step ok"><span class="n">2</span><div class="b"><span class="t">OPN</span><div class="d">OpenSecureChannel con certificados X.509 de los dos lados (confianza mutua).</div></div></li>
+          <li class="step ok"><span class="n">3</span><div class="b"><span class="t">CreateSession + ActivateSession</span><div class="d">Identidad del usuario (operador), cifrada.</div></div></li>
+          <li class="step ok"><span class="n">4</span><div class="b"><span class="t">CreateSubscription + CreateMonitoredItems</span><div class="d">El servidor avisa solo cuando algo cambia.</div></div></li>
+          <li class="step run"><span class="n">5</span><div class="b"><span class="t">Publish (ciclo) · Write (comandos)</span><div class="d">Régimen permanente mientras la sesión está activa.</div></div></li>
+          <li class="step"><span class="n">6</span><div class="b"><span class="t">CLO</span><div class="d">Cierre ordenado del canal.</div></div></li>
+        </ol>
+      </section>
+    </div>
+
+    <section class="sec card">
+      <h2>Notificaciones en vivo</h2>
+      <p class="lead">Cambios de valor que el servidor notificó al Edge Node, <b>reconstruidos</b> desde las métricas Sparkplug, que llevan el mismo nombre, el mismo tipo y el SourceTimestamp del servidor.</p>
+      <ol class="eventos" id="ua-notifs"></ol>
+    </section>
+  </div>
+
+  <!-- ============================ SPARKPLUG ============================ -->
+  <div id="p-sparkplug" class="panel" role="tabpanel" aria-labelledby="t-sparkplug" hidden>
+    <section class="sec card">
+      <h2>MQTT · Sparkplug B · nube (nivel 3 → 4)</h2>
+      <p class="lead">Publicación por excepción a través de un broker en internet (I-03). El payload es binario, Protobuf según sparkplug_b.proto (I-02); solo STATE va en JSON.</p>
+      <div class="facts">
+        <div class="fact"><b>BROKER</b><span id="spb-broker">—</span></div>
+        <div class="fact"><b>EDGE NODE</b>MQTT sobre TLS · 8883</div>
+        <div class="fact"><b>ESTA PÁGINA</b>MQTT sobre WebSocket con TLS · 8084</div>
+        <div class="fact"><b>NAMESPACE</b>spBv1.0</div>
+        <div class="fact"><b>SESIÓN</b>bdSeq <span id="spb-f-bdseq">—</span> · seq <span id="spb-f-seq">—</span></div>
+      </div>
+    </section>
+
+    <section class="sec card">
+      <h2>Estructura de un tópico</h2>
+      <div class="frame">
+        <div class="fseg hdr"><b>spBv1.0</b><span>namespace (fijo)</span></div>
+        <div class="fseg sch"><b id="top-grupo">grupo</b><span>group_id</span></div>
+        <div class="fseg fc"><b>NBIRTH · DDATA · …</b><span>message_type</span></div>
+        <div class="fseg seqh"><b id="top-nodo">nodo</b><span>edge_node_id (dispositivo 3)</span></div>
+        <div class="fseg body"><b id="top-disp">dispositivo</b><span>device_id (dispositivo 1) · solo en D*</span></div>
+      </div>
+      <p class="lead sep">STATE es distinto: <span class="mono" id="top-state">spBv1.0/STATE/…</span>, retenido, con «offline» como Last Will (I-08).</p>
+    </section>
+
+    <section class="sec split">
+      <div class="main card">
+        <h2>Mensajes en vivo</h2>
+        <p class="lead">Lo que llegó del broker, incluidos los comandos que publicó esta página. Elegí uno para ver su payload byte por byte.</p>
+        <div class="feed" id="spb-lista"></div>
+      </div>
+      <div class="side card">
+        <h2>Payload decodificado</h2>
+        <p class="lead mono rompe" id="spb-topico">—</p>
+        <div class="bytes" id="spb-bytes"></div>
+        <div class="legend"><span><span class="by tag">08</span>tag (campo + tipo de cable)</span><span><span class="by ts">..</span>timestamp</span><span><span class="by alias">..</span>alias</span><span><span class="by dt">..</span>datatype</span><span><span class="by val">..</span>valor</span><span><span class="by seq">..</span>seq</span></div>
+        <div class="tbl tbl-sep"><table><tbody id="spb-filas"></tbody></table></div>
+        <p class="age" id="spb-tam"></p>
+      </div>
+    </section>
+
+    <div class="sec grid2">
+      <section class="card">
+        <h2>Tipos de mensaje</h2>
+        <div class="tbl"><table>
+          <thead><tr><th>Tipo</th><th>Quién lo publica</th><th>Cuándo</th><th>Recibidos</th></tr></thead>
+          <tbody id="spb-tipos"></tbody></table></div>
+      </section>
+      <section class="card">
+        <h2>Métricas</h2>
+        <p class="lead">En los BIRTH viajan nombre y alias; en DATA y CMD, solo el alias.</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Métrica</th><th>Alias</th><th>Tipo</th><th>Valor</th></tr></thead>
+          <tbody id="spb-metricas"></tbody></table></div>
+      </section>
+    </div>
+
+    <section class="sec card">
+      <h2>Usuarios del broker y permisos</h2>
+      <p class="lead">Mínimo privilegio por tópico (ADR-005, ADR-027): todo lo no permitido se deniega.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Usuario</th><th>Publica</th><th>Se suscribe</th></tr></thead>
+        <tbody>
+          <tr><td><b>edge_node</b></td><td>N* y D* de su nodo</td><td>Sus NCMD y DCMD · STATE</td></tr>
+          <tr><td><b>Host Application</b> (esta página)</td><td>Su STATE · NCMD · DCMD</td><td>Todo el grupo · su STATE</td></tr>
+          <tr><td><b>observador</b></td><td>Nada</td><td>spBv1.0/# (solo lectura)</td></tr>
+        </tbody></table></div>
+    </section>
+  </div>
+
+  <!-- ============================ GUÍA ============================ -->
+  <div id="p-guia" class="panel" role="tabpanel" aria-labelledby="t-guia" hidden>
+    <section class="sec card">
+      <h2>Dos tableros, dos niveles</h2>
+      <p class="lead">El sistema tiene dos interfaces. No compiten: cada una está en un nivel distinto de la arquitectura y sirve a otra persona.</p>
+      <div class="tbl cmp"><table>
+        <thead><tr><th>Aspecto</th><th>Host Application Sparkplug B <span class="here">ESTÁ ACÁ</span></th><th>Dashboard de Node-RED</th></tr></thead>
+        <tbody>
+          <tr><td><b>Qué es</b></td><td>La aplicación del usuario final (consigna 3)</td><td>La consola de ingeniería del dispositivo 2 (consigna 1)</td></tr>
+          <tr><td><b>Nivel</b></td><td>4 · usuario (red IT, internet)</td><td>2 · borde (red de planta, OT)</td></tr>
+          <tr><td><b>Dónde corre</b></td><td>En el navegador; se conecta al broker en la nube</td><td>En la Raspberry Pi; se abre por túnel SSH</td></tr>
+          <tr><td><b>De dónde salen los datos</b></td><td>De mensajes Sparkplug B que recorrieron toda la cadena</td><td>Directo del maestro MODBus, sin OPC UA ni nube</td></tr>
+          <tr><td><b>Qué muestra</b></td><td>E/S del dispositivo 1, estado de las cuatro capas, modelo MODBus y OPC UA, tramas, mensajes y tiempos</td><td>Contadores y tramas MODBus, configuración del maestro, lista de confianza OPC UA</td></tr>
+          <tr><td><b>Qué permite hacer</b></td><td>Operar: LED digital y PWM, con confirmación</td><td>Configurar: Unit ID, baudios, mapa y descubrimiento de un esclavo desconocido (I-04)</td></tr>
+          <tr><td><b>Quién accede</b></td><td>Quien tenga usuario del broker, desde PC o celular</td><td>Solo quien tiene la clave SSH de la placa</td></tr>
+          <tr><td><b>Si se corta internet</b></td><td>Pasa a OBSOLETO y se recupera sola al volver (I-10)</td><td>Sigue funcionando: la planta no depende de la nube</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section class="sec card">
+      <h2>Dónde está cada cosa</h2>
+      <div class="niveles">
+        <div class="lv"><span class="ln">Nivel 4</span><div><b>Host Application (esta página)</b> <span class="here">ESTÁ ACÁ</span><div class="age">Navegador en PC o celular · MQTT sobre WSS 8084</div></div></div>
+        <div class="lv"><span class="ln">Nube</span><div><b>Broker MQTT (EMQX Cloud)</b><div class="age">Distribuye los mensajes Sparkplug B · TLS</div></div></div>
+        <div class="lv"><span class="ln">Nivel 3</span><div><b>Dispositivo 3 · Notebook</b><div class="age">Cliente OPC UA + Edge Node Sparkplug B (Python)</div></div></div>
+        <div class="lv"><span class="ln">Nivel 2</span><div><b>Dispositivo 2 · Raspberry Pi</b> <span class="here verde">DASHBOARD NODE-RED</span><div class="age">Maestro MODBus + servidor OPC UA</div></div></div>
+        <div class="lv"><span class="ln">Nivel 0/1</span><div><b>Dispositivo 1 · ESP32</b><div class="age">Esclavo MODBus RTU · pulsador, potenciómetro y dos LED</div></div></div>
+      </div>
+    </section>
+
+    <section class="sec card">
+      <h2>Qué significa cada estado</h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Estado</th><th>Capa</th><th>Significado</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge ok">DONE</span></td><td>MODBus · OPC UA</td><td>La última transacción o sesión fue correcta</td></tr>
+          <tr><td><span class="badge warn">CRC ERROR</span></td><td>MODBus</td><td>Llegó una respuesta, pero corrupta o incompleta</td></tr>
+          <tr><td><span class="badge err">DEVICE NOT REACHED</span></td><td>MODBus</td><td>El esclavo no responde hace más de 2 s → DDEATH</td></tr>
+          <tr><td><span class="badge ok">EN LÍNEA</span></td><td>Sparkplug B</td><td>Hay un BIRTH vigente y los datos están al día</td></tr>
+          <tr><td><span class="badge stale">OBSOLETO</span></td><td>Sparkplug B</td><td>Llegó un DEATH: el último valor ya no es confiable</td></tr>
+          <tr><td><span class="badge stale">DESCONOCIDO</span></td><td>Sparkplug B</td><td>Todavía no llegó un BIRTH en esta sesión</td></tr>
+          <tr><td><span class="badge info">ENVIADO → CONFIRMADO</span></td><td>Comando</td><td>El DCMD salió; el DDATA del dispositivo confirma el valor</td></tr>
+        </tbody></table></div>
+    </section>
+  </div>
+</div>
+</div>
+
+<script src="vendor/mqtt.min.js"></script>
+<script src="vendor/protobuf.min.js"></script>
+<script src="config.js"></script>
+<script src="sparkplug.js"></script>
+<script src="tramas.js"></script>
+<script src="modelo.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

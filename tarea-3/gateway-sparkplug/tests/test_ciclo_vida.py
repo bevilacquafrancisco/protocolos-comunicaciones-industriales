@@ -106,6 +106,25 @@ def test_contadores_agrupados_en_un_ndata_por_periodo(nucleo, metricas, reloj):
     assert len(nucleo.tick()) == 1
 
 
+def test_tramas_de_diagnostico_agrupadas_con_los_contadores(nucleo, metricas, reloj):
+    # ADR-028: la ultima trama TX/RX cambia en CADA transaccion (16/s). Sin agrupar, cada
+    # notificacion OPC UA seria un NDATA; agrupada, viaja en el NDATA periodico (ADR-021),
+    # y el par TX/RX que llega es el ultimo, consistente.
+    nucleo_en_linea(nucleo)
+    reloj.avanzar(5000)
+    assert nucleo.tick() == []
+    for tx, rx in [("01 02 00 00 00 01 B9 CA", "01 02 01 00 A1 88"), ("01 03 00 00 00 01 84 0A", "01 03 02 00 00 B8 44")]:
+        assert nucleo.al_dato("Status/MODBUS/UltimaTramaTx", tx, None, True) == []
+        assert nucleo.al_dato("Status/MODBUS/UltimaTramaRx", rx, None, True) == []
+    assert nucleo.al_dato("Status/MODBUS/LatenciaMs", 26, None, True) == []
+    [ndata] = nucleo.tick()
+    assert metricas_de(ndata, metricas) == {"Status/MODBUS/UltimaTramaTx": "01 03 00 00 00 01 84 0A",
+                                            "Status/MODBUS/UltimaTramaRx": "01 03 02 00 00 B8 44",
+                                            "Status/MODBUS/LatenciaMs": 26}
+    # Un cambio de ESTADO sigue saliendo al instante (es un evento, no diagnostico)
+    assert len(nucleo.al_dato("Status/MODBUS/Estado", "CRC ERROR", None, True)) == 1
+
+
 def test_seq_compartido_por_ndata_y_ddata_envuelve_255_a_0(nucleo):
     salida = nucleo_en_linea(nucleo)
     for i in range(600):

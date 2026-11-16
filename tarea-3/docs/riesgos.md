@@ -27,7 +27,7 @@ Sin disparador medible, un riesgo no está gestionado.
 | R-11 | Citar números de la T2 que no tienen evidencia en el repositorio | 2 | 2 | 4 | Informe |
 | R-13 | ~~Biblioteca Sparkplug B para Python~~ **Cerrado 2026-11-12** (contingencia adoptada) | — | — | 0 | — |
 | R-03 | `node-opcua` no corre en la imagen de la Raspberry Pi del laboratorio | 1 | 3 | 3 | F4 |
-| R-08 | Credenciales MQTT expuestas en el navegador; acotadas con ACL por usuario (ADR-027) | 3 | 1 | 3 | Nube |
+| R-08 | Credenciales MQTT de la web: ya no están en la página (ADR-028); ACL por usuario (ADR-027) | 1 | 1 | 1 | Nube |
 | R-12 | Restaurar mal la microSD del laboratorio | 1 | 3 | 3 | F3-F4 |
 | R-15 | Erratas de la consigna mal interpretadas (nombre de archivo, criterios) | 2 | 1 | 2 | Entrega |
 | R-16 | `serial in` deja de recibir tras reabrir el puerto con `serial control` | 2 | 3 | **6** | F3-banco |
@@ -183,7 +183,12 @@ Sin disparador medible, un riesgo no está gestionado.
 
 ### R-08 — Credenciales MQTT en el navegador
 
-**Actualizado el 2026-11-16 (ADR-027).** El broker del banco es EMQX Cloud Serverless, con
+**Actualizado el 2026-11-16 (ADR-028).** La página ya no lleva la clave en `config.js`: la pide al
+entrar y la guarda solo en memoria, con un usuario del broker por persona. La causa original del
+riesgo, una clave pública de hecho, desaparece. Queda el riesgo normal de cualquier contraseña
+(robo o reutilización), acotado por el ACL. Baja a P = 1, I = 1.
+
+**Antes, 2026-11-16 (ADR-027).** El broker del banco es EMQX Cloud Serverless, con
 autorización por usuario: se configura la tabla del ADR-005 completa. Con la clave de la web ya
 **no** se puede publicar un NBIRTH falso (perfil `minimo` de `test_permisos_broker.py`). Baja a
 I = 1: con esa clave se puede leer el proceso y accionar los dos LED, dentro de los rangos que

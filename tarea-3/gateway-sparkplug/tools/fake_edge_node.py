@@ -15,7 +15,9 @@ asi la web se prueba contra el protocolo exacto que vera en la demo (mensajes si
 contenido, reales en la forma).
 
 Datos sinteticos: potenciometro en rampa triangular de 8 s, pulsador que cambia cada 4 s,
-Status/MODBUS/OK +1 cada 250 ms (como el sondeo del maestro). Las escrituras (DCMD) se
+Status/MODBUS/OK +1 cada 250 ms (como el sondeo del maestro), y la ultima trama TX/RX con su
+latencia (diagnostico, ADR-028): las cuatro lecturas del ciclo FC 02, 04, 01 y 03 con CRC-16
+valido, FC 05/06 al escribir, y RX vacia con DEVICE NOT REACHED. Las escrituras (DCMD) se
 "confirman" 50 ms despues, como el eco MODBus (ADR-015), salvo que se pida lo contrario.
 
 Comandos por la entrada estandar (para provocar cada situacion que la web debe mostrar):
@@ -54,6 +56,52 @@ from sparkplug_edge_node import ConfigMqtt, EdgeNode, RegistroMensajes, cargar_e
 _log = logging.getLogger("fake")
 
 
+def _crc16(datos: bytes) -> bytes:
+    """
+    CRC-16 MODBus (polinomio reflejado 0xA001, inicio 0xFFFF), byte bajo primero. Solo para que las
+    tramas SINTETICAS sean validas: el CRC del sistema es el del maestro (edge-nodered/lib/modbus.js)
+    y el del esclavo (firmware/.../crc16.py), I-01.
+
+    Parametros:
+        datos (bytes): trama sin CRC.
+    Retorna:
+        bytes: los dos bytes del CRC, en el orden en que viajan.
+    """
+    crc = 0xFFFF
+    for b in datos:
+        crc ^= b
+        for _ in range(8):
+            crc = (crc >> 1) ^ 0xA001 if crc & 1 else crc >> 1
+    return bytes([crc & 0xFF, crc >> 8])
+
+
+def _hex(datos: bytes) -> str:
+    return " ".join(f"{b:02X}" for b in datos)
+
+
+def trama_sintetica(fc: int, valor: int, responde: bool = True) -> tuple[str, str]:
+    """
+    Par TX/RX de una transaccion con el esclavo 1, direccion 0 (el mapa del diccionario §1).
+
+    Parametros:
+        fc (int): 1-4 lectura de 1 elemento; 5/6 escritura (la respuesta es el eco).
+        valor (int): valor leido (o escrito).
+        responde (bool): False = TIMEOUT (RX vacia).
+    Retorna:
+        tuple[str, str]: (TX, RX) en hexadecimal separado por espacios, como los nodos OPC UA.
+    """
+    if fc in (5, 6):
+        cuerpo = bytes([1, fc, 0, 0]) + (bytes([0xFF if valor else 0, 0]) if fc == 5 else valor.to_bytes(2, "big"))
+        tx = cuerpo + _crc16(cuerpo)
+        return _hex(tx), _hex(tx) if responde else ""
+    pet = bytes([1, fc, 0, 0, 0, 1])
+    tx = pet + _crc16(pet)
+    if not responde:
+        return _hex(tx), ""
+    resp = bytes([1, fc, 1, 1 if valor else 0]) if fc in (1, 2) else bytes([1, fc, 2]) + int(valor).to_bytes(2, "big")
+    return _hex(tx), _hex(resp + _crc16(resp))
+
+
 class OpcuaFalso:
     """Sustituto del ClienteOpcua: misma interfaz (ejecutar, escribir) y mismos callbacks."""
 
@@ -63,7 +111,10 @@ class OpcuaFalso:
         self._valores = {"Inputs/Pulsador": False, "Inputs/Potenciometro": 0, "Outputs/LedDigital": False,
                          "Outputs/LedPWM": 0, "Inputs/Potenciometro_pct": 0.0, "Status/MODBUS/Estado": "DONE",
                          "Status/MODBUS/OK": 0, "Status/MODBUS/CRC_ERROR": 0, "Status/MODBUS/TIMEOUT": 0,
-                         "Status/MODBUS/EXCEPTION": 0}
+                         "Status/MODBUS/EXCEPTION": 0, "Status/MODBUS/UltimaTramaTx": "",
+                         "Status/MODBUS/UltimaTramaRx": "", "Status/MODBUS/LatenciaMs": 0}
+        self._fc_ciclo = (2, 4, 1, 3)
+        self._indice = 0
         self._opcua_ok = True
         self.escrituras_ok = True
         self.pote_auto = True
@@ -82,6 +133,14 @@ class OpcuaFalso:
             for nombre, valor in self._valores.items():       # notificacion inicial de la sesion nueva
                 self._edge.al_dato(nombre, valor, spb.ahora_ms(), True)
 
+    def _transaccion(self, fc: int, valor: int, responde: bool = True):
+        """Publica la ultima trama como lo hace el maestro en Status.MODBUS.UltimaTrama* (ADR-028)."""
+        tx, rx = trama_sintetica(fc, valor, responde)
+        self.fijar("Status/MODBUS/UltimaTramaTx", tx)
+        self.fijar("Status/MODBUS/UltimaTramaRx", rx)
+        if responde:
+            self.fijar("Status/MODBUS/LatenciaMs", 22 + (self._indice * 7) % 9)
+
     async def ejecutar(self):
         self.opcua(True)
         t0 = time.monotonic()
@@ -92,6 +151,11 @@ class OpcuaFalso:
             t = time.monotonic() - t0
             if self._valores["Status/MODBUS/Estado"] != "DEVICE NOT REACHED":
                 self.fijar("Status/MODBUS/OK", self._valores["Status/MODBUS/OK"] + 1)
+                fc = self._fc_ciclo[self._indice % 4]
+                self._indice += 1
+                valores = {2: self._valores["Inputs/Pulsador"], 4: self._valores["Inputs/Potenciometro"],
+                           1: self._valores["Outputs/LedDigital"], 3: self._valores["Outputs/LedPWM"]}
+                self._transaccion(fc, int(valores[fc]))
                 if self.pote_auto:
                     fase = (t % 8) / 8
                     crudo = int(4095 * (2 * fase if fase < 0.5 else 2 - 2 * fase))
@@ -101,6 +165,7 @@ class OpcuaFalso:
                     self.fijar("Inputs/Pulsador", int(t // 4) % 2 == 1)
             else:
                 self.fijar("Status/MODBUS/TIMEOUT", self._valores["Status/MODBUS/TIMEOUT"] + 1)
+                self._transaccion(4, 0, responde=False)
 
     async def escribir(self, node_id, tipo, valor):
         nombre = self._metricas.por_node_id(node_id).nombre
@@ -109,6 +174,7 @@ class OpcuaFalso:
             return "BadNotConnected"
         if not self.escrituras_ok or self._valores["Status/MODBUS/Estado"] == "DEVICE NOT REACHED":
             return "BadCommunicationError"                          # el valor NO cambia (ADR-015)
+        self._transaccion(5 if nombre == "Outputs/LedDigital" else 6, int(valor))
         self.fijar(nombre, valor)
         return "Good"
 
