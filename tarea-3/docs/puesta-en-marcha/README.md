@@ -29,8 +29,8 @@ cumplir todas las consignas del TP integrador. Se parte de lo siguiente:
  Nivel 3           Notebook (dispositivo 3: cliente OPC UA + Edge Node Sparkplug B)
                           │  Ethernet 192.168.10.2/24  ·  Wi-Fi → internet
                           │  MQTT sobre TLS :8883
- Nube              Broker HiveMQ Cloud (Serverless)
-                          │  MQTT sobre WebSocket con TLS :8884
+ Nube              Broker EMQX Cloud (Serverless)
+                          │  MQTT sobre WebSocket con TLS :8084
  Nivel 4           Navegador de la notebook y del celular (Host Application)
 ```
 
@@ -41,7 +41,7 @@ cumplir todas las consignas del TP integrador. Se parte de lo siguiente:
 | Raspberry Pi 4 | `eth0` 192.168.10.1/24 (OPC UA) · `wlan0` por DHCP (SSH e instalación) · USB (adaptador RS-485) | Node-RED 4.1.16 + `edge-nodered` | 04, 05, 06 |
 | Notebook | Ethernet 192.168.10.2/24 (OPC UA) · Wi-Fi a internet | Python 3.11 + `gateway-sparkplug`, Node.js + `hmi-web`, Wireshark, MQTT Explorer | 01, 07, 08 |
 | Celular | Punto de acceso Wi-Fi (internet para la notebook y la Raspberry) y visor de la web | Navegador | 01, 08 |
-| Broker | En internet (I-03) | HiveMQ Cloud Serverless, con tres credenciales | 02 |
+| Broker | En internet (I-03) | EMQX Cloud Serverless, con tres credenciales y permisos por tópico | 02 |
 
 **Plan de red.**
 
@@ -92,9 +92,9 @@ es gratuito).
 
 | Secreto | Se crea en | Vive en | Lo lee |
 |---|---|---|---|
-| Clave del usuario MQTT `edge_node` | Consola de HiveMQ (02) | `tarea-3/.env` de la notebook | Edge Node |
-| Clave del usuario MQTT `host_app` | Consola de HiveMQ (02) | `hmi-web/config.js` (ignorado por git) | Navegador. **Es pública de hecho** (ADR-005, ADR-026) |
-| Clave del usuario MQTT `observador` | Consola de HiveMQ (02) | `tarea-3/.env` y MQTT Explorer | Observador, MQTT Explorer |
+| Clave del usuario MQTT `edge_node` | Consola de EMQX (02) | `tarea-3/.env` de la notebook | Edge Node |
+| Clave del usuario MQTT `host_app` | Consola de EMQX (02) | `hmi-web/config.js` (ignorado por git) | Navegador. **Es pública de hecho** (ADR-005, ADR-027) |
+| Clave del usuario MQTT `observador` | Consola de EMQX (02) | `tarea-3/.env` y MQTT Explorer | Observador, MQTT Explorer |
 | Clave del usuario OPC UA `operador` | La elige el equipo (05 §4) | Hash scrypt en `/etc/pdci-t3-nodered.env` (Raspberry); en claro en `tarea-3/.env` (notebook) | Servidor OPC UA (hash); Edge Node (clave) |
 | Clave privada SSH (solo para el TP) | Notebook (01 §3) | `C:\Users\<usuario>\.ssh\id_ed25519_pdci_t3` | Solo la notebook |
 | Claves privadas OPC UA | Se generan solas en el primer arranque | `~/.pdci-t3/opcua-pki` (Raspberry) y `gateway-sparkplug/pki` (notebook) | Servidor y cliente |

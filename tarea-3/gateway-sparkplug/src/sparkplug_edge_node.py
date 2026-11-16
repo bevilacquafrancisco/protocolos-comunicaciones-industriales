@@ -280,8 +280,8 @@ class EdgeNode:
             _, _, codigos = await self._esperar("suback", TIMEOUT_CONNACK_S)
             # SUBACK 0x80 = el broker no autoriza ese topico. NCMD y DCMD son obligatorios (sin ellos no
             # hay Rebirth ni comandos). STATE es OPCIONAL salvo con --esperar-host (Sparkplug 3.0 §5.3):
-            # un broker con un solo filtro por credencial (HiveMQ Cloud Serverless, ADR-026) puede no
-            # cubrirlo, y eso no debe impedir que el nodo publique.
+            # un broker con un solo filtro por credencial (ADR-026) puede no cubrirlo, y eso no debe
+            # impedir que el nodo publique. El broker del banco si lo autoriza (ADR-027).
             if codigos[0].is_failure or codigos[1].is_failure:
                 raise PermissionError(f"SUBACK rechazado para NCMD/DCMD: {[str(c) for c in codigos]}")
             if len(codigos) > 2 and codigos[2].is_failure:

@@ -23,7 +23,7 @@ PS> notepad config.js
 
 | Campo | Valor |
 |---|---|
-| `url` | `wss://<url-del-broker>:8884/mqtt`. Si la consola de HiveMQ muestra otra ruta de WebSocket (02 §2), usar esa |
+| `url` | `wss://<direccion-del-broker>:8084/mqtt` (02 §2) |
 | `usuario` / `clave` | `host_app` / su clave |
 | `grupo`, `nodo`, `dispositivo`, `hostId` | Los de la plantilla (diccionario §4) |
 
@@ -31,8 +31,8 @@ PS> notepad config.js
 
 - `config.js` está en `.gitignore`: verificar que **no** aparezca en `git status`.
 - Igual lo descarga el navegador, así que la clave de `host_app` es pública de hecho. El comentario de
-  `config.example.js` explica por qué esto es una mitigación y no una solución, y ADR-026 describe el
-  riesgo residual del plan gratuito.
+  `config.example.js` explica por qué esto es una mitigación y no una solución, y el ADR-027 describe los
+  permisos por tópico que acotan lo que se puede hacer con ella.
 
 ## 2. Servir la página
 
@@ -76,7 +76,7 @@ El NCMD #1 es normal: los BIRTH no se retienen, así que una página nueva pide 
 | ☐ | El registro dice `Comando Outputs/LedDigital = true CONFIRMADO (NNN ms)`. **Anotar NNN**: es la latencia del comando medida en el banco real, con la nube incluida (09 §6) |
 
 Si la tarjeta MQTT dice **CREDENCIALES RECHAZADAS**, revisar `usuario` y `clave`. Si queda en
-CONECTANDO, revisar la URL y la ruta del WebSocket (02 §5.1, puerto 8884).
+CONECTANDO, revisar la URL y la ruta del WebSocket (02 §5.1, puerto 8084).
 
 ## 4. Verificación en el celular
 

@@ -71,7 +71,7 @@ node tools/servir.js --lan     # http://<IP de la PC>:8080, para abrirla desde e
 
 La página no necesita `npm` para funcionar: `vendor/` está versionado.
 
-**Seguridad (ADR-005, R-08)**
+**Seguridad (ADR-005, ADR-027, R-08)**
 
 - `config.js` está en `.gitignore`, pero **el navegador lo descarga**: la clave del usuario
   `host_app` es pública de hecho. La mitigación es que ese usuario tenga permisos mínimos por
@@ -131,7 +131,7 @@ Recibe estos comandos por teclado:
 
 | # | Prueba | Criterio |
 |---|---|---|
-| W-1 | Contra el broker en la nube (WSS 8884) con el usuario `host_app` (ADR-026) | Conecta y opera. En HiveMQ Serverless este usuario **sí** puede publicar fuera de STATE, NCMD y DCMD, porque no hay ACL por tópico: es el riesgo residual documentado, y no un fallo de la prueba. Con `observador`, cualquier publicación **falla** |
+| W-1 | Contra el broker en la nube (WSS 8084) con el usuario `host_app` (ADR-027) | Conecta y opera. Con la clave de `host_app`, publicar en NBIRTH **no** llega a nadie (mínimo privilegio, puesta en marcha 02 §5.3). Con `observador`, cualquier publicación **falla** |
 | W-2 | En un celular real, por la red del aula o con datos móviles (R-06) | Se lee sin zoom y los controles responden |
 | W-3 | Cadena completa: ESP32 → Raspberry Pi → dispositivo 3 → nube → web | Pulsador y potenciómetro en vivo. El LED responde al conmutador (E2E-01 a E2E-04) |
 | W-4 | Cortar la red del dispositivo 3 | NDEATH a los ~15 s (keepalive 10 s × 1,5): todo OBSOLETO. Al volver, todo EN LÍNEA sin tocar la web (I-10) |

@@ -83,8 +83,9 @@ opcua INFO  [C3] suscripcion: PublishingInterval=100 ms MaxKeepAlive=10 Lifetime
 edge  INFO  Status/OPCUA/Estado = DONE
 ```
 
-Puede aparecer este aviso, que es **esperado** en HiveMQ Serverless (ADR-026): el permiso de
-`edge_node` cubre el grupo, pero no el STATE de la Host Application, que es opcional.
+Este aviso **no** debe aparecer: el permiso de `edge_node` incluye `spBv1.0/STATE/#` (02 §3.2).
+Si aparece, falta esa regla en la consola de EMQX. El Edge Node igual publica, porque STATE es
+opcional (ADR-026), pero no se entera de si la Host Application está en línea.
 
 ```
 edge  WARNING el broker no autoriza spBv1.0/STATE/HA01_WebDashboard: se sigue sin conocer el STATE de la Host Application

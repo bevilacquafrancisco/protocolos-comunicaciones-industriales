@@ -1,17 +1,17 @@
 """
-test_permisos_broker.py — el sistema con los permisos reales del broker (ADR-026).
-Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-14 · v1.0
+test_permisos_broker.py — el sistema con los permisos del broker (ADR-026, ADR-027).
+Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-14 · v1.1 (2026-11-16: perfiles renombrados)
 
-HiveMQ Cloud Serverless (el plan gratuito del banco) admite UN permiso con UN filtro por credencial.
-El broker de desarrollo reproduce ese perfil ('serverless') y el de minimo privilegio del ADR-005
-('minimo'), para probar dos cosas sin la nube:
+El broker del banco (EMQX Cloud Serverless, ADR-027) aplica el minimo privilegio del ADR-005: el
+perfil 'minimo'. El perfil 'un_filtro' reproduce un broker con UN permiso y UN filtro por credencial
+(HiveMQ Cloud Serverless, ADR-026, ya retirado). Con los dos se prueban dos cosas sin la nube:
 
 1. El Edge Node publica aunque el broker le rechace la suscripcion a STATE (opcional en Sparkplug
    3.0 salvo con --esperar-host). Antes de esta correccion, cualquier SUBACK 0x80 cortaba la conexion
    y el nodo no habria arrancado nunca contra el broker del banco.
 2. Que cambia en seguridad entre los dos perfiles: con 'minimo', la clave de la web (publica de
-   hecho, ADR-005) no puede publicar un NBIRTH falso; con 'serverless', si. Es el riesgo residual
-   documentado en el ADR-026.
+   hecho, ADR-005) no puede publicar un NBIRTH falso; con 'un_filtro', si. Es la diferencia de
+   riesgo entre el ADR-026 y el ADR-027.
 """
 
 import asyncio
@@ -54,7 +54,7 @@ def observar(b):
 
 @pytest.mark.asyncio
 async def test_edge_node_publica_con_un_solo_filtro_por_credencial(tmp_path, metricas):
-    b = broker(tmp_path, "serverless")
+    b = broker(tmp_path, "un_filtro")
     servidor = await ServidorPrueba(metricas, 48500 + random.randint(0, 300)).iniciar()
     obs, c_obs = observar(b)
     edge = lanzar_edge(tmp_path, b, servidor)
@@ -71,7 +71,7 @@ async def test_edge_node_publica_con_un_solo_filtro_por_credencial(tmp_path, met
         b.detener()
 
 
-@pytest.mark.parametrize("perfil,nbirth_falso_llega", [("serverless", True), ("minimo", False)])
+@pytest.mark.parametrize("perfil,nbirth_falso_llega", [("un_filtro", True), ("minimo", False)])
 def test_clave_de_la_web_y_nbirth_falso(tmp_path, perfil, nbirth_falso_llega):
     b = broker(tmp_path, perfil)
     obs, c_obs = observar(b)

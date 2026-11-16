@@ -13,7 +13,7 @@ El dispositivo tiene dos piezas:
 a punta contra Node-RED, el servidor OPC UA en SignAndEncrypt y el simulador del esclavo. Quedan
 dos cosas pendientes, y son manuales (§8):
 
-- la corrida contra el **broker en la nube** (necesita la cuenta y los usuarios del ADR-005);
+- la corrida contra el **broker en la nube** (necesita la cuenta y los usuarios del ADR-005, en EMQX: ADR-027);
 - la verificación con **MQTT Explorer**.
 
 ---
@@ -32,7 +32,7 @@ dos cosas pendientes, y son manuales (§8):
 | `tools/traer_certificado_servidor.py` | Trae el certificado del servidor OPC UA. Lo guarda solo si la huella coincide con la del panel |
 | `tools/observador_sparkplug.py` | Suscriptor de solo lectura. Decodifica, **verifica `seq` y `bdSeq`** y archiva en JSONL |
 | `tools/host_comandos.py` | NCMD Rebirth y DCMD, como los envía la web |
-| `tools/broker_dev.py` | Broker de **desarrollo** (amqtt) con TLS, usuarios, un WebSocket opcional para la web, y `--acl serverless` o `--acl minimo` para reproducir los permisos del broker real (ADR-026). **Nunca** se usa en la demo (I-03) |
+| `tools/broker_dev.py` | Broker de **desarrollo** (amqtt) con TLS, usuarios, un WebSocket opcional para la web, y `--acl minimo` (los permisos del broker del banco, ADR-027) o `--acl un_filtro` (ADR-026). **Nunca** se usa en la demo (I-03) |
 | `tools/fake_edge_node.py` | Edge Node **real** con datos sintéticos, para desarrollar la web (F6). Comandos por teclado: `dnr`, `ok`, `crc`, `opcua off` y `on`, `saltar` (salto de `seq`), `escrituras falla` y `ok`, `matar` |
 | `tests/` | pytest: diccionario, codec, máquina de estados, cliente OPC UA y sistema completo |
 
@@ -156,7 +156,7 @@ tipo y valor. Cada Write OPC UA ocupa otra línea con su StatusCode.
 | `test_ciclo_vida.py` | NBIRTH con `seq` = 0, `bdSeq`, Rebirth sin alias y las cuatro capas. DBIRTH. DATA solo ante cambio y solo con alias. Un único `seq` para NDATA y DDATA en 600 mensajes. DDEATH y DBIRTH. Reconexión. `bdSeq` persistido, con 255→0. Rebirth. DCMD por alias y por nombre, más 9 casos de rechazo. STATE |
 | `test_opcua_client.py` | Servidor asyncua real: 10 ítems, un Write que vuelve por la suscripción, escritura sobre un nodo de solo lectura, caída del servidor y reconexión con retroceso 1 s → 2 s |
 | `test_sistema.py` | **El Edge Node como subproceso** contra un broker TLS y un servidor OPC UA. Recorre el ciclo de vida completo, incluido el **corte del broker** (`bdSeq`+1, `Reconexiones`=1) y el **kill** (NDEATH emitido por el broker con el `bdSeq` que corresponde). Al final verifica que el observador **no registró violaciones** |
-| `test_permisos_broker.py` | Los **permisos reales del broker** (ADR-026): con el perfil `serverless`, el Edge Node publica aunque se le rechace la suscripción a STATE (falla sin la corrección, verificado). Además, la clave de la web puede publicar un NBIRTH falso con `serverless` y no con `minimo` |
+| `test_permisos_broker.py` | Los **permisos del broker** (ADR-026, ADR-027): con el perfil `un_filtro`, el Edge Node publica aunque se le rechace la suscripción a STATE (falla sin la corrección, verificado). Además, la clave de la web puede publicar un NBIRTH falso con `un_filtro` y **no** con `minimo`, que es el perfil del broker del banco |
 
 Las pruebas del núcleo se validaron con mutación: `seq` módulo 257 y `Reconexiones` sin incrementar
 se detectan las dos.
@@ -179,7 +179,7 @@ se detectan las dos.
 
 | # | Prueba | Criterio |
 |---|---|---|
-| P-1 | Crear el broker en la nube y los tres usuarios con permisos por tópico (ADR-005) | `edge_node` no puede suscribirse a `spBv1.0/#` (SUBACK 0x80) |
+| P-1 | Crear el broker en la nube y los tres usuarios con permisos por tópico (ADR-005, ADR-027; puesta en marcha 02) | `edge_node` no puede suscribirse a `spBv1.0/#` (SUBACK 0x80) |
 | P-2 | Edge Node contra la nube, con **MQTT Explorer** suscripto a `spBv1.0/#` con el usuario `observador` | Se ven NBIRTH, DBIRTH, NDATA y DDATA. Al matar el proceso, el NDEATH del broker |
 | P-3 | La misma sesión con `tools/observador_sparkplug.py` archivando | Los 7 tipos y `violaciones: ninguna` |
 | P-4 | Desde la red del aula: `openssl s_client -connect <broker>:8883` (R-06) | Handshake TLS correcto |

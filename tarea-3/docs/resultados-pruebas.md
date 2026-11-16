@@ -109,6 +109,14 @@ permisos) · `hmi-web` 16/16.
 
 ---
 
+## Puesta en marcha · 2026-11-16 · Alta del broker
+
+| # | Hallazgo | Clase | Corrección | Verificación |
+|---|---|---|---|---|
+| D-5 | **No se podía crear el broker del ADR-005.** La consola de HiveMQ solo ofrecía brokers *self-managed*: HiveMQ Cloud Serverless dejó de venderse el 2026-09-30 y se apaga el 2026-12-31 (docs.hivemq.com, "Serverless End of Life"). El ADR-005 y el ADR-026 se habían verificado contra páginas del plan que no mencionaban el retiro | Defecto de documentación (fuente no revisada: se verificaron las características del servicio, pero no su ciclo de vida) | ADR-027: EMQX Cloud Serverless con *Spend Limit* en USD 0 y la tabla de permisos del ADR-005 completa. WSS pasa de 8884 a 8084. El perfil `serverless` del broker de desarrollo se renombra `un_filtro`, y `minimo` pasa a ser el del banco | El código no tenía nada atado al proveedor: solo cambian la configuración, los comentarios y la documentación. `gateway-sparkplug` 61/61 y `hmi-web` 16/16 después del cambio. Las pruebas de mínimo privilegio contra la nube son las de 02 §5.3, **pendientes** del alta |
+
+---
+
 ## Pendiente con hardware
 
 El banco real (ESP32, RS-485, Raspberry Pi, broker en la nube) repite **las mismas** pruebas con

@@ -31,7 +31,7 @@ flowchart TB
         subgraph N4["Nivel 4 · Usuario"]
             HA["Host Application<br/>navegador (PC o celular)<br/>mqtt.js · protobuf.js<br/>HA01_WebDashboard"]
         end
-        BR <-->|"MQTT sobre WSS 8884<br/>STATE · NCMD · DCMD"| HA
+        BR <-->|"MQTT sobre WSS 8084<br/>STATE · NCMD · DCMD"| HA
     end
 
     OT <-->|"Dispositivo 3 ↔ broker: MQTT + Sparkplug B (spBv1.0, Protobuf) · TLS 8883 · publicación por excepción"| IT

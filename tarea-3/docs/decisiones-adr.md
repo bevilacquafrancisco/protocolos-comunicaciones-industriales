@@ -14,7 +14,7 @@ Revisión contra el código de las Tareas 1 y 2 ([analisis-t1.md](analisis-t1.md
 | 002 | **Aceptado; se activó la consecuencia** | La T1 usa `umodbus`: el stack del esclavo se reescribe |
 | 003 | Aceptado | Confirmado: es decisión defendida en la T1. `Potenciometro_pct` declarada en el diccionario |
 | 004 | Aceptado | Fundamento reforzado con la medición de la T2 (en PC) |
-| 005 | **Aceptado con corrección** | El broker sí; el mínimo privilegio por tópico **no** se puede en el plan gratuito → ADR-026 |
+| 005 | **Aceptado con corrección** | Broker gestionado y tres usuarios con permisos por tópico, sí. El proveedor (HiveMQ Serverless) se retiró → ADR-027 |
 | 006 | Aceptado | Sin cambios |
 | 007 | Aceptado | Sin cambios; depende de ADR-010 |
 | 008 | Aceptado | Sin cambios |
@@ -35,7 +35,8 @@ Revisión contra el código de las Tareas 1 y 2 ([analisis-t1.md](analisis-t1.md
 | 023 | Aceptado (F5) | Reconexión OPC UA y MQTT con retroceso exponencial 1-30 s |
 | 024 | Aceptado (F6) | Host Application: núcleo puro, cliente MQTT por conexión, bibliotecas en `vendor/` |
 | 025 | Aceptado (F6) | CSP con `'unsafe-eval'` (protobuf.js) y `worker-src blob:` (mqtt.js), medido |
-| 026 | Aceptado (puesta en marcha) | HiveMQ Serverless: un permiso por credencial; STATE opcional en el Edge Node; riesgo residual medido |
+| 026 | **Superado por ADR-027** (2026-11-16) | HiveMQ Serverless: un permiso por credencial. Queda vigente la corrección del código (STATE opcional en el Edge Node) |
+| 027 | Aceptado (puesta en marcha, 2026-11-16) | EMQX Cloud Serverless: HiveMQ Serverless ya no se vende; se recupera el mínimo privilegio del ADR-005 |
 
 ---
 
@@ -657,7 +658,11 @@ proporcional al riesgo). `ui.test.js` verifica que la consola no tenga errores, 
 
 ---
 
-## ADR-026 — Permisos reales del broker gratuito: un filtro por credencial *(Aceptado, puesta en marcha; corrige el ADR-005)*
+## ADR-026 — Permisos reales del broker gratuito: un filtro por credencial *(Superado por el ADR-027; corregía el ADR-005)*
+
+> **Superado el 2026-11-16.** HiveMQ Cloud Serverless dejó de venderse y el banco usa EMQX con
+> permisos por usuario (ADR-027). Se conserva como registro. **Sigue vigente** la corrección del
+> código: el Edge Node tolera que el broker le rechace la suscripción a STATE.
 
 **Contexto.** El ADR-005 eligió HiveMQ Cloud Serverless (gratuito) y propuso tres usuarios con
 permisos por tópico diferenciados (mínimo privilegio). Al redactar la puesta en marcha se verificó la
@@ -720,6 +725,66 @@ publicar y el broker registra quién se conecta. El riesgo residual se acota en 
 - **Si el TP pasara a producción**, la opción es B o C. En el informe se muestra el `acl_file` de C,
   que es el mínimo privilegio completo, como la configuración de referencia
   (`docs/puesta-en-marcha/02-broker-mqtt.md` §6).
+
+---
+
+## ADR-027 — Broker del banco: EMQX Cloud Serverless *(Aceptado, puesta en marcha, 2026-11-16; reemplaza al proveedor del ADR-005 y supera al ADR-026)*
+
+**Contexto.** Al dar de alta el broker, la consola de HiveMQ solo ofrecía brokers *self-managed*. La
+documentación oficial ("HiveMQ Cloud Serverless End of Life", docs.hivemq.com, consultada el
+2026-11-16) dice lo siguiente:
+
+- **Fin de venta: 2026-09-30.** Desde esa fecha no se crean clusters Serverless.
+- **Fin de vida: 2026-12-31.** Ese día dejan de aceptarse conexiones y se borran los datos.
+- La licencia de migración gratuita es solo para cuentas que ya tenían un cluster cuando se anunció el
+  retiro. No es el caso de este grupo.
+
+El ADR-005 y el ADR-026 se apoyaron en páginas de HiveMQ consultadas el 2026-11-14, que describían
+el plan sin mencionar el retiro. **Error de proceso:** se verificaron las características del plan,
+pero no su ciclo de vida.
+
+**Opciones**
+
+| Opción | I-03 | Mínimo privilegio (ADR-005) | Costo | Trabajo y riesgo |
+|---|---|---|---|---|
+| **A. EMQX Cloud Serverless** | Sí | **Completo**: reglas por usuario (tópico, acción, permitir o denegar) | Gratis con *Spend Limit* en USD 0: 1 GB y 1 M de minutos de sesión por mes | Mínimo. Lo opera EMQX. Exige SNI. Según una fuente no oficial, se detiene tras 30 días sin uso |
+| B. Broker propio (Mosquitto, o HiveMQ con licencia Lab) en una VM en la nube | Sí | Completo (`acl_file`) | Gratis en una capa *always free*, o unos USD 4-8 por mes | Alto: TLS y dominio, firewall, parches; más superficie de ataque, a semanas de la entrega |
+| C. HiveMQ Cloud pago (Starter o Enterprise) | Sí | Completo, con roles | Pago | Bajo, pero el presupuesto del TP es cero |
+| D. Broker público de prueba (`broker.emqx.io`, `test.mosquitto.org`) | Sí | **Ninguno**: sin autenticación y con tópicos visibles para cualquiera | Gratis | **Descartado**: cualquiera podría accionar el LED |
+| E. HiveMQ con licencia Lab en la notebook (Docker) | **No**: broker local | — | Gratis | **Descartado** por I-03 |
+
+**Decisión.** A. Se configura la tabla de permisos del ADR-005 completa: una regla *Deny* `#` para
+todos los usuarios, que convierte la autorización en lista blanca, y diez reglas *Allow* por usuario
+(`docs/puesta-en-marcha/02-broker-mqtt.md` §3.2).
+
+**Fundamento.**
+
+- **Requisitos.** Cumple I-03 y los requisitos de la consigna para el broker: MQTT 3.1.1/5.0, Last
+  Will, retenidos y WebSocket.
+- **Presupuesto cero, con garantía.** El *Spend Limit* en USD 0 garantiza que no se cobra nada.
+- **Mínimo privilegio real.** Recupera lo que el ADR-026 había tenido que resignar.
+- **Reversibilidad.** El código no depende del proveedor: el host y los puertos van en `.env`, la URL
+  WSS en `config.js`, y TLS usa el almacén de CAs del sistema. Cambiar de broker otra vez es cambiar
+  configuración, no código.
+
+**Consecuencias**
+
+- **Seguridad.** Con la clave de la web, que es pública de hecho, ya **no** se puede publicar un
+  NBIRTH falso: es el perfil `minimo` de `test_permisos_broker.py`, que ahora es el perfil del banco.
+  R-08 baja a I = 1.
+- **Puerto WSS: 8084** (HiveMQ usaba 8884). Cambian `config.example.js`, `.env.example`, el diagrama
+  de arquitectura y la puesta en marcha. R-06 se actualiza.
+- **La cuota limita el uso continuo.** Con el tráfico medido en régimen (≈ 4,2 MB/h, `mediciones.md`
+  §2), 1 GB alcanza para unas 230 h por mes, pero no para tener la cadena encendida 24 × 7. Al
+  terminar cada sesión se detienen el Edge Node y el observador. Si la cuota se agota, el broker se
+  detiene sin cobrar.
+- **Región fija.** La latencia de los comandos que se mida en el banco incluye el viaje a esa región, y
+  se informa junto con ella.
+- **El código del ADR-026 queda.** La tolerancia al rechazo de STATE sigue siendo correcta frente a
+  cualquier broker que no lo autorice (Sparkplug 3.0 §5.3), y su prueba se mantiene con un perfil
+  renombrado: `un_filtro` (antes `serverless`).
+- **Lección de proceso.** Antes de adoptar un servicio externo se consulta también su página de ciclo
+  de vida o de fin de servicio. Queda como defecto D-5 en `resultados-pruebas.md`.
 
 ---
 

@@ -80,8 +80,8 @@ PS> Remove-NetIPAddress -InterfaceAlias "<Ethernet>" -IPAddress 192.168.10.2 -Co
 
 | Qué | Cómo |
 |---|---|
-| Credenciales del broker | Borrarlas en la consola de HiveMQ. La de `host_app` estuvo en un navegador: se considera expuesta |
-| Broker | Borrar el broker Serverless, si no se va a usar más |
+| Credenciales del broker | Borrarlas en la consola de EMQX. La de `host_app` estuvo en un navegador: se considera expuesta |
+| Broker | Borrar el deployment Serverless de EMQX, si no se va a usar más |
 | Clave del usuario OPC UA | Desaparece al restaurar la tarjeta. Si la microSD es propia y se guarda, cambiarla antes de reutilizarla |
 | Imágenes de respaldo | Borrar `rpi-lab-original.img` cuando la cátedra confirme que la placa quedó bien |
 
@@ -97,7 +97,7 @@ detalle.
 | Síntoma | Capa | Causa probable | Ver |
 |---|---|---|---|
 | MQTT = CREDENCIALES RECHAZADAS | MQTT | `usuario` o `clave` en `config.js` | 08 §1 |
-| MQTT queda en CONECTANDO | MQTT | URL o ruta del WebSocket, o la red bloquea el puerto 8884 | 02 §5.1, 02 §5.4 |
+| MQTT queda en CONECTANDO | MQTT | URL o ruta del WebSocket, o la red bloquea el puerto 8084, o el deployment está detenido | 02 §5.1, 02 §5.4, 02 §5.5 |
 | Todo DESCONOCIDO, MQTT conectado | Sparkplug | El Edge Node no está publicando | 07 |
 | NODO OBSOLETO | Sparkplug | El Edge Node murió o perdió internet (NDEATH) | 07 §2 |
 | OPC UA = ERROR, MODBUS = SIN DATOS | OPC UA | El servicio de la Raspberry está detenido, o el cable o la confianza fallan | 05 §5, 07 §2 |
@@ -114,8 +114,9 @@ detalle.
 | `el certificado del servidor ... NO es el confiado` | Cambió la PKI de la Raspberry | 07 §2.1 |
 | `el servidor no ofrece SignAndEncrypt` | `OPCUA_SEGURIDAD` mal escrito, u otro servidor en esa IP | 07 §1 |
 | `CONNACK rechazado` | Credenciales MQTT de `edge_node` | 02 §4 |
-| `SUBACK rechazado para NCMD/DCMD` | El permiso de `edge_node` no cubre el grupo | 02 §3.1 |
-| `el broker no autoriza spBv1.0/STATE/...` | **Esperado** con HiveMQ Serverless (ADR-026) | 07 §2 |
+| `SUBACK rechazado para NCMD/DCMD` | Falta una regla de `edge_node`, o tiene un error de tipeo | 02 §3.2 |
+| `el broker no autoriza spBv1.0/STATE/...` | Falta la regla `spBv1.0/STATE/#` de `edge_node` en EMQX. El nodo sigue funcionando (ADR-026) | 02 §3.2 |
+| `CERTIFICATE_VERIFY_FAILED` | Windows no tiene la raíz de la CA del broker | 02 §4 (`MQTT_CA`) |
 
 ### En la Raspberry (`journalctl -u pdci-t3-nodered`)
 

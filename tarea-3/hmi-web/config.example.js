@@ -11,7 +11,7 @@
  * descarga al navegador y cualquiera que abra la pagina la ve (herramientas de desarrollo, red).
  * En una pagina estatica no hay donde esconder un secreto. Lo que si se hace es limitar el dano:
  *
- *   - Usuario host_app con permisos MINIMOS por topico en el broker (ADR-005):
+ *   - Usuario host_app con permisos MINIMOS por topico en el broker (ADR-005; en EMQX, ADR-027):
  *       publica:  spBv1.0/STATE/HA01_WebDashboard
  *                 spBv1.0/UNRaf_PdCI_2026/NCMD/EN01_Gateway
  *                 spBv1.0/UNRaf_PdCI_2026/DCMD/EN01_Gateway/DEV01_ESP32_Slave
@@ -33,9 +33,9 @@
  * ---------------------------------------------------------------------------------------------
  */
 window.PDCI_CONFIG = Object.freeze({
-    // WSS del broker en la nube (HiveMQ Cloud: puerto 8884, ruta /mqtt). I-03: nunca un broker local
-    // en la demo. ws://127.0.0.1:<puerto>/mqtt solo para desarrollo con tools/broker_dev.py.
-    url: 'wss://<id-del-cluster>.<proveedor-del-broker>:8884/mqtt',
+    // WSS del broker en la nube (EMQX Cloud Serverless, ADR-027: puerto 8084, ruta /mqtt). I-03: nunca
+    // un broker local en la demo. ws://127.0.0.1:<puerto>/mqtt solo para desarrollo con tools/broker_dev.py.
+    url: 'wss://<direccion-del-broker>:8084/mqtt',
     usuario: 'host_app',
     clave: '<clave-del-usuario-host_app>',
     // Identificadores Sparkplug (docs/diccionario-de-datos.md §4)
