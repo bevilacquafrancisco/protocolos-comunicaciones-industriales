@@ -74,7 +74,7 @@ function Verificar {
         Fila 'SSH por el cable + servicio' ($estado -eq 'active') "pdci-t3-nodered: $estado"
         try {
             $d = DesfaseMs
-            Fila 'Hora de la Raspberry' ([math]::Abs($d) -lt 1000) "desfase $d ms (si falla: banco.ps1 hora)"
+            Fila 'Hora de la Raspberry' ([math]::Abs($d) -lt 1000) "desfase $d ms -> corregir: powershell -ExecutionPolicy Bypass -File scripts\banco.ps1 hora"
         } catch { Fila 'Hora de la Raspberry' $false 'no se pudo leer' }
     } else {
         Fila 'SSH por el cable' $false 'falta la regla de ufw para eth0 o la clave SSH (guia de arranque, paso 1.3)'
@@ -117,7 +117,7 @@ function Iniciar {
     }
     Write-Host ''
     Write-Host 'Dashboard de Node-RED:  http://localhost:1880/dashboard'
-    $hmi = if ($env:PDCI_HMI_URL) { $env:PDCI_HMI_URL } else { 'https://<usuario>.github.io/<repositorio>/  (o: banco.ps1 web)' }
+    $hmi = if ($env:PDCI_HMI_URL) { $env:PDCI_HMI_URL } else { 'https://<usuario>.github.io/<repositorio>/  (o: powershell -ExecutionPolicy Bypass -File scripts\banco.ps1 web)' }
     Write-Host "Host Application:       $hmi"
 }
 
