@@ -12,3 +12,12 @@
 # valor de EnvironmentFile se vuelve parte del valor (el hash OPC UA dejaria de coincidir).
 *.service text eol=lf
 *.ejemplo text eol=lf
+
+# Node-RED (edge-nodered): generar_flujos.js incrusta el codigo de funciones/ y plantillas/
+# dentro de flows/*.json, y flujos.test.js compara byte a byte. Con core.autocrlf=true un
+# checkout en Windows los dejaba en CRLF y la prueba fallaba (ademas, el CR viajaria a la
+# Raspberry dentro del flujo). LF en todos los sistemas.
+edge-nodered/**/*.js   text eol=lf
+edge-nodered/**/*.json text eol=lf
+edge-nodered/**/*.vue  text eol=lf
+edge-nodered/**/*.css  text eol=lf
