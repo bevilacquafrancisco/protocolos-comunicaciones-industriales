@@ -18,7 +18,9 @@
  *     DEVICE NOT REACHED (consigna 1.c, I-05). "CRC_ERROR" cuenta tambien las tramas que no
  *     se pudieron recomponer (MALFORMED, WRONG_SLAVE), como pide la consigna; el detalle
  *     queda en contadores.detalle.
- *   - Ultima trama transmitida y recibida en hexadecimal, y latencia.
+ *   - Muestra de diagnostico (ultimaTx, ultimaRx, latenciaMs): la transaccion MAS IMPORTANTE de
+ *     cada ventana de 1 s, no la ultima (v1.1, ver _registrarMuestra). Peticion y respuesta son
+ *     siempre de la MISMA transaccion: tras un TIMEOUT, ultimaRx queda vacia.
  *   - Reconfiguracion en vivo (I-04), prueba de conexion, trama manual, asistente de
  *     descubrimiento (barrido de Unit ID x baud x paridad) y exploracion de direcciones.
  *
@@ -61,6 +63,21 @@ const COMO_CRC = new Set([ERROR_TYPE.CRC_ERROR, ERROR_TYPE.MALFORMED, ERROR_TYPE
  * 247 (el maximo, usado por algunos equipos como direccion de servicio).
  */
 const PRIORITARIOS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 17, 247];
+
+/**
+ * Muestra de diagnostico de tramas (v1.1). El maestro hace ~16 transacciones/s, pero la muestra
+ * llega a la web una vez por segundo (OPC UA -> NDATA agrupado a 1 Hz, ADR-021/028). Se publica,
+ * de cada ventana, la transaccion de mayor prioridad (a igual prioridad, la mas reciente).
+ */
+const VENTANA_MUESTRA_MS = 1000;
+/**
+ * Una muestra de error o de escritura se sostiene al menos 2 s frente a una de menor prioridad.
+ * Motivo: el maestro entrega su instantanea cada 500 ms y el Edge Node agrupa a 1 Hz; dos muestras
+ * separadas por ~1 s pueden caer en el mismo NDATA y la primera se perderia. Con 2 s, lo
+ * importante siempre llega a la web.
+ */
+const RETENCION_MUESTRA_MS = 2000;
+const PRIORIDAD_MUESTRA = Object.freeze({ LECTURA: 0, LECTURA_CAMBIO: 1, ESCRITURA: 2, ERROR: 3 });
 
 /** Reloj real; las pruebas inyectan uno controlado. */
 const RELOJ_REAL = { ahora: () => Date.now(), setTimeout: (f, ms) => setTimeout(f, ms), clearTimeout: (t) => clearTimeout(t) };
@@ -105,6 +122,9 @@ class MaestroModbus extends EventEmitter {
         this.ultimaTx = '';
         this.ultimaRx = '';
         this.latenciaMs = null;
+        this._ventanaMuestra = null;      // {inicio, mejor} de la ventana en curso
+        this._muestra = null;             // {prioridad, hasta} de la muestra publicada
+        this._rxPorTx = new Map();        // tx -> ultima rx (para detectar respuestas que cambian)
         this.ultimaExcepcion = null;
         this.valores = new Map();
         this.ciclos = 0;
@@ -303,6 +323,7 @@ class MaestroModbus extends EventEmitter {
             resultado = await this._intento(req, op);
             resultado.intentos = intento + 1;
             if (contar) this._contar(resultado);
+            this._registrarMuestra(req, resultado);
             this.emit('trama', { tx: resultado.tx, rx: resultado.rx, resultado: resultado.errorType,
                 latenciaMs: resultado.latenciaMs, contada: contar });
             if (resultado.ok || !REINTENTABLES.has(resultado.errorType)) break;   // [DF-2.14]
@@ -331,8 +352,7 @@ class MaestroModbus extends EventEmitter {
             this._enCurso = intento;
             // [DF-2.7] Transmitir. El fin de la trama en el bus se estima por su duracion.
             this._ultimaActividad = inicio + modbus.txMs(trama.length, baud);
-            this.ultimaTx = modbus.toHex(trama);
-            intento.tx = this.ultimaTx;
+            intento.tx = modbus.toHex(trama);     // la muestra publicada la elige _registrarMuestra
             try {
                 this.transporte.enviar(trama);
             } catch (e) {
@@ -370,11 +390,54 @@ class MaestroModbus extends EventEmitter {
         resultado.rx = modbus.toHex(buffer);
         resultado.crcValido = buffer && buffer.length >= 4 ? modbus.checkCrc(buffer) : null;
         resultado.latenciaMs = buffer && buffer.length ? ahora - intento.inicio : null;
-        if (buffer && buffer.length) {
-            this.ultimaRx = resultado.rx;
-            this.latenciaMs = resultado.latenciaMs;
-        }
         intento.resolver(resultado);
+    }
+
+    /**
+     * Muestra de diagnostico por prioridad (v1.1). Corrige ademas el defecto de la v1.0, que tras
+     * un TIMEOUT publicaba la peticion nueva con la respuesta de la transaccion anterior.
+     *
+     * Prioridad: ERROR (TIMEOUT, CRC, trama no recomponible, excepcion) > ESCRITURA (FC 05/06) >
+     * LECTURA_CAMBIO (la respuesta difiere de la anterior a la misma peticion) > LECTURA.
+     * La primera transaccion se publica en el acto; despues, una por ventana de 1 s.
+     *
+     * @param {object} req peticion ({fc, ...})
+     * @param {object} r resultado de _intento ({ok, errorType, tx, rx, latenciaMs})
+     * @returns {void}
+     */
+    _registrarMuestra(req, r) {
+        const ahora = this.reloj.ahora();
+        const anterior = this._rxPorTx.get(r.tx);
+        this._rxPorTx.set(r.tx, r.rx);
+        if (this._rxPorTx.size > 64) this._rxPorTx.delete(this._rxPorTx.keys().next().value);   // acotado
+        let prioridad = PRIORIDAD_MUESTRA.LECTURA;
+        if (!r.ok || r.errorType !== ERROR_TYPE.NONE) prioridad = PRIORIDAD_MUESTRA.ERROR;
+        else if (req.fc === 5 || req.fc === 6) prioridad = PRIORIDAD_MUESTRA.ESCRITURA;
+        else if (anterior !== undefined && anterior !== r.rx) prioridad = PRIORIDAD_MUESTRA.LECTURA_CAMBIO;
+        const candidata = { prioridad, tx: r.tx || '', rx: r.rx || '', latenciaMs: r.latenciaMs ?? null };
+
+        if (!this._muestra) {                       // la primera: se publica en el acto
+            this._publicarMuestra(candidata, ahora);
+            this._ventanaMuestra = { inicio: ahora, mejor: null };
+            return;
+        }
+        const v = this._ventanaMuestra;
+        if (!v.mejor || candidata.prioridad >= v.mejor.prioridad) v.mejor = candidata;
+        if (ahora - v.inicio < VENTANA_MUESTRA_MS) return;
+        // Cierra la ventana: lo importante publicado se sostiene RETENCION_MUESTRA_MS.
+        if (!(ahora < this._muestra.hasta && v.mejor.prioridad < this._muestra.prioridad)) {
+            this._publicarMuestra(v.mejor, ahora);
+        }
+        this._ventanaMuestra = { inicio: ahora, mejor: null };
+    }
+
+    /** Fija ultimaTx, ultimaRx y latenciaMs juntas: siempre de la misma transaccion. */
+    _publicarMuestra(m, ahora) {
+        this.ultimaTx = m.tx;
+        this.ultimaRx = m.rx;                       // '' si fue TIMEOUT
+        this.latenciaMs = m.latenciaMs;             // null si fue TIMEOUT
+        this._muestra = { prioridad: m.prioridad,
+            hasta: m.prioridad >= PRIORIDAD_MUESTRA.ESCRITURA ? ahora + RETENCION_MUESTRA_MS : ahora };
     }
 
     /** [DF-2.9] [DF-2.11] [DF-2.12b] [DF-2.13] [DF-2.15] Contadores y estado. */

@@ -299,7 +299,16 @@
     <section class="sec split">
       <div class="main card">
         <div class="fila-t"><h2>Tramas en vivo</h2><span class="badge info" id="tramas-fuente">esperando NDATA</span></div>
-        <p class="lead">Última petición y respuesta del maestro, publicadas por el Edge Node una vez por segundo (Status/MODBUS/UltimaTrama*, ADR-028). El maestro hace unas 16 por segundo: acá se ve <b>una muestra</b>, no todas.</p>
+        <p class="lead">De cada segundo, el maestro publica la transacción <b>más importante</b>: error (TIMEOUT, CRC, excepción) &gt; escritura FC 05/06 &gt; lectura cuya respuesta cambió &gt; la última. Llega con el NDATA del Edge Node (Status/MODBUS/UltimaTrama*). Petición y respuesta son siempre de la misma transacción.</p>
+        <p class="tasa" id="tramas-tasa">maestro: midiendo la tasa de transacciones…</p>
+        <div class="fila-t controles">
+          <div class="seg" role="group" aria-label="Filtro de tramas">
+            <button type="button" class="btn sm" id="tf-todas" aria-pressed="true">Todas</button>
+            <button type="button" class="btn sm" id="tf-errores" aria-pressed="false">Solo errores</button>
+            <button type="button" class="btn sm" id="tf-escrituras" aria-pressed="false">Solo escrituras</button>
+          </div>
+          <button type="button" class="btn sm" id="btn-pausa-tramas" aria-pressed="false">Pausar</button>
+        </div>
         <div class="feed" id="tramas-lista"></div>
       </div>
       <div class="side card">
@@ -471,6 +480,26 @@
         <div class="fseg body"><b id="top-disp">dispositivo</b><span>device_id (dispositivo 1) · solo en D*</span></div>
       </div>
       <p class="lead sep">STATE es distinto: <span class="mono" id="top-state">spBv1.0/STATE/…</span>, retenido, con «offline» como Last Will (I-08).</p>
+    </section>
+
+    <section class="sec card">
+      <h2>Tópicos implementados</h2>
+      <p class="lead">Los nueve tópicos del sistema. El broker no los crea de antemano: un tópico existe cuando alguien publica en él, y el broker reenvía cada mensaje a quienes tengan una suscripción que coincida. Quién puede publicar o suscribirse en cada uno lo decide la lista de permisos del broker (abajo).</p>
+      <div class="tbl"><table class="topicos">
+        <thead><tr><th>Tópico</th><th>Publica</th><th>Se suscriben</th><th>QoS · retenido</th><th>Cuándo y para qué</th></tr></thead>
+        <tbody>
+          <tr><td class="mono rompe">spBv1.0/UNRaf_PdCI_2026/<b>NBIRTH</b>/EN01_Gateway</td><td>Edge Node (dispositivo 3)</td><td>Esta página · observador</td><td>0 · no</td><td><b>Nacimiento del nodo.</b> Al conectarse al broker y ante cada Rebirth. Lleva <b>todas</b> las métricas del nodo con nombre, alias, tipo y valor, más <span class="mono">bdSeq</span> y <span class="mono">Node Control/Rebirth</span>. <span class="mono">seq</span> = 0. Sin un NBIRTH previo, ningún dato del nodo es válido.</td></tr>
+          <tr><td class="mono rompe">spBv1.0/UNRaf_PdCI_2026/<b>NDATA</b>/EN01_Gateway</td><td>Edge Node</td><td>Esta página · observador</td><td>0 · no</td><td><b>Cambios del nodo:</b> estados MODBus y OPC UA, contadores, reconexiones, Rebirths y la trama de diagnóstico. Agrupado una vez por segundo (los contadores cambian ~16 veces por segundo); un cambio de estado sale en el acto. Solo alias, sin nombres. <span class="mono">seq</span> 0-255.</td></tr>
+          <tr><td class="mono rompe">spBv1.0/UNRaf_PdCI_2026/<b>NDEATH</b>/EN01_Gateway</td><td><b>El broker</b> (Last Will del Edge Node)</td><td>Esta página · observador</td><td>1 · no</td><td><b>Muerte del nodo.</b> El Edge Node lo deja registrado en el CONNECT; si su conexión cae (proceso cerrado, sin internet), lo publica el broker. Lleva el mismo <span class="mono">bdSeq</span> del NBIRTH de esa sesión: así la página sabe que murió <b>esa</b> sesión y marca nodo y dispositivo como obsoletos.</td></tr>
+          <tr><td class="mono rompe">spBv1.0/UNRaf_PdCI_2026/<b>NCMD</b>/EN01_Gateway</td><td>Esta página (Host Application)</td><td>Edge Node</td><td>0 · no</td><td><b>Comando al nodo:</b> <span class="mono">Node Control/Rebirth = true</span>. La página lo publica al conectarse, ante un salto de <span class="mono">seq</span> o ante datos sin BIRTH previo (como máximo uno cada 5 s). El nodo responde republicando NBIRTH y DBIRTH.</td></tr>
+          <tr><td class="mono rompe">spBv1.0/UNRaf_PdCI_2026/<b>DBIRTH</b>/EN01_Gateway/DEV01_ESP32_Slave</td><td>Edge Node</td><td>Esta página · observador</td><td>0 · no</td><td><b>Nacimiento del dispositivo 1</b> (el ESP32). Después del NBIRTH y cada vez que el esclavo vuelve a responder. Lleva sus E/S con nombre, alias, tipo y valor.</td></tr>
+          <tr><td class="mono rompe">spBv1.0/UNRaf_PdCI_2026/<b>DDATA</b>/EN01_Gateway/DEV01_ESP32_Slave</td><td>Edge Node</td><td>Esta página · observador</td><td>0 · no</td><td><b>Cambios de las E/S</b> (pulsador, potenciómetro, LED, PWM). Por excepción: solo cuando un valor cambia. Su timestamp de métrica es el SourceTimestamp OPC UA (cuándo leyó el maestro). Confirma los comandos.</td></tr>
+          <tr><td class="mono rompe">spBv1.0/UNRaf_PdCI_2026/<b>DDEATH</b>/EN01_Gateway/DEV01_ESP32_Slave</td><td>Edge Node</td><td>Esta página · observador</td><td>0 · no</td><td><b>Muerte del dispositivo 1:</b> el esclavo dejó de responder 2 s seguidos (DEVICE NOT REACHED) o se perdió la sesión OPC UA (cable Ethernet). Las métricas de estado siguen vivas en el nodo, para mostrar la causa.</td></tr>
+          <tr><td class="mono rompe">spBv1.0/UNRaf_PdCI_2026/<b>DCMD</b>/EN01_Gateway/DEV01_ESP32_Slave</td><td>Esta página</td><td>Edge Node</td><td>0 · no</td><td><b>Comandos a las salidas</b> (<span class="mono">Outputs/LedDigital</span>, <span class="mono">Outputs/LedPWM</span>). El Edge Node lo convierte en un Write OPC UA, el maestro en FC 05/06, y la confirmación vuelve en un DDATA.</td></tr>
+          <tr><td class="mono rompe">spBv1.0/<b>STATE</b>/HA01_WebDashboard</td><td>Esta página; el broker publica el «offline» (Last Will)</td><td>Edge Node · observador · esta página</td><td>1 · <b>sí</b></td><td><b>Estado de la Host Application</b>, en JSON (única excepción a Protobuf): <span class="mono">{"online": true, "timestamp": …}</span>. Retenido: quien se conecta después lo recibe igual. Si la página se cierra o pierde la red, el broker publica <span class="mono">online: false</span>.</td></tr>
+        </tbody></table></div>
+      <p class="lead sep"><b>Cómo se suscriben.</b> Esta página usa <span class="mono">spBv1.0/UNRaf_PdCI_2026/#</span> (el comodín <span class="mono">#</span> abarca todos los niveles del grupo) más su STATE. El Edge Node se suscribe solo a sus NCMD y DCMD y a <span class="mono">spBv1.0/STATE/#</span>. El observador usa <span class="mono">spBv1.0/#</span>, sin permiso de publicar. Las suscripciones se piden con QoS 1.</p>
+      <p class="lead sep"><b>Por qué QoS 0 en los datos.</b> Un DATA perdido se detecta por el salto de <span class="mono">seq</span> y se recupera con un Rebirth; QoS 1 agregaría un acuse por mensaje sin ganar nada. NDEATH y STATE van con QoS 1 porque anuncian que algo murió: no deben perderse. Solo STATE se retiene: un BIRTH retenido sería un estado viejo presentado como actual.</p>
     </section>
 
     <section class="sec split">

@@ -293,3 +293,12 @@ td.hex { font-family: var(--mono); white-space: nowrap; }
     .io-v { font-size: 24px; }
     .tab { flex: 1 1 45%; }
 }
+
+/* ---------------------------------------------------------------- tramas: tasa, filtro y pausa (v2.1) */
+.tasa { font-size: 13px; color: var(--ink); background: var(--b50); border-radius: 8px; padding: 6px 10px; margin: 6px 0 8px; }
+.controles { margin-bottom: 8px; }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn[aria-pressed="true"] { background: var(--b50); border-color: var(--blue); color: #1B4AAE; }
+#btn-pausa-tramas[aria-pressed="true"] { background: #FFF4D6; border-color: #C98A00; color: #6B4A00; }
+.topicos td { vertical-align: top; }
+.topicos .mono { font-size: 11.5px; }
