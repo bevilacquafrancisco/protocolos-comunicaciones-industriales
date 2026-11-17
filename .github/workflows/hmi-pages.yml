@@ -1,0 +1,63 @@
+# hmi-pages.yml — Publica la Host Application (tarea-3/hmi-web) en GitHub Pages (ADR-029)
+# Autores: Bevilacqua Francisco, Peralta Agustina · 2026-11-16
+#
+# Un enlace fijo para los profesores: https://<usuario>.github.io/<repositorio>/
+# La página NO lleva claves (ADR-028): las pide al entrar. La URL del broker sale de la
+# variable del repositorio HMI_BROKER_URL (Settings > Secrets and variables > Actions >
+# Variables), no de un archivo versionado.
+#
+# Antes de ejecutar las pruebas no hace falta Chrome ni el venv: la prueba del navegador
+# se saltea sola en CI y la cubre la corrida local (npm test).
+name: Host Application en GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['tarea-3/hmi-web/**', '.github/workflows/hmi-pages.yml']
+  workflow_dispatch:          # boton "Run workflow" en la pestaña Actions
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tarea-3/hmi-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Dependencias exactas del lockfile
+        run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+      - name: Pruebas (nucleo, decodificacion, modelo y entrega)
+        run: npm test
+      - name: Armar el sitio (lista blanca, sin claves)
+        run: node tools/armar_sitio.js "$GITHUB_WORKSPACE/_sitio"
+        env:
+          HMI_BROKER_URL: ${{ vars.HMI_BROKER_URL }}
+          HMI_USUARIO_SUGERIDO: ${{ vars.HMI_USUARIO_SUGERIDO }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _sitio
+
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - id: despliegue
+        uses: actions/deploy-pages@v4

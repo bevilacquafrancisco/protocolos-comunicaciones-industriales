@@ -77,6 +77,9 @@ comunicación").
 | `Status/MODBUS/CRC_ERROR` | `UInt32` | `s=Status.MODBUS.CRC_ERROR` | 12 | OPC UA | Respuestas con CRC inválido **o trama no recomponible** (longitud, Unit ID o FC inesperados; consigna §1.c) |
 | `Status/MODBUS/TIMEOUT` | `UInt32` | `s=Status.MODBUS.TIMEOUT` | 13 | OPC UA | Peticiones sin respuesta dentro del tiempo de espera |
 | `Status/MODBUS/EXCEPTION` | `UInt32` | `s=Status.MODBUS.EXCEPTION` | 14 | OPC UA | Respuestas de excepción (FC con bit 7, códigos 01–04) — *añadido propio*: la T1 distingue timeout, excepción y CRC (`protocolo-comunicacion.md` §10.1) |
+| `Status/MODBUS/UltimaTramaTx` | `String` | `s=Status.MODBUS.UltimaTramaTx` | 15 | OPC UA | Última petición del maestro en hexadecimal, p. ej. `01 03 00 00 00 01 84 0A` — diagnóstico, agrupado a 1 Hz (ADR-028) |
+| `Status/MODBUS/UltimaTramaRx` | `String` | `s=Status.MODBUS.UltimaTramaRx` | 16 | OPC UA | Última respuesta recibida en hexadecimal (vacía si hubo TIMEOUT) — diagnóstico, agrupado a 1 Hz (ADR-028) |
+| `Status/MODBUS/LatenciaMs` | `UInt16` | `s=Status.MODBUS.LatenciaMs` | 17 | OPC UA | Fin de la transmisión → respuesta completa, medido por el maestro. **Incluye la latencia del conversor USB** — diagnóstico, agrupado a 1 Hz (ADR-028) |
 | `Status/OPCUA/Estado` | `String` | `s=Status.OPCUA.Estado` | 20 | interno | `DONE` \| `ERROR` — lo **calcula el dispositivo 3** según el estado de su sesión y suscripción; el nodo del servidor solo informa que el servidor vive |
 | `Status/MQTT/Reconexiones` | `UInt32` | — | 30 | interno | Reconexiones del cliente MQTT del Edge Node |
 | `Status/Sparkplug/Rebirths` | `UInt32` | — | 40 | interno | Rebirths solicitados por la Host Application |
@@ -93,8 +96,9 @@ Nodo: 10-49; dispositivo: 101-199.
 > suscripción fallan (T2 v2, bloque C7), `DONE` con la sesión activa. El NodeId se conserva para que
 > UaExpert lo muestre, pero la métrica Sparkplug **no** se lee de ese nodo.
 
-**Diagnóstico adicional recomendado** (no exigido, pero vale mucho en la defensa y en el análisis
-de tramas del informe):
+**Diagnóstico del enlace MODBus.** Estos tres nodos OPC UA viajan además como métricas Sparkplug
+(alias 15-17, tabla de arriba) desde el 2026-11-16 (ADR-028): la Host Application decodifica las
+tramas reales del bus. Detalle de cada nodo:
 
 | NodeId OPC UA | Tipo | Contenido |
 |---|---|---|
@@ -183,6 +187,14 @@ salto en `seq`, los datos son sospechosos y corresponde pedir Rebirth. Ese mecan
 distingue Sparkplug B de "MQTT con JSON", y es el argumento central de la defensa.
 
 ---
+
+### Registro de configuración del esclavo (ADR-029)
+
+No es una E/S del proceso: no viaja a OPC UA ni a Sparkplug B, y el maestro no lo sondea.
+
+| Registro | Tabla y offset | FC | Valores | Efecto |
+|---|---|---|---|---|
+| `Config/Perfil` | Holding Register `0x0F00` (Modicon 43841), en **los dos** perfiles | 03 / 06 | 1 = DISPOSITIVO_1 · 2 = DESCONOCIDO (otro valor → excepción 03) | El esclavo responde el eco y después se reinicia con ese perfil. No se guarda: reiniciar el ESP32 vuelve al perfil de arranque |
 
 ## 5. Parámetros del enlace serie
 

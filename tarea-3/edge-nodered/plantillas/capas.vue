@@ -20,7 +20,7 @@
             <span>{{ nombre }}</span><b>{{ valor }}</b>
           </div>
           <div v-if="!Object.keys(dato(capa).contadores).length" class="text-caption text-medium-emphasis">
-            {{ capa === 'MODBUS' ? 'esperando la primera petición' : 'se integra en ' + fase[capa] }}
+            {{ capa === 'MODBUS' ? 'esperando la primera petición' : fase[capa] }}
           </div>
           <v-btn v-if="capa === 'MODBUS'" class="mt-2" size="small" variant="text"
                  @click="send({ topic: 'reiniciar-contadores' })">Poner en cero</v-btn>
@@ -36,7 +36,8 @@ export default {
     return {
       orden: ['MODBUS', 'OPCUA', 'MQTT', 'SPARKPLUG'],
       titulos: { MODBUS: 'MODBus RTU', OPCUA: 'OPC UA', MQTT: 'MQTT', SPARKPLUG: 'Sparkplug B' },
-      fase: { OPCUA: 'F4', MQTT: 'F5', SPARKPLUG: 'F5' },
+      // MQTT y Sparkplug B ocurren en el dispositivo 3: su estado se ve en la Host Application (ADR-028)
+      fase: { OPCUA: 'sin datos del servidor OPC UA', MQTT: 'capa del dispositivo 3: ver la Host Application', SPARKPLUG: 'capa del dispositivo 3: ver la Host Application' },
       capas: {},
       ahora: Date.now()
     }

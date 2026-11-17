@@ -109,6 +109,60 @@ permisos) · `hmi-web` 16/16.
 
 ---
 
+## Puesta en marcha · 2026-11-16 · Alta del broker
+
+| # | Hallazgo | Clase | Corrección | Verificación |
+|---|---|---|---|---|
+| D-5 | **No se podía crear el broker del ADR-005.** La consola de HiveMQ solo ofrecía brokers *self-managed*: HiveMQ Cloud Serverless dejó de venderse el 2026-09-30 y se apaga el 2026-12-31 (docs.hivemq.com, "Serverless End of Life"). El ADR-005 y el ADR-026 se habían verificado contra páginas del plan que no mencionaban el retiro | Defecto de documentación (fuente no revisada: se verificaron las características del servicio, pero no su ciclo de vida) | ADR-027: EMQX Cloud Serverless con *Spend Limit* en USD 0 y la tabla de permisos del ADR-005 completa. WSS pasa de 8884 a 8084. El perfil `serverless` del broker de desarrollo se renombra `un_filtro`, y `minimo` pasa a ser el del banco | El código no tenía nada atado al proveedor: solo cambian la configuración, los comentarios y la documentación. `gateway-sparkplug` 61/61 y `hmi-web` 16/16 después del cambio. Las pruebas de mínimo privilegio contra la nube son las de 02 §5.3, **pendientes** del alta |
+
+---
+
+## Host Application v2 · 2026-11-16 · ADR-028
+
+| Suite | Resultado |
+|---|---|
+| `gateway-sparkplug` (pytest) | **62/62** (+1: tramas de diagnóstico agrupadas en el NDATA) |
+| `hmi-web` (`node:test`) | **24/24**: núcleo 12, decodificación y modelo 9, entrega 2, página en Chrome 1 |
+
+- **CRC-16 de `tramas.js`** contra cuatro tramas reales del sistema: `84 0A` y `B8 44` (banco,
+  2026-11-16), `31 CA` (diccionario) y `B9 E4` (verificación OPC UA). Las cuatro coinciden byte a byte.
+- **`modelo.js` contra la fuente de verdad**: la primera corrida falló porque el lector de la prueba
+  partía `\|` dentro de una celda del diccionario. Fue un **defecto de la prueba**, y se corrigió.
+- **Página en Chrome**: la primera corrida falló en la vista de celular (conmutador de 0 px). Al
+  pasar a modo celular, Puppeteer recarga la página y la clave, que solo vive en memoria, se pierde.
+  Es el **comportamiento buscado** (ADR-028). La prueba ahora vuelve a ingresar, y además verifica
+  que ninguna de las cinco pestañas desborde en 390 px.
+- **Revisión visual** de las capturas de cada pestaña: se corrigieron una columna FC que partía el
+  número, palabras cortadas en tablas angostas, la abreviatura del broker y los Float con 14 decimales.
+
+---
+
+## Preparación para la defensa · 2026-11-16 · ADR-029
+
+| Suite | Resultado |
+|---|---|
+| Firmware (CPython) | `TODO OK`: `prueba_config.py` 38 verificaciones (+9: registro de perfil, eco antes del cambio, excepción 03) |
+| `edge-nodered` (Jest) | 179/179, con los flujos regenerados |
+| `gateway-sparkplug` (pytest) | 62/62 (retroceso OPC UA 1, 2, 4, 5, 5…) |
+| `hmi-web` (`node:test`) | **25/25**: + sitio de GitHub Pages sin claves; la página en Chrome ahora verifica la alarma del bus, la del cable (sin acusar al bus) y las dos recuperaciones |
+
+- **Defecto de la prueba:** el chequeo "sin claves" del sitio fallaba con el comentario del propio
+  `config.js` ("SIN claves"). Ahora busca un **campo** de clave, no la palabra.
+- **Defecto del script:** `banco.ps1 verificar` no detectaba la falla de SSH, porque PowerShell no
+  convierte el código de salida de un programa externo en excepción, y calculaba un desfase de
+  −1,79·10¹² ms. Ahora revisa `$LASTEXITCODE`.
+- **Hallazgo de la prueba en seco, con el banco desconectado:** `ping 192.168.10.1` respondía. La
+  placa Ethernet de la notebook había perdido la IP fija (10 §4 de la versión anterior la borraba),
+  así que el paquete salía por la Wi-Fi de casa y contestaba otro equipo con esa dirección. Por eso
+  `verificar` comprueba primero que la ruta a la Raspberry salga **por Ethernet**, y la IP fija pasa
+  a ser permanente (ADR-029).
+
+**Pendiente con hardware:** desenchufar y volver a enchufar el cable Ethernet y el bus RS-485,
+cronometrando la alarma y la recuperación (11 §5); el cambio de perfil del ESP32 desde el Dashboard
+seguido del descubrimiento; el sitio publicado en GitHub Pages, abierto desde un celular en otra red.
+
+---
+
 ## Pendiente con hardware
 
 El banco real (ESP32, RS-485, Raspberry Pi, broker en la nube) repite **las mismas** pruebas con

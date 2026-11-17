@@ -27,7 +27,7 @@ Sin disparador medible, un riesgo no está gestionado.
 | R-11 | Citar números de la T2 que no tienen evidencia en el repositorio | 2 | 2 | 4 | Informe |
 | R-13 | ~~Biblioteca Sparkplug B para Python~~ **Cerrado 2026-11-12** (contingencia adoptada) | — | — | 0 | — |
 | R-03 | `node-opcua` no corre en la imagen de la Raspberry Pi del laboratorio | 1 | 3 | 3 | F4 |
-| R-08 | Credenciales MQTT expuestas en el navegador; en el plan gratuito, sin ACL por tópico (ADR-026) | 3 | 2 | **6** | Nube |
+| R-08 | Credenciales MQTT de la web: ya no están en la página (ADR-028); ACL por usuario (ADR-027) | 1 | 1 | 1 | Nube |
 | R-12 | Restaurar mal la microSD del laboratorio | 1 | 3 | 3 | F3-F4 |
 | R-15 | Erratas de la consigna mal interpretadas (nombre de archivo, criterios) | 2 | 1 | 2 | Entrega |
 | R-16 | `serial in` deja de recibir tras reabrir el puerto con `serial control` | 2 | 3 | **6** | F3-banco |
@@ -91,7 +91,7 @@ Sin disparador medible, un riesgo no está gestionado.
 
 | | |
 |---|---|
-| **Causa** | Redes universitarias suelen filtrar puertos no web; 8883 (MQTT/TLS) y 8884 (WSS de HiveMQ) no son 443 |
+| **Causa** | Redes universitarias suelen filtrar puertos no web; 8883 (MQTT/TLS) y 8084 (WSS de EMQX, ADR-027) no son 443 |
 | **Efecto** | Falla I-03 en la demo |
 | **Mitigación** | Probar desde la red de la facultad en una clase anterior; tener datos móviles compartidos probados (plan de pruebas N5); preferir un broker que ofrezca WSS en 443 como respaldo (verificar en F5) |
 | **Disparador** | `openssl s_client -connect <broker>:8883` o la web por WSS fallan desde la red del aula |
@@ -183,17 +183,28 @@ Sin disparador medible, un riesgo no está gestionado.
 
 ### R-08 — Credenciales MQTT en el navegador
 
-**Actualizado el 2026-11-14 (ADR-026).** El mínimo privilegio por tópico del ADR-005 **no** se
-puede en HiveMQ Cloud Serverless: hay un permiso por credencial y no hay roles. Con la clave de la
+**Actualizado el 2026-11-16 (ADR-028).** La página ya no lleva la clave en `config.js`: la pide al
+entrar y la guarda solo en memoria, con un usuario del broker por persona. La causa original del
+riesgo, una clave pública de hecho, desaparece. Queda el riesgo normal de cualquier contraseña
+(robo o reutilización), acotado por el ACL. Baja a P = 1, I = 1.
+
+**Antes, 2026-11-16 (ADR-027).** El broker del banco es EMQX Cloud Serverless, con
+autorización por usuario: se configura la tabla del ADR-005 completa. Con la clave de la web ya
+**no** se puede publicar un NBIRTH falso (perfil `minimo` de `test_permisos_broker.py`). Baja a
+I = 1: con esa clave se puede leer el proceso y accionar los dos LED, dentro de los rangos que
+validan el Edge Node y el servidor OPC UA.
+
+*Historial, 2026-11-14 (ADR-026, superado).* El mínimo privilegio por tópico del ADR-005 **no** se
+podía en HiveMQ Cloud Serverless: había un permiso por credencial y no había roles. Con la clave de la
 web, que es pública de hecho, se puede publicar en todo `spBv1.0/#`, incluido un NBIRTH falso
 (medido en `test_permisos_broker.py`). Se mantiene P = 3 y sube a I = 2: puede engañar a la vista,
 pero no accionar el campo, porque cada DCMD lo vuelven a validar el Edge Node y el servidor OPC UA.
 
 | | |
 |---|---|
-| **Mitigación** | Tres credenciales separadas y rotables; `observador` solo puede suscribirse; validación de comandos en dos capas |
+| **Mitigación** | Tres credenciales separadas y rotables; ACL en lista blanca por usuario (ADR-027); `observador` solo puede suscribirse; validación de comandos en dos capas |
 | **Disparador** | Llevar el sistema más allá del TP, o que el tribunal pida mínimo privilegio real |
-| **Contingencia** | HiveMQ Starter con roles, o Mosquitto propio con `acl_file` (ADR-026, opciones B y C) |
+| **Contingencia** | Backend con autenticación por persona y tokens de vida corta (`hmi-web/config.example.js`); o Mosquitto propio con `acl_file` (ADR-027, opción B) |
 
 ### R-15 — Erratas de la consigna
 

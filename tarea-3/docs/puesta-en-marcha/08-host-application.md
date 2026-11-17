@@ -23,16 +23,16 @@ PS> notepad config.js
 
 | Campo | Valor |
 |---|---|
-| `url` | `wss://<url-del-broker>:8884/mqtt`. Si la consola de HiveMQ muestra otra ruta de WebSocket (02 §2), usar esa |
-| `usuario` / `clave` | `host_app` / su clave |
+| `url` | `wss://<direccion-del-broker>:8084/mqtt` (02 §2) |
+| `usuario` | Opcional: el usuario que se sugiere al entrar. **La clave no va en `config.js`** (ADR-028) |
 | `grupo`, `nodo`, `dispositivo`, `hostId` | Los de la plantilla (diccionario §4) |
 
 **[SEC]**
 
 - `config.js` está en `.gitignore`: verificar que **no** aparezca en `git status`.
-- Igual lo descarga el navegador, así que la clave de `host_app` es pública de hecho. El comentario de
-  `config.example.js` explica por qué esto es una mitigación y no una solución, y ADR-026 describe el
-  riesgo residual del plan gratuito.
+- Desde la v2 la página **pide usuario y contraseña al entrar** y los guarda solo en memoria: no hay
+  ninguna clave en los archivos que descarga el navegador. Si un `config.js` viejo todavía tiene
+  `clave`, la página avisa que hay que borrarla.
 
 ## 2. Servir la página
 
@@ -54,7 +54,8 @@ PS> (Get-NetIPAddress -InterfaceAlias "Wi-Fi" -AddressFamily IPv4).IPAddress    
 
 ## 3. Verificación en la notebook
 
-Abrir **http://localhost:8080**. En el registro de eventos, que muestra lo más nuevo **arriba**, tienen
+Abrir **http://localhost:8080** e ingresar con el usuario de la Host Application y su contraseña
+(02 §3). Con una contraseña equivocada, la pantalla de ingreso lo dice y no entra. En el registro de eventos, que muestra lo más nuevo **arriba**, tienen
 que aparecer estas líneas. Se leen de abajo hacia arriba; acá van en orden cronológico:
 
 ```
@@ -76,7 +77,7 @@ El NCMD #1 es normal: los BIRTH no se retienen, así que una página nueva pide 
 | ☐ | El registro dice `Comando Outputs/LedDigital = true CONFIRMADO (NNN ms)`. **Anotar NNN**: es la latencia del comando medida en el banco real, con la nube incluida (09 §6) |
 
 Si la tarjeta MQTT dice **CREDENCIALES RECHAZADAS**, revisar `usuario` y `clave`. Si queda en
-CONECTANDO, revisar la URL y la ruta del WebSocket (02 §5.1, puerto 8884).
+CONECTANDO, revisar la URL y la ruta del WebSocket (02 §5.1, puerto 8084).
 
 ## 4. Verificación en el celular
 

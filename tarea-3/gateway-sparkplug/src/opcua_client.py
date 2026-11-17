@@ -23,7 +23,7 @@ Que se reutilizo y que cambio
 | C5 Escritor: write_value con            | ADAPTADO      | Devuelve el StatusCode en vez de imprimirlo: el     |
 |   DataValue; rechazo != error de canal  |               | Edge Node lo registra junto al DCMD que lo causo    |
 | correr_hasta_falla()                    | REUTILIZADO   | Generico                                            |
-| C7 bucle de reconexion, clasificacion   | ADAPTADO      | Reintento fijo 2 s -> retroceso exponencial 1-30 s  |
+| C7 bucle de reconexion, clasificacion   | ADAPTADO      | Reintento fijo 2 s -> retroceso exponencial 1-5 s   |
 |   UaStatusCodeError / transporte        |               | (abajo); informa Status/OPCUA/Estado DONE / ERROR   |
 | nodos_del_modelo()                      | REESCRITO     | Los NodeIds salen del diccionario, no del codigo    |
 | C2 rampa, C4 LED, C6 consola, GPIO      | DESCARTADO    | El dispositivo 3 es una PC: no tiene GPIO           |
@@ -44,11 +44,13 @@ Parametros de la suscripcion (heredados de la T2 v2, cliente_suscripcion.py:32-4
 
 Reconexion (C7) con retroceso exponencial
 -----------------------------------------
-Espera = min(1 s x 2^(intento-1), 30 s): 1, 2, 4, 8, 16, 30, 30... Vuelve a 1 s despues de una
-sesion que llego a suscribirse. Frente al reintento fijo de 2 s de la T2: reconecta mas rapido
-ante un corte breve (1 s) y no satura al dispositivo 2 si esta caido mucho tiempo (un intento
-cada 30 s abre canal + sesion: HEL, OPN, CreateSession, ActivateSession). Sin jitter: hay UN
-solo cliente por servidor, no existe el problema de reconexiones sincronizadas de muchos clientes.
+Espera = min(1 s x 2^(intento-1), 5 s): 1, 2, 4, 5, 5... Vuelve a 1 s despues de una sesion que
+llego a suscribirse. El tope era 30 s (ADR-023) y bajo a 5 s (ADR-029): el enlace es UN cable
+punto a punto con UN cliente, asi que reintentar seguido no satura a nadie (un intento cada 5 s
+abre canal + sesion: HEL, OPN, CreateSession, ActivateSession, una firma RSA por intento), y al
+reconectar el cable en la defensa la sesion vuelve en <= 5 s + establecimiento, no en hasta 30 s.
+El MQTT hacia la nube conserva su tope de 30 s: ahi si conviene no insistir contra un broker
+compartido. Sin jitter: hay un solo cliente por servidor.
 
 Seguridad (ADR-009, docs/seguridad-opcua.md)
 --------------------------------------------
@@ -90,7 +92,7 @@ QUEUE_SIZE = 1
 MAX_KEEPALIVE_COUNT = 10
 LIFETIME_COUNT = 300
 RETROCESO_INICIAL_S = 1.0
-RETROCESO_MAXIMO_S = 30.0
+RETROCESO_MAXIMO_S = 5.0            # ADR-029: cable punto a punto, un solo cliente
 
 URI_APLICACION = "urn:unraf:pdci:t3:gateway"    # debe coincidir con la URI de su certificado
 
@@ -113,7 +115,7 @@ def espera_reintento(intento: int) -> float:
     Parametros:
         intento (int): 1 para el primer reintento.
     Retorna:
-        float: segundos a esperar = min(1 x 2^(intento-1), 30).
+        float: segundos a esperar = min(1 x 2^(intento-1), 5).
     """
     return min(RETROCESO_INICIAL_S * 2 ** max(0, intento - 1), RETROCESO_MAXIMO_S)
 

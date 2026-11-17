@@ -99,17 +99,19 @@ def escribir_usuarios(ruta: Path, credenciales: dict[str, str]) -> None:
 
 _G, _N, _H = "spBv1.0/UNRaf_PdCI_2026", "EN01_Gateway", "HA01_WebDashboard"
 
-#: Permisos por usuario que puede reproducir el broker de desarrollo (ADR-026). Cada perfil es
-#: {usuario: (filtros para publicar, filtros para suscribirse)}.
+#: Permisos por usuario que puede reproducir el broker de desarrollo (ADR-026, ADR-027). Cada perfil
+#: es {usuario: (filtros para publicar, filtros para suscribirse)}.
 PERFILES_ACL = {
-    # Lo maximo que permite HiveMQ Cloud Serverless (plan gratuito): UN permiso por credencial, con
-    # UN filtro (docs.hivemq.com, "Access Management Options per Cloud Plan"). Es el perfil del banco.
-    "serverless": {
+    # UN permiso con UN filtro por credencial: lo que permitia HiveMQ Cloud Serverless (ADR-026,
+    # retirado). Se conserva para probar que el Edge Node tolera que le rechacen STATE (Sparkplug
+    # 3.0 §5.3) y para medir el riesgo de un broker sin ACL por topico.
+    "un_filtro": {
         "edge_node": ([f"{_G}/#"], [f"{_G}/#"]),               # Publish and Subscribe: el grupo
         "host_app": (["spBv1.0/#"], ["spBv1.0/#"]),            # Publish and Subscribe: necesita STATE
         "observador": ([], ["spBv1.0/#"]),                     # Subscribe Only
     },
-    # Minimo privilegio del ADR-005: requiere roles (HiveMQ Starter) o un Mosquitto con acl_file.
+    # Minimo privilegio del ADR-005. ES EL PERFIL DEL BANCO: las mismas reglas se cargan en EMQX Cloud
+    # Serverless (ADR-027, docs/puesta-en-marcha/02-broker-mqtt.md §3.2) y en un acl_file de Mosquitto.
     "minimo": {
         "edge_node": ([f"{_G}/+/{_N}", f"{_G}/+/{_N}/#"],
                       [f"{_G}/NCMD/{_N}", f"{_G}/DCMD/{_N}/#", "spBv1.0/STATE/#"]),
@@ -219,7 +221,7 @@ def main() -> None:
     parser.add_argument("--puerto", type=int, default=8883)
     parser.add_argument("--puerto-ws", type=int, default=None, help="WebSocket sin TLS en 127.0.0.1 (para la web)")
     parser.add_argument("--acl", choices=sorted(PERFILES_ACL), default=None,
-                        help="permisos por usuario: 'serverless' (como HiveMQ Cloud gratuito) o 'minimo' (ADR-005)")
+                        help="permisos por usuario: 'minimo' (ADR-005, el del broker del banco) o 'un_filtro' (ADR-026)")
     args = parser.parse_args()
     credenciales = {}
     for usuario in USUARIOS_POR_DEFECTO:

@@ -2,7 +2,7 @@
 main.py  (ESCLAVO MODBus RTU — Tarea 3, dispositivo 1)
 Autores: Bevilacqua Francisco, Peralta Agustina
 Fecha de creacion: 2026-11-09
-Version: 1.0
+Version: 1.1 (2026-11-16: cambio de perfil pedido por el maestro, ADR-029)
 
 Descripcion general
 -------------------
@@ -28,6 +28,7 @@ Correspondencia con el diagrama de flujo (docs/diagramas/flujo-esclavo.mmd)
   [DF-1.16] Transmitir                   -> Esclavo.transmitir()
   [DF-1.17] Aplicar salidas              -> Esclavo.aplicar_salidas()
   [DF-1.18] a [DF-1.20] Descartes        -> contadores en Esclavo.procesar()
+  [DF-1.21] Cambio de perfil             -> Esclavo.procesar() (lo detecta), main() (lo aplica)
 
 Dependencias externas
 ---------------------
@@ -160,6 +161,8 @@ class Esclavo:
             frame_parser.MOTIVO_CRC: 0, frame_parser.MOTIVO_INVALIDA: 0,
         }
         self.errores_internos = 0
+        #: [DF-1.21] perfil que pidio el maestro por REGISTRO_PERFIL (None = ninguno)
+        self.perfil_pedido = None
         self._inicio_ms = time.ticks_ms()
         self._ultimo_latido_ms = self._inicio_ms
 
@@ -178,6 +181,7 @@ class Esclavo:
             "led_digital": lambda: SalidaDigital(config.PIN_LED_DIGITAL, estado_inicial=False),
             "led_pwm": lambda: SalidaPWM(config.PIN_LED_PWM),
             "uptime_s": lambda: None,          # calculada, sin hardware
+            "perfil": lambda: None,            # registro de configuracion (ADR-029), sin hardware
         }
         creados = {}
         for senal in self.modelo.senales():
@@ -269,6 +273,12 @@ class Esclavo:
             self.transmitir(respuesta)                      # [DF-1.16]
         if motivo in (frame_parser.MOTIVO_RESPONDIDA, frame_parser.MOTIVO_DIFUSION):
             self.aplicar_salidas()      # una escritura se ve en el LED sin esperar otra vuelta
+            # [DF-1.21] El maestro escribio REGISTRO_PERFIL. El eco YA se transmitio (transmitir
+            # vacia el UART): el cambio se aplica despues, y el maestro recibe su confirmacion.
+            codigo = self.modelo.valor_de_senal("perfil")
+            pedido = config.CODIGOS_PERFIL.get(codigo)
+            if pedido is not None and pedido != self.nombre_perfil:
+                self.perfil_pedido = pedido
         # La traza va DESPUES de responder: imprimir antes demoraria la respuesta.
         if config.NIVEL_LOG >= 2:
             print("RX {} -> {}{}".format(_hex(trama), motivo,
@@ -350,14 +360,14 @@ class Esclavo:
         se hacen solo con el bus en reposo.
 
         Retorna:
-            None: no retorna. Ctrl+C en Thonny lo interrumpe (KeyboardInterrupt no es
-            Exception y no lo atrapa el except).
+            str: el perfil que pidio el maestro (ADR-029); hasta entonces no retorna.
+            Ctrl+C en Thonny lo interrumpe (KeyboardInterrupt no es Exception).
         """
         if config.NIVEL_LOG >= 1:
             self.mostrar_arranque()
         self.publicar_entradas()
         self.aplicar_salidas()
-        while True:
+        while self.perfil_pedido is None:
             try:
                 if self.atender_bus():
                     continue                    # hay trafico: seguir atendiendo el UART
@@ -370,6 +380,23 @@ class Esclavo:
                 # que lo registra y sigue: se cuenta y se informa.
                 self.errores_internos += 1
                 print("ERROR interno: {}".format(error))
+        return self.perfil_pedido
+
+    def cerrar(self):
+        """
+        [DF-1.21] Libera el bus y deja las salidas en estado seguro antes de cambiar de perfil.
+
+        Retorna:
+            None
+        """
+        self.de_re.value(0)                          # nunca dejar el transmisor tomando el bus
+        p = self.perifericos
+        if "led_digital" in p:
+            p["led_digital"].escribir(False)
+        if "led_pwm" in p:
+            p["led_pwm"].apagar()
+        if hasattr(self.uart, "deinit"):
+            self.uart.deinit()                       # el perfil nuevo abre el UART con otro baud
 
 
 def _hex(datos):
@@ -378,9 +405,19 @@ def _hex(datos):
 
 
 def main():
-    """Punto de entrada: [DF-1.1] perfil, construccion del esclavo y lazo."""
+    """
+    Punto de entrada: [DF-1.1] perfil, construccion del esclavo y lazo. [DF-1.21] Si el
+    maestro pide otro perfil, se cierra el esclavo y se construye uno nuevo con ese perfil:
+    otro Unit ID, otro enlace serie y otro mapa, como si fuera otra placa (ADR-029).
+    """
     nombre, perfil = elegir_perfil()
-    Esclavo(nombre, perfil).ejecutar()
+    while True:
+        esclavo = Esclavo(nombre, perfil)
+        pedido = esclavo.ejecutar()
+        esclavo.cerrar()
+        print("Cambio de perfil pedido por el maestro: {} -> {} (se pierde al reiniciar)".format(
+            nombre, pedido))
+        nombre, perfil = pedido, config.PERFILES[pedido]
 
 
 if __name__ == "__main__":

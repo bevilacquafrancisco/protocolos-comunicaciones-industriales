@@ -51,13 +51,40 @@ Todo es libre o gratuito.
 **[SEC]** La clave reemplaza a la contraseña para entrar a la Raspberry: no se puede adivinar por fuerza
 bruta y no viaja por la red.
 
+Se crea una clave **solo para el TP**, con su propio nombre de archivo (`-f`):
+
 ```powershell
-PS> ssh-keygen -t ed25519 -C "pdci-t3"
+PS> ssh-keygen -t ed25519 -C "pdci-t3" -f $env:USERPROFILE\.ssh\id_ed25519_pdci_t3
 ```
 
-- Aceptar la ruta por defecto y poner una frase de paso.
-- La clave pública (`id_ed25519.pub`) es la que se le da a la Raspberry en 04 §3.
-- La privada (`id_ed25519`, sin extensión) **no sale de la notebook**.
+- Poner una frase de paso.
+- ⚠️ **No usar la ruta por defecto (`id_ed25519`) si ya existe**: si `ssh-keygen` pregunta
+  `Overwrite (y/n)?`, responder **`n`**. Sobrescribirla borra la clave que ya se usa para GitHub u otros
+  equipos, y se pierde ese acceso.
+- **Por qué una clave aparte:** si se compromete (la notebook se usa en el aula, la microSD pasa por
+  otras manos), se descarta sin afectar ningún otro acceso. Es el mismo criterio de credenciales
+  separadas que se usa en el broker.
+- La clave pública (`id_ed25519_pdci_t3.pub`) es la que se le da a la Raspberry en 04 §2.
+- La privada (`id_ed25519_pdci_t3`, sin extensión) **no sale de la notebook**.
+
+Para que `ssh`, `scp`, el túnel al Dashboard y el menú de fallas usen esa clave sin escribir `-i` en
+cada comando, agregar esta entrada a `C:\Users\<usuario>\.ssh\config` (si el archivo no existe, se
+crea):
+
+```text
+Host rpi-pdci-t3.local 192.168.10.1
+    User pdci
+    IdentityFile ~/.ssh/id_ed25519_pdci_t3
+    IdentitiesOnly yes
+```
+
+- `IdentitiesOnly yes` evita que SSH le ofrezca primero a la placa las otras claves de la notebook.
+- La entrada cubre el nombre mDNS y la IP fija del cable (192.168.10.1, 04 §4). Si se entra por la IP
+  que asigna el celular, que cambia, hay que indicar la clave a mano: `ssh -i
+  $env:USERPROFILE\.ssh\id_ed25519_pdci_t3 pdci@<ip>`.
+
+*(Alternativa: reutilizar la clave existente, `id_ed25519.pub`. Funciona, pero comparte el riesgo con
+todos los demás accesos de esa clave.)*
 
 ## 4. Repositorio y dependencias
 
@@ -98,12 +125,12 @@ PS> cd gateway-sparkplug; .venv\Scripts\python -m pytest -q; cd ..
 PS> cd hmi-web; npm test; cd ..
 ```
 
-| Suite | Resultado esperado (2026-11-14) |
+| Suite | Resultado esperado (2026-11-16) |
 |---|---|
 | Firmware del esclavo (CPython) | `TODO OK`: 169 verificaciones (35 + 48 + 57 + 29) |
 | `edge-nodered` (Jest) | 179 de 179 |
-| `gateway-sparkplug` (pytest) | 61 de 61 |
-| `hmi-web` (`node:test`, incluye la página en Chrome) | 16 de 16 |
+| `gateway-sparkplug` (pytest) | 62 de 62 |
+| `hmi-web` (`node:test`, incluye la página en Chrome) | 24 de 24 |
 
 Si una suite falla en la notebook del banco y no en otra, la diferencia está en el entorno: versión de
 Python o de Node, o un puerto ocupado. Hay que resolverlo acá y no en el laboratorio.

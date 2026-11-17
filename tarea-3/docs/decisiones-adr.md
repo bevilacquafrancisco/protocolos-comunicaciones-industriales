@@ -14,7 +14,7 @@ Revisión contra el código de las Tareas 1 y 2 ([analisis-t1.md](analisis-t1.md
 | 002 | **Aceptado; se activó la consecuencia** | La T1 usa `umodbus`: el stack del esclavo se reescribe |
 | 003 | Aceptado | Confirmado: es decisión defendida en la T1. `Potenciometro_pct` declarada en el diccionario |
 | 004 | Aceptado | Fundamento reforzado con la medición de la T2 (en PC) |
-| 005 | **Aceptado con corrección** | El broker sí; el mínimo privilegio por tópico **no** se puede en el plan gratuito → ADR-026 |
+| 005 | **Aceptado con corrección** | Broker gestionado y tres usuarios con permisos por tópico, sí. El proveedor (HiveMQ Serverless) se retiró → ADR-027 |
 | 006 | Aceptado | Sin cambios |
 | 007 | Aceptado | Sin cambios; depende de ADR-010 |
 | 008 | Aceptado | Sin cambios |
@@ -35,7 +35,10 @@ Revisión contra el código de las Tareas 1 y 2 ([analisis-t1.md](analisis-t1.md
 | 023 | Aceptado (F5) | Reconexión OPC UA y MQTT con retroceso exponencial 1-30 s |
 | 024 | Aceptado (F6) | Host Application: núcleo puro, cliente MQTT por conexión, bibliotecas en `vendor/` |
 | 025 | Aceptado (F6) | CSP con `'unsafe-eval'` (protobuf.js) y `worker-src blob:` (mqtt.js), medido |
-| 026 | Aceptado (puesta en marcha) | HiveMQ Serverless: un permiso por credencial; STATE opcional en el Edge Node; riesgo residual medido |
+| 026 | **Superado por ADR-027** (2026-11-16) | HiveMQ Serverless: un permiso por credencial. Queda vigente la corrección del código (STATE opcional en el Edge Node) |
+| 027 | Aceptado (puesta en marcha, 2026-11-16) | EMQX Cloud Serverless: HiveMQ Serverless ya no se vende; se recupera el mínimo privilegio del ADR-005 |
+| 029 | Aceptado (2026-11-16) | Defensa: banco independiente de la Wi-Fi, Host Application en GitHub Pages, alarmas con recuperación, OPC UA reintenta cada ≤ 5 s y perfil del ESP32 desde el Dashboard |
+| 028 | Aceptado (2026-11-16) | Host Application v2: ingreso con usuario y clave del broker, tramas MODBus reales por Sparkplug, lo no capturable se muestra reconstruido y rotulado |
 
 ---
 
@@ -657,7 +660,11 @@ proporcional al riesgo). `ui.test.js` verifica que la consola no tenga errores, 
 
 ---
 
-## ADR-026 — Permisos reales del broker gratuito: un filtro por credencial *(Aceptado, puesta en marcha; corrige el ADR-005)*
+## ADR-026 — Permisos reales del broker gratuito: un filtro por credencial *(Superado por el ADR-027; corregía el ADR-005)*
+
+> **Superado el 2026-11-16.** HiveMQ Cloud Serverless dejó de venderse y el banco usa EMQX con
+> permisos por usuario (ADR-027). Se conserva como registro. **Sigue vigente** la corrección del
+> código: el Edge Node tolera que el broker le rechace la suscripción a STATE.
 
 **Contexto.** El ADR-005 eligió HiveMQ Cloud Serverless (gratuito) y propuso tres usuarios con
 permisos por tópico diferenciados (mínimo privilegio). Al redactar la puesta en marcha se verificó la
@@ -720,6 +727,138 @@ publicar y el broker registra quién se conecta. El riesgo residual se acota en 
 - **Si el TP pasara a producción**, la opción es B o C. En el informe se muestra el `acl_file` de C,
   que es el mínimo privilegio completo, como la configuración de referencia
   (`docs/puesta-en-marcha/02-broker-mqtt.md` §6).
+
+---
+
+## ADR-027 — Broker del banco: EMQX Cloud Serverless *(Aceptado, puesta en marcha, 2026-11-16; reemplaza al proveedor del ADR-005 y supera al ADR-026)*
+
+**Contexto.** Al dar de alta el broker, la consola de HiveMQ solo ofrecía brokers *self-managed*. La
+documentación oficial ("HiveMQ Cloud Serverless End of Life", docs.hivemq.com, consultada el
+2026-11-16) dice lo siguiente:
+
+- **Fin de venta: 2026-09-30.** Desde esa fecha no se crean clusters Serverless.
+- **Fin de vida: 2026-12-31.** Ese día dejan de aceptarse conexiones y se borran los datos.
+- La licencia de migración gratuita es solo para cuentas que ya tenían un cluster cuando se anunció el
+  retiro. No es el caso de este grupo.
+
+El ADR-005 y el ADR-026 se apoyaron en páginas de HiveMQ consultadas el 2026-11-14, que describían
+el plan sin mencionar el retiro. **Error de proceso:** se verificaron las características del plan,
+pero no su ciclo de vida.
+
+**Opciones**
+
+| Opción | I-03 | Mínimo privilegio (ADR-005) | Costo | Trabajo y riesgo |
+|---|---|---|---|---|
+| **A. EMQX Cloud Serverless** | Sí | **Completo**: reglas por usuario (tópico, acción, permitir o denegar) | Gratis con *Spend Limit* en USD 0: 1 GB y 1 M de minutos de sesión por mes | Mínimo. Lo opera EMQX. Exige SNI. Según una fuente no oficial, se detiene tras 30 días sin uso |
+| B. Broker propio (Mosquitto, o HiveMQ con licencia Lab) en una VM en la nube | Sí | Completo (`acl_file`) | Gratis en una capa *always free*, o unos USD 4-8 por mes | Alto: TLS y dominio, firewall, parches; más superficie de ataque, a semanas de la entrega |
+| C. HiveMQ Cloud pago (Starter o Enterprise) | Sí | Completo, con roles | Pago | Bajo, pero el presupuesto del TP es cero |
+| D. Broker público de prueba (`broker.emqx.io`, `test.mosquitto.org`) | Sí | **Ninguno**: sin autenticación y con tópicos visibles para cualquiera | Gratis | **Descartado**: cualquiera podría accionar el LED |
+| E. HiveMQ con licencia Lab en la notebook (Docker) | **No**: broker local | — | Gratis | **Descartado** por I-03 |
+
+**Decisión.** A. Se configura la tabla de permisos del ADR-005 completa: una regla *Deny* `#` para
+todos los usuarios, que convierte la autorización en lista blanca, y diez reglas *Allow* por usuario
+(`docs/puesta-en-marcha/02-broker-mqtt.md` §3.2).
+
+**Fundamento.**
+
+- **Requisitos.** Cumple I-03 y los requisitos de la consigna para el broker: MQTT 3.1.1/5.0, Last
+  Will, retenidos y WebSocket.
+- **Presupuesto cero, con garantía.** El *Spend Limit* en USD 0 garantiza que no se cobra nada.
+- **Mínimo privilegio real.** Recupera lo que el ADR-026 había tenido que resignar.
+- **Reversibilidad.** El código no depende del proveedor: el host y los puertos van en `.env`, la URL
+  WSS en `config.js`, y TLS usa el almacén de CAs del sistema. Cambiar de broker otra vez es cambiar
+  configuración, no código.
+
+**Consecuencias**
+
+- **Seguridad.** Con la clave de la web, que es pública de hecho, ya **no** se puede publicar un
+  NBIRTH falso: es el perfil `minimo` de `test_permisos_broker.py`, que ahora es el perfil del banco.
+  R-08 baja a I = 1.
+- **Puerto WSS: 8084** (HiveMQ usaba 8884). Cambian `config.example.js`, `.env.example`, el diagrama
+  de arquitectura y la puesta en marcha. R-06 se actualiza.
+- **La cuota limita el uso continuo.** Con el tráfico medido en régimen (≈ 4,2 MB/h, `mediciones.md`
+  §2), 1 GB alcanza para unas 230 h por mes, pero no para tener la cadena encendida 24 × 7. Al
+  terminar cada sesión se detienen el Edge Node y el observador. Si la cuota se agota, el broker se
+  detiene sin cobrar.
+- **Región fija.** La latencia de los comandos que se mida en el banco incluye el viaje a esa región, y
+  se informa junto con ella.
+- **El código del ADR-026 queda.** La tolerancia al rechazo de STATE sigue siendo correcta frente a
+  cualquier broker que no lo autorice (Sparkplug 3.0 §5.3), y su prueba se mantiene con un perfil
+  renombrado: `un_filtro` (antes `serverless`).
+- **Lección de proceso.** Antes de adoptar un servicio externo se consulta también su página de ciclo
+  de vida o de fin de servicio. Queda como defecto D-5 en `resultados-pruebas.md`.
+
+## ADR-028 — Host Application v2: ingreso sin secretos en la página, tramas reales y reconstrucción rotulada *(Aceptado, 2026-11-16)*
+
+**Contexto.** La web de la v1 mostraba el estado y accionaba las salidas, pero no explicaba la cadena:
+ni el modelo de datos MODBus, ni el espacio de direcciones OPC UA, ni cómo viajan las tramas, el CRC o
+los tiempos. Además, para publicarla con un enlace propio (sin depender de la IP de la notebook),
+`config.js` no puede llevar la clave: el navegador lo descarga, y la clave queda pública (R-08).
+
+Hay tres preguntas de diseño:
+
+1. **¿De dónde salen las tramas MODBus reales?** El servidor OPC UA ya expone
+   `Status.MODBUS.UltimaTramaTx`, `UltimaTramaRx` y `LatenciaMs` (diccionario §2), pero no viajaban por
+   Sparkplug.
+2. **¿Cómo se autentica la página sin un secreto en sus archivos?**
+3. **¿Qué se muestra de los tramos que el navegador no puede ver?** La sesión OPC UA va cifrada entre
+   las placas, y la trama FC 05/06 del comando ocurre en el bus.
+
+**Opciones y decisión**
+
+| Pregunta | Opciones | Decisión | Por qué |
+|---|---|---|---|
+| 1 | (a) Métricas Sparkplug de nodo con alias 15-17 · (b) un tópico propio con las tramas · (c) mostrar solo tramas calculadas | **(a)**, agrupadas en el NDATA periódico como los contadores (ADR-021) | (b) rompe Sparkplug: todo viaja en métricas. (c) no es evidencia. Las tramas cambian ~16 veces por segundo; sin agrupar, cada notificación OPC UA sería un NDATA |
+| 2 | (a) Clave en `config.js` (v1) · (b) usuario y clave pedidos al entrar, solo en memoria · (c) backend con tokens de vida corta | **(b)** | (a) la publica. (c) es lo correcto en producción, pero agrega un servidor que el TP no necesita. Con (b) cada persona tiene su usuario del broker con el ACL de la Host Application (ADR-027), revocable por separado |
+| 3 | (a) Omitirlos · (b) mostrarlos reconstruidos, rotulados **RECONSTRUIDO** frente a **CAPTURADO** | **(b)** | Es la única forma de explicar el recorrido completo de un comando sin inventar evidencia: lo capturado son bytes que llegaron; lo reconstruido se calcula con el mismo mapa y el mismo CRC, y se dice |
+
+**Medición de tiempos.** El comando guarda cinco marcas: T0 (envío), T1 (eco del DCMD que devuelve el
+broker), T2 (SourceTimestamp OPC UA, reloj de la Raspberry), T3 (timestamp del payload, reloj del Edge
+Node) y T4 (confirmación). **Solo son exactas las restas entre marcas del mismo reloj**: T1 − T0 y T4 − T0.
+Los tramos intermedios restan relojes distintos y la página lo dice junto a cada número.
+
+**Consecuencias**
+
+- Diccionario: 3 métricas de nodo nuevas (alias 15-17). En el Edge Node, `_agrupable` las incluye.
+  Node-RED no cambia: los nodos ya existían.
+- El Edge Node hay que reiniciarlo en el banco para que tome el diccionario nuevo.
+- Tráfico: el NDATA de 1 Hz crece unos 60 bytes por segundo. Es menor que la cuota de EMQX (ADR-027).
+- R-08 baja a 1: no hay clave en la página. Hay que **cambiar la clave de `host_app`**, que estuvo en
+  el `config.js` de la v1, y crear un usuario por profesor (puesta en marcha 02 §3.2).
+- `modelo.js` duplica datos del diccionario para la página estática; `hmi-web/test/tramas.test.js`
+  falla si se desincronizan (I-06).
+- Recargar la página pide la clave otra vez. Es el comportamiento buscado.
+
+---
+
+## ADR-029 — Preparación para la defensa: cualquier red, enlace público y fallas que se anuncian y se recuperan *(Aceptado, 2026-11-16)*
+
+**Contexto.** La defensa puede hacerse en la red de casa, la del laboratorio o la del celular, los
+profesores tienen que abrir la página sin depender de la IP de la notebook, y las fallas típicas del
+banco (cable Ethernet, bus RS-485, esclavo desconocido) tienen que **verse** y **recuperarse solas**.
+
+**Decisiones**
+
+| Tema | Decisión | Alternativas descartadas | Por qué |
+|---|---|---|---|
+| Red | Todo lo de las placas va por el **cable**: OPC UA y también SSH y el túnel al Dashboard (`ufw` acepta SSH por `eth0` solo desde 192.168.10.2). La Wi-Fi solo le da internet a la notebook. IP fija de la notebook **permanente** | mDNS (`rpi-pdci-t3.local`) por Wi-Fi; una IP de la Raspberry por red | Las redes de aula suelen aislar clientes o bloquear mDNS: por Wi-Fi, cambiar de red cambia todo. El cable es igual en cualquier lugar. El riesgo agregado es mínimo: un enlace punto a punto, un origen permitido y SSH solo con clave |
+| Hora de la Raspberry | `scripts/banco.ps1 hora` la iguala a la de la notebook por SSH cuando la placa no tiene internet | NTP de Windows como servidor (registro y firewall); RTC | La Raspberry no tiene RTC. Sin internet arranca con la hora del último apagado, y las marcas de tiempo (ADR-028) salen corridas. Un comando al empezar alcanza |
+| Enlace público | **GitHub Pages**, publicado por GitHub Actions con `tools/armar_sitio.js` (la misma lista blanca de `servir.js`). La URL del broker sale de una variable del repositorio | Servirla desde la notebook o la Raspberry; Netlify, Cloudflare Pages | Pages es gratis, HTTPS, y ya está donde vive el código. EMQX no aloja páginas. Como la página no lleva claves (ADR-028), publicarla no expone credenciales |
+| Alarmas | Panel de **alarmas activas** en la web: qué falló, desde cuándo, qué revisar; y **RECUPERADO** con su duración. Se suprime la consecuencia: sin OPC UA no se acusa al bus | Solo el color de la capa | En la defensa hay que decir en segundos qué pasó. El color solo no dice la causa ni el tiempo |
+| Reconexión OPC UA | Tope del retroceso: **5 s** (antes 30 s, ADR-023). MQTT conserva 30 s | Reintento fijo; mantener 30 s | Un solo cliente sobre un cable propio: reintentar cada 5 s no satura nada, y al reconectar el cable la sesión vuelve en ≤ 5 s + el establecimiento, no en hasta 30 s |
+| Esclavo desconocido | El ESP32 tiene un **registro de configuración** (Holding 0x0F00) en los dos perfiles. El Dashboard le escribe 2 (desconocido) o 1 (dispositivo 1) con FC 06. El esclavo responde el eco y **después** se reinicia con el otro Unit ID, baud y mapa. No se guarda: reiniciar el ESP32 vuelve al dispositivo 1. El jumper de GPIO 13 sigue como alternativa por hardware | Seguir con el jumper; guardar el perfil en la flash | El jumper exige tocar el protoboard en plena defensa. Sin guardar, un reinicio siempre recupera un estado conocido |
+
+**Consecuencias**
+
+- Firmware: `config.py` y `main.py` cambian (`[DF-1.21]`); la biblioteca `lib/modbus_slave` no.
+  Prueba: `prueba_config.py` verifica el eco antes del cambio y la excepción 03 ante un código
+  inexistente.
+- Node-RED: dos botones en el panel *Prueba* que usan la trama manual existente, más el texto de
+  la tarjeta de capas. Hay que regenerar los flujos y reiniciar el servicio.
+- Notebook: `scripts/banco.ps1` (`verificar`, `hora`, `iniciar`, `web`).
+- La IP 192.168.10.2 de la notebook ya **no se borra** al terminar (10 §4).
+- Si una red Wi-Fi usara también 192.168.10.0/24, la ruta al cable gana igual (es la red conectada
+  directamente), y `banco.ps1 verificar` comprueba que la ruta a la Raspberry salga por Ethernet.
 
 ---
 

@@ -95,7 +95,7 @@ panel. Es otro cliente (`PdCI-T3-verificador`) y se confía igual que en 07 §2.
 
 | ID | Prueba | Cómo | Evidencia |
 |---|---|---|---|
-| 3.1 | Broker en internet (I-03) | El host del `.env` es el de HiveMQ; `tracert <url-del-broker>` sale de la red local | `banco-tracert-broker.txt` |
+| 3.1 | Broker en internet (I-03) | El host del `.env` es el de EMQX Cloud; `tracert <url-del-broker>` sale de la red local | `banco-tracert-broker.txt` |
 | 3.10 / N2.4 | Los **siete tipos**: NBIRTH, DBIRTH, NDATA, DDATA, DCMD, DDEATH, NDEATH | MQTT Explorer con `observador` (07 §3.2) mientras se ejecutan F-01 (DDEATH), F-05 (NDEATH) y un comando desde la web (DCMD) | `banco-mqttexplorer-<tipo>.png` + `sparkplug-banco.jsonl` |
 | 3.9 | Payload Protobuf | Un DDATA de `sparkplug-banco.jsonl`: `.venv\Scripts\python tools\volcado_sparkplug.py --jsonl ..\docs\capturas\banco\sparkplug-banco.jsonl --tipo DDATA --markdown` | `banco-volcado-ddata.md` |
 | 3.12 | STATE retenido de la Host Application | MQTT Explorer: `spBv1.0/STATE/HA01_WebDashboard`, con la marca de *retained*, `{"online": true, ...}` | `banco-mqttexplorer-state.png` |
