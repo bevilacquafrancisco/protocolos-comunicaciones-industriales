@@ -166,11 +166,13 @@ Dashboard no quedan expuestos en la Wi-Fi.
 
 **[SEC]** El servidor OPC UA escucha en todas las interfaces, y eso incluye la Wi-Fi del celular. Se
 deja abierto solo por `eth0`, como en la regla de la T2 de que todo el tráfico OPC UA vaya por el
-cable. **Primero** se permite SSH: si no, se pierde la sesión.
+cable. **Primero** se permite SSH: si no, se pierde la sesión. SSH entra por la Wi-Fi y también
+por el cable, solo desde la notebook (ADR-029): así el túnel al Dashboard funciona en cualquier red.
 
 ```bash
 $ sudo apt install -y ufw
 $ sudo ufw allow in on wlan0 to any port 22 proto tcp
+$ sudo ufw allow in on eth0 from 192.168.10.2 to any port 22 proto tcp   # SSH por el cable (ADR-029)
 $ sudo ufw allow in on eth0  to any port 4840 proto tcp
 $ sudo ufw default deny incoming
 $ sudo ufw enable

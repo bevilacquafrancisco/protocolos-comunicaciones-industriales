@@ -229,15 +229,30 @@
                 def.valor = this.codec.valor(m.crudo, m.tipo || def.tipo);
                 def.ts = m.timestamp ?? tsPayload;
                 def.vigencia = VIGENCIA.EN_LINEA;
-                this._confirmar(nombre, def.valor, r);
+                this._confirmar(nombre, def.valor, r, def.ts, tsPayload);
             }
         }
 
-        _confirmar(nombre, valor, r) {
+        /**
+         * [DF-4.14] Un DATA (o DBIRTH) con el valor pedido confirma el comando. Guarda las marcas
+         * de tiempo para la medicion de la pestana Panel general (ADR-028):
+         *   t          envio del DCMD           (reloj de ESTA pagina)
+         *   tEco       el broker devolvio el DCMD a esta pagina (mismo reloj)
+         *   tsFuente   timestamp de la metrica = SourceTimestamp OPC UA (reloj de la Raspberry)
+         *   tsPayload  timestamp del payload   (reloj del Edge Node)
+         *   tConfirmado llegada de la confirmacion (reloj de ESTA pagina)
+         * Solo las restas entre marcas del MISMO reloj son exactas (t, tEco, tConfirmado).
+         */
+        _confirmar(nombre, valor, r, tsFuente = null, tsPayload = null) {
             const c = this.comandos.get(nombre);
             if (c && c.estado === 'enviado' && c.valor === valor) {
                 c.estado = 'confirmado';
-                r.eventos.push({ nivel: 'info', texto: `Comando ${nombre} = ${valor} CONFIRMADO (${this.ahora() - c.t} ms)` });
+                c.tConfirmado = this.ahora();
+                c.tsFuente = tsFuente;
+                c.tsPayload = tsPayload;
+                c.seqConfirmacion = this.nodo.seq;
+                r.confirmados.push(nombre);
+                r.eventos.push({ nivel: 'info', texto: `Comando ${nombre} = ${valor} CONFIRMADO (${c.tConfirmado - c.t} ms)` });
             }
         }
 
@@ -274,7 +289,8 @@
          * @returns {{eventos: Array<{nivel:string, texto:string}>, publicar: Array<object>, state: ?object, tipo: ?string}}
          */
         procesar(topico, bytes, retenido = false) {
-            const r = { eventos: [], publicar: [], state: null, tipo: null };
+            // payload: el mensaje decodificado (para la vista); confirmados: comandos que confirma ESTE mensaje
+            const r = { eventos: [], publicar: [], state: null, tipo: null, payload: null, confirmados: [] };
             const t = analizarTopico(topico);
             if (!t) return r;
             r.tipo = t.tipo;
@@ -297,10 +313,18 @@
                 r.eventos.push({ nivel: 'error', texto: `${t.tipo}: payload Protobuf inválido (${e.message})` });
                 return r;
             }
+            r.payload = p;
 
             if (t.tipo === 'NCMD' || t.tipo === 'DCMD') {           // comandos (de esta web o de otra)
-                const lista = p.metricas.map((m) => (m.nombre || (this.alias.get(m.alias) || {}).nombre || `alias ${m.alias}`)
-                    + ' = ' + this.codec.valor(m.crudo, m.tipo)).join(', ');
+                const lista = p.metricas.map((m) => {
+                    const nombre = m.nombre || (this.alias.get(m.alias) || {}).nombre || `alias ${m.alias}`;
+                    const valor = this.codec.valor(m.crudo, m.tipo);
+                    // Eco: el broker devolvio a esta pagina (suscripta al grupo) un DCMD pendiente.
+                    // Mide la ida y vuelta pagina <-> broker con UN solo reloj (ADR-028).
+                    const c = t.tipo === 'DCMD' ? this.comandos.get(nombre) : null;
+                    if (c && c.estado === 'enviado' && c.valor === valor && c.tEco == null) c.tEco = this.ahora();
+                    return `${nombre} = ${valor}`;
+                }).join(', ');
                 r.eventos.push({ nivel: 'info', texto: `${t.tipo} ${lista}` });
                 return r;
             }
@@ -348,7 +372,7 @@
                 this._aplicarData(this.nodo, 'nodo', p.metricas, p.timestamp, r);
             } else if (t.tipo === 'DBIRTH') {
                 this._cargarBirth(this.disp, 'dispositivo', p.metricas, p.timestamp);
-                for (const [nombre, m] of this.disp.metricas) this._confirmar(nombre, m.valor, r);
+                for (const [nombre, m] of this.disp.metricas) this._confirmar(nombre, m.valor, r, m.ts, p.timestamp);
                 r.eventos.push({ nivel: 'info', texto: `DBIRTH seq=${p.seq}: dispositivo EN LÍNEA` });
             } else if (t.tipo === 'DDATA') {
                 if (this.disp.estado !== VIGENCIA.EN_LINEA) this._pedirRebirth(r, 'DDATA sin DBIRTH vigente');
@@ -380,9 +404,11 @@
             }
             const t = this.ahora();
             // Solo alias (payloads-alias-data-cmd-requirement); el tipo, el del DBIRTH.
-            r.publicar.push({ topico: this.topicos.dcmd, qos: 0, retener: false,
-                bytes: this.codec.codificar({ timestamp: t, metricas: [{ alias: m.alias, tipo: m.tipo, valor }] }) });
-            this.comandos.set(nombre, { valor, estado: 'enviado', t });
+            const bytes = this.codec.codificar({ timestamp: t, metricas: [{ alias: m.alias, tipo: m.tipo, valor }] });
+            r.publicar.push({ topico: this.topicos.dcmd, qos: 0, retener: false, bytes });
+            // bytes, alias y tipo quedan para el recorrido del comando en la vista (ADR-028)
+            this.comandos.set(nombre, { valor, estado: 'enviado', t, tEco: null, tConfirmado: null, tsFuente: null,
+                tsPayload: null, seqConfirmacion: null, alias: m.alias, tipo: m.tipo, bytes });
             r.eventos.push({ nivel: 'info', texto: `DCMD ${nombre} = ${valor} ENVIADO` });
             return r;
         }

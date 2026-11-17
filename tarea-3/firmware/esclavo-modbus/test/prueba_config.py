@@ -29,7 +29,7 @@ import config
 from modbus_slave.data_model import ModeloDatos
 
 #: Senales que main.py sabe manejar (Esclavo._crear_perifericos).
-SENALES_CONOCIDAS = {"pulsador", "potenciometro", "led_digital", "led_pwm", "uptime_s", None}
+SENALES_CONOCIDAS = {"pulsador", "potenciometro", "led_digital", "led_pwm", "uptime_s", "perfil", None}
 
 #: GPIO prohibidos (tarea-1/docs/arquitectura.md §8.1): strapping y flash SPI.
 PINES_PROHIBIDOS = {0, 2, 5, 12, 15, 6, 7, 8, 9, 10, 11}
@@ -72,13 +72,40 @@ def main():
                 and modelo.valor_de_senal("led_digital") in (0, None),
                 "las salidas arrancan apagadas (estado seguro)")
 
-    d1 = {(e["tabla"], e["direccion"], e["nombre"]) for e in config.PERFILES["DISPOSITIVO_1"]["mapa"]}
+    # Config/* es configuracion del esclavo, no una E/S del diccionario (ADR-029)
+    d1 = {(e["tabla"], e["direccion"], e["nombre"]) for e in config.PERFILES["DISPOSITIVO_1"]["mapa"]
+          if not e["nombre"].startswith("Config/")}
     v.check(d1 == DICCIONARIO_D1, "DISPOSITIVO_1 = diccionario de datos §1 (nombres y offsets, I-06)")
     p1, p2 = config.PERFILES["DISPOSITIVO_1"], config.PERFILES["DESCONOCIDO"]
     v.check(p1["unit_id"] != p2["unit_id"] and (p1["baud"], p1["paridad"]) != (p2["baud"], p2["paridad"]),
             "DESCONOCIDO difiere del dispositivo 1 en Unit ID, baud y paridad (ADR-007)")
     v.check(p1["baud"] == 9600 and p1["paridad"] == "N" and p1["unit_id"] == 1,
             "DISPOSITIVO_1 conserva 9600 8N1, Unit ID 1 de la Tarea 1")
+
+    print("-- Cambio de perfil desde el maestro (ADR-029)")
+    from modbus_slave import frame_parser
+    from modbus_slave.crc16 import agregar_crc
+    v.check(set(config.CODIGOS_PERFIL.values()) == {"DISPOSITIVO_1", "DESCONOCIDO"},
+            "CODIGOS_PERFIL cubre los dos perfiles")
+    for nombre, perfil in config.PERFILES.items():
+        reg = [e for e in perfil["mapa"] if e.get("senal") == "perfil"]
+        codigo_propio = [c for c, n in config.CODIGOS_PERFIL.items() if n == nombre]
+        v.check(len(reg) == 1 and reg[0]["tabla"] == "holding_registers"
+                and reg[0]["direccion"] == config.REGISTRO_PERFIL and reg[0]["inicial"] == codigo_propio[0],
+                "{}: registro de perfil en 0x{:04X} con su propio codigo".format(nombre, config.REGISTRO_PERFIL))
+        modelo = ModeloDatos(perfil["mapa"])
+        uid = perfil["unit_id"]
+        otro = [c for c in config.CODIGOS_PERFIL if c != codigo_propio[0]][0]
+        pet = agregar_crc(bytes([uid, 6, config.REGISTRO_PERFIL >> 8, config.REGISTRO_PERFIL & 0xFF, 0, otro]))
+        resp, motivo = frame_parser.procesar_trama(pet, uid, modelo, False)
+        v.check(motivo == frame_parser.MOTIVO_RESPONDIDA and bytes(resp) == bytes(pet),
+                "{}: FC 06 al registro responde el ECO antes de cambiar".format(nombre))
+        v.check(config.CODIGOS_PERFIL[modelo.valor_de_senal("perfil")] != nombre,
+                "{}: el registro queda con el codigo del otro perfil".format(nombre))
+        mala = agregar_crc(bytes([uid, 6, config.REGISTRO_PERFIL >> 8, config.REGISTRO_PERFIL & 0xFF, 0, 3]))
+        resp, motivo = frame_parser.procesar_trama(mala, uid, modelo, False)
+        v.check(motivo == frame_parser.MOTIVO_EXCEPCION and resp[1] == 0x86 and resp[2] == 3,
+                "{}: un codigo inexistente (3) se rechaza con excepcion 03".format(nombre))
 
     print("-- Pines")
     pines = {n: getattr(config, n) for n in dir(config) if n.startswith("PIN_")}

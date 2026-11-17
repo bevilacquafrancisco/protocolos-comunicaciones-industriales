@@ -73,8 +73,11 @@ PowerShell como administrador:
 
 ```powershell
 PS> Remove-NetFirewallRule -DisplayName "PdCI T3 web (temporal)"
-PS> Remove-NetIPAddress -InterfaceAlias "<Ethernet>" -IPAddress 192.168.10.2 -Confirm:$false
 ```
+
+**La IP fija 192.168.10.2 del cable ya no se borra** (ADR-029): el banco la necesita en cada
+sesión, en cualquier red. Solo si la notebook se va a usar en otra red cableada:
+`Remove-NetIPAddress -InterfaceAlias "<Ethernet>" -IPAddress 192.168.10.2 -Confirm:$false`.
 
 ## 5. Al terminar el cuatrimestre
 

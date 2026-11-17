@@ -24,15 +24,15 @@ PS> notepad config.js
 | Campo | Valor |
 |---|---|
 | `url` | `wss://<direccion-del-broker>:8084/mqtt` (02 §2) |
-| `usuario` / `clave` | `host_app` / su clave |
+| `usuario` | Opcional: el usuario que se sugiere al entrar. **La clave no va en `config.js`** (ADR-028) |
 | `grupo`, `nodo`, `dispositivo`, `hostId` | Los de la plantilla (diccionario §4) |
 
 **[SEC]**
 
 - `config.js` está en `.gitignore`: verificar que **no** aparezca en `git status`.
-- Igual lo descarga el navegador, así que la clave de `host_app` es pública de hecho. El comentario de
-  `config.example.js` explica por qué esto es una mitigación y no una solución, y el ADR-027 describe los
-  permisos por tópico que acotan lo que se puede hacer con ella.
+- Desde la v2 la página **pide usuario y contraseña al entrar** y los guarda solo en memoria: no hay
+  ninguna clave en los archivos que descarga el navegador. Si un `config.js` viejo todavía tiene
+  `clave`, la página avisa que hay que borrarla.
 
 ## 2. Servir la página
 
@@ -54,7 +54,8 @@ PS> (Get-NetIPAddress -InterfaceAlias "Wi-Fi" -AddressFamily IPv4).IPAddress    
 
 ## 3. Verificación en la notebook
 
-Abrir **http://localhost:8080**. En el registro de eventos, que muestra lo más nuevo **arriba**, tienen
+Abrir **http://localhost:8080** e ingresar con el usuario de la Host Application y su contraseña
+(02 §3). Con una contraseña equivocada, la pantalla de ingreso lo dice y no entra. En el registro de eventos, que muestra lo más nuevo **arriba**, tienen
 que aparecer estas líneas. Se leen de abajo hacia arriba; acá van en orden cronológico:
 
 ```

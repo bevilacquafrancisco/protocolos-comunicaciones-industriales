@@ -15,7 +15,7 @@ pytestmark = pytest.mark.red
 
 
 def test_retroceso_exponencial_con_tope():
-    assert [espera_reintento(i) for i in range(1, 9)] == [1, 2, 4, 8, 16, 30, 30, 30]
+    assert [espera_reintento(i) for i in range(1, 9)] == [1, 2, 4, 5, 5, 5, 5, 5]      # ADR-029: tope 5 s
 
 
 async def esperar(condicion, timeout=10.0):
@@ -42,7 +42,7 @@ async def test_suscripcion_escritura_caida_y_reconexion(metricas):
     tarea = asyncio.create_task(cliente.ejecutar())
     try:
         # Notificacion inicial de los 10 MonitoredItems (5 del dispositivo + 5 Status/MODBUS)
-        await esperar(lambda: len(datos) == 10)
+        await esperar(lambda: len(datos) == 13)
         assert estados == [True] and cliente.conectado
         assert datos["Status/MODBUS/Estado"][0] == "DONE"
 
@@ -64,7 +64,7 @@ async def test_suscripcion_escritura_caida_y_reconexion(metricas):
         await asyncio.sleep(1.5)                   # algunos reintentos fallidos
         servidor = await ServidorPrueba(metricas, puerto).iniciar()
         datos.clear()
-        await esperar(lambda: estados[-1] is True and len(datos) == 10, timeout=20)
+        await esperar(lambda: estados[-1] is True and len(datos) == 13, timeout=20)
         assert cliente.sesiones == 2
         assert esperas[:2] == [1.0, 2.0]           # retroceso exponencial mientras estuvo caido
     finally:

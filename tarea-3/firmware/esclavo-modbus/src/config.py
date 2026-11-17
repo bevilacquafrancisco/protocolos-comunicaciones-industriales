@@ -2,7 +2,7 @@
 config.py  (ESCLAVO MODBus RTU — Tarea 3)
 Autores: Bevilacqua Francisco, Peralta Agustina
 Fecha de creacion: 2026-11-09
-Version: 1.0
+Version: 1.1 (2026-11-16: perfil elegible desde el maestro, ADR-029)
 
 Descripcion general
 -------------------
@@ -17,10 +17,15 @@ Dos perfiles en el mismo archivo:
                  rate, otra paridad y otro mapa. Quien prepara el ensayo edita SOLO este
                  perfil y no le cuenta los valores a quien opera el maestro.
 
-Cual se usa lo decide PERFIL. Con "JUMPER" lo elige el jumper de GPIO13 al arrancar
+Cual se usa al ARRANCAR lo decide PERFIL. Con "JUMPER" lo elige el jumper de GPIO13
 (abierto = DISPOSITIVO_1, a GND = DESCONOCIDO): las dos placas cargan exactamente los
-mismos archivos, igual que en la T1 los dos esclavos compartian firmware (un solo firmware
-elimina el error "actualice una placa y me olvide de la otra").
+mismos archivos, igual que en la T1 los dos esclavos compartian firmware.
+
+Desde la v1.1 el perfil tambien se cambia EN MARCHA desde el Dashboard de Node-RED, sin
+jumper (ADR-029): el maestro escribe el registro de configuracion REGISTRO_PERFIL (FC 06)
+con 1 = DISPOSITIVO_1 o 2 = DESCONOCIDO; el esclavo responde el eco y recien despues se
+reinicia con el perfil pedido. El cambio NO se guarda: reiniciar el ESP32 (boton EN) lo
+devuelve al perfil de arranque, que es la salida segura si el maestro pierde al esclavo.
 
 Justificacion de cada valor: tarea-1/docs/ (pines, niveles, baud) y tarea-3/docs/
 (diccionario de datos, ADR-007, ADR-010, ADR-014).
@@ -40,6 +45,15 @@ PERFIL = "JUMPER"
 #: Jumper de seleccion de perfil, con pull-up interno: abierto = 1 = DISPOSITIVO_1,
 #: puenteado a GND = 0 = DESCONOCIDO. Es el mismo pin que en la T1 elegia el Unit ID.
 PIN_JUMPER_PERFIL = 13
+
+#: Registro de configuracion del perfil (Holding Register, FC 03/06), en LOS DOS perfiles
+#: y en la misma direccion: asi el maestro lo encuentra antes y despues del cambio.
+#: 0x0F00 queda lejos de los offsets de ambos mapas (0x0000-0x0201), y se elige un valor
+#: alto para que el sondeo de rutina nunca lo toque por accidente.
+REGISTRO_PERFIL = 0x0F00
+
+#: Valor del registro -> perfil. Un valor fuera de 1-2 se rechaza con excepcion 03.
+CODIGOS_PERFIL = {1: "DISPOSITIVO_1", 2: "DESCONOCIDO"}
 
 
 # =============================================================================
@@ -136,6 +150,9 @@ PERFILES = {
              "senal": "led_digital", "inicial": 0},                        # Modicon 00001
             {"tabla": "holding_registers", "direccion": 0x0000, "nombre": "Outputs/LedPWM",
              "senal": "led_pwm", "maximo": 255, "inicial": 0},             # Modicon 40001
+            # Configuracion (ADR-029): no es una E/S del proceso y no viaja a OPC UA ni Sparkplug.
+            {"tabla": "holding_registers", "direccion": REGISTRO_PERFIL, "nombre": "Config/Perfil",
+             "senal": "perfil", "minimo": 1, "maximo": 2, "inicial": 1},  # Modicon 43841
         ],
     },
 
@@ -165,6 +182,8 @@ PERFILES = {
              "senal": "led_pwm", "maximo": 255, "inicial": 0},
             {"tabla": "holding_registers", "direccion": 0x0201, "nombre": "Outputs/Consigna",
              "maximo": 1000, "inicial": 500},
+            {"tabla": "holding_registers", "direccion": REGISTRO_PERFIL, "nombre": "Config/Perfil",
+             "senal": "perfil", "minimo": 1, "maximo": 2, "inicial": 2},
         ],
     },
 }

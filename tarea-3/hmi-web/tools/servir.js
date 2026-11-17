@@ -25,7 +25,7 @@ const path = require('node:path');
 const RAIZ = path.join(__dirname, '..');
 const PERMITIDOS = new Map([
     ['/', 'index.html'], ['/index.html', 'index.html'], ['/styles.css', 'styles.css'], ['/app.js', 'app.js'],
-    ['/sparkplug.js', 'sparkplug.js'], ['/config.js', 'config.js'], ['/vendor/mqtt.min.js', 'vendor/mqtt.min.js'],
+    ['/sparkplug.js', 'sparkplug.js'], ['/tramas.js', 'tramas.js'], ['/modelo.js', 'modelo.js'], ['/config.js', 'config.js'], ['/vendor/mqtt.min.js', 'vendor/mqtt.min.js'],
     ['/vendor/protobuf.min.js', 'vendor/protobuf.min.js'], ['/proto/sparkplug_b.proto', 'proto/sparkplug_b.proto'],
 ]);
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
