@@ -241,6 +241,75 @@ describe('maestro: concurrencia y escrituras', () => {
     });
 });
 
+describe('muestra de diagnostico de tramas (v1.1)', () => {
+    // Reloj controlado: la ventana (1 s) y la retencion (2 s) se prueban sin esperar.
+    function conReloj() {
+        const reloj = { t: 1000, ahora() { return this.t; }, setTimeout: () => 0, clearTimeout: () => {} };
+        const maestro = new MaestroModbus({ config: clon(), transporte: { enviar() {}, reconfigurar: () => Promise.resolve() }, reloj });
+        return { maestro, reloj };
+    }
+    const LECT = { fc: 3 };
+    const ok = (tx, rx) => ({ ok: true, errorType: 'NONE', tx, rx, latenciaMs: 25 });
+    const timeout = (tx) => ({ ok: false, errorType: 'TIMEOUT', tx, rx: '', latenciaMs: null });
+
+    test('TIMEOUT: la respuesta publicada queda vacia (no la de la transaccion anterior)', () => {
+        const { maestro, reloj } = conReloj();
+        maestro._registrarMuestra(LECT, ok('01 03 A', '01 03 R1'));
+        reloj.t += 1100;
+        maestro._registrarMuestra(LECT, timeout('01 03 B'));       // cierra la ventana: el error gana
+        expect(maestro.ultimaTx).toBe('01 03 B');
+        expect(maestro.ultimaRx).toBe('');
+        expect(maestro.latenciaMs).toBeNull();
+    });
+
+    test('en la ventana gana el error aunque despues lleguen lecturas correctas', () => {
+        const { maestro, reloj } = conReloj();
+        maestro._registrarMuestra(LECT, ok('A', 'R'));             // primera: se publica
+        reloj.t += 100; maestro._registrarMuestra(LECT, timeout('ERR'));
+        reloj.t += 100; maestro._registrarMuestra(LECT, ok('B', 'R'));
+        expect(maestro.ultimaTx).toBe('A');                          // la ventana sigue abierta
+        reloj.t += 900; maestro._registrarMuestra(LECT, ok('C', 'R'));
+        expect(maestro.ultimaTx).toBe('ERR');
+    });
+
+    test('el error se sostiene 2 s frente a lecturas y despues se reemplaza', () => {
+        const { maestro, reloj } = conReloj();
+        maestro._registrarMuestra(LECT, ok('A', 'R'));
+        reloj.t += 1000; maestro._registrarMuestra(LECT, timeout('ERR'));   // publicado en t=2000
+        reloj.t += 1000; maestro._registrarMuestra(LECT, ok('B', 'R'));     // t=3000 < 4000: se sostiene
+        expect(maestro.ultimaTx).toBe('ERR');
+        reloj.t += 1000; maestro._registrarMuestra(LECT, ok('C', 'R'));     // t=4000: se reemplaza
+        expect(maestro.ultimaTx).toBe('C');
+        expect(maestro.ultimaRx).toBe('R');
+    });
+
+    test('prioridad: escritura > lectura cuya respuesta cambio > lectura igual', () => {
+        const { maestro, reloj } = conReloj();
+        maestro._registrarMuestra(LECT, ok('L', 'R1'));
+        reloj.t += 100; maestro._registrarMuestra(LECT, ok('L', 'R2'));     // cambio
+        reloj.t += 100; maestro._registrarMuestra(LECT, ok('X', 'RX'));     // primera vez: sin cambio
+        reloj.t += 900; maestro._registrarMuestra(LECT, ok('Y', 'RY'));
+        expect([maestro.ultimaTx, maestro.ultimaRx]).toEqual(['L', 'R2']);
+        reloj.t += 100; maestro._registrarMuestra({ fc: 6 }, ok('W', 'W'));
+        reloj.t += 100; maestro._registrarMuestra(LECT, ok('L', 'R3'));     // cambio, pero menos que la escritura
+        reloj.t += 900; maestro._registrarMuestra(LECT, ok('Z', 'RZ'));
+        expect(maestro.ultimaTx).toBe('W');
+    });
+
+    test('con el maestro real: un Unit ID que nadie tiene publica peticion con respuesta vacia', async () => {
+        const { maestro } = crear();
+        await maestro.reconfigurar(Object.assign(clon(), { esclavo: Object.assign(clon().esclavo, { id: 7 }) }));
+        maestro.iniciar();
+        try {
+            expect(await hasta(() => maestro.contadores.TIMEOUT >= 1)).toBe(true);
+            expect(maestro.ultimaTx).toMatch(/^07 0[1-4] /);
+            expect(maestro.ultimaRx).toBe('');
+        } finally {
+            maestro.detener();
+        }
+    });
+});
+
 describe('tipos de dato', () => {
     test('int16, uint32, int32 y float32 con orden de palabras', () => {
         expect(tipos.decodificar('int16', [0xFFFE])).toBe(-2);

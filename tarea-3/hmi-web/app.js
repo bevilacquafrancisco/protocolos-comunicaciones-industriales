@@ -60,6 +60,8 @@
     const vista = {
         mensajes: [], selMensaje: null, conteo: {},
         tramas: [], selTrama: null, ultimoTxTs: null,
+        filtroTramas: 'todas', pausaTramas: null,     // pausa: copia congelada de la lista
+        tasa: [], ultimoTasaTs: null,                 // [{ts, total}] de los contadores MODBus
         notificaciones: [], selNodo: 'Dispositivo1.Inputs.Potenciometro',
         ultimoComando: null, confirmaciones: new Map(), lectura: null,
         alarmas: new Map(), recuperadas: [],          // [DF-4.17] id -> desde (ms); recuperaciones recientes
@@ -385,6 +387,20 @@
             vista.version.tramas += 1;
         }
 
+        // Tasa real del maestro: total de transacciones contadas (OK + CRC_ERROR + TIMEOUT +
+        // EXCEPTION) a lo largo del tiempo. El timestamp es el SourceTimestamp OPC UA del
+        // contador: todas las marcas son del MISMO reloj (la Raspberry), la resta es valida.
+        const ok = host.metrica('Status/MODBUS/OK');
+        if (ok.valor !== null && ok.ts && ok.ts !== vista.ultimoTasaTs) {
+            vista.ultimoTasaTs = ok.ts;
+            const total = ['OK', 'CRC_ERROR', 'TIMEOUT', 'EXCEPTION']
+                .reduce((s, k) => s + (Number(host.metrica(`Status/MODBUS/${k}`).valor) || 0), 0);
+            const ultimo = vista.tasa[vista.tasa.length - 1];
+            if (ultimo && (total < ultimo.total || ok.ts < ultimo.ts)) vista.tasa = [];   // contadores en cero
+            vista.tasa.push({ ts: ok.ts, total });
+            while (vista.tasa.length > 2 && ok.ts - vista.tasa[0].ts > 10000) vista.tasa.shift();   // ventana de 10 s
+        }
+
         // Notificaciones OPC UA reconstruidas y latencia de lectura
         if (r.payload && /DATA|BIRTH/.test(t.tipo)) {
             for (const m of r.payload.metricas) {
@@ -623,6 +639,31 @@
     }
 
     // ---------------------------------------------------------------- MODBus
+    /**
+     * Transacciones por segundo del maestro: diferencia del total contado entre la primera y la
+     * ultima muestra de la ventana (10 s), dividida por la diferencia de sus SourceTimestamp.
+     * @returns {number|null} null si hay menos de 2 s de historia
+     */
+    function tasaMaestro() {
+        const h = vista.tasa;
+        if (h.length < 2) return null;
+        const a = h[0], b = h[h.length - 1];
+        const dt = (b.ts - a.ts) / 1000;
+        return dt < 2 ? null : (b.total - a.total) / dt;
+    }
+
+    /**
+     * Filtro de la lista de tramas.
+     * @param {{tx: string, rx: string}} t muestra
+     * @param {'todas'|'errores'|'escrituras'} filtro
+     * @returns {boolean}
+     */
+    function filtroTrama(t, filtro) {
+        if (filtro === 'errores') return clasificarTrama(t)[0] !== 'ok';
+        if (filtro === 'escrituras') { const fc = (Tr.hexABytes(t.tx)[1] || 0) & 0x7F; return fc === 5 || fc === 6; }
+        return true;
+    }
+
     function clasificarTrama(t) {
         if (!t.rx) return ['err', 'TIMEOUT'];
         const rx = Tr.hexABytes(t.rx);
@@ -641,12 +682,27 @@
                 { texto: `${valor}${x.vigencia === V.EN_LINEA ? '' : ` (${x.vigencia})`}`, clase: 'hex' });
         }));
 
-        if (vista.dibujado.tramas !== vista.version.tramas || vista.dibujado.selTrama !== vista.selTrama) {
-            vista.dibujado.tramas = vista.version.tramas;
+        const tasa = tasaMaestro();
+        texto('tramas-tasa', tasa === null
+            ? 'maestro: midiendo la tasa de transacciones (hacen falta unos segundos de NDATA)…'
+            : `maestro: ${tasa.toLocaleString('es-AR', { maximumFractionDigits: 1 })} transacciones/s · se muestra 1 por segundo `
+              + `(≈ ${Math.round(100 / Math.max(tasa, 1))} %) · cálculo: Δ(OK + CRC_ERROR + TIMEOUT + EXCEPTION) / Δt en los últimos 10 s`);
+
+        const vigentes = vista.pausaTramas || vista.tramas;
+        const lista = vigentes.filter((t) => filtroTrama(t, vista.filtroTramas));
+        const clave = `${vista.version.tramas}|${vista.filtroTramas}|${Boolean(vista.pausaTramas)}`;
+        if (vista.dibujado.tramas !== clave || vista.dibujado.selTrama !== vista.selTrama) {
+            vista.dibujado.tramas = clave;
             vista.dibujado.selTrama = vista.selTrama;
-            const sel = vista.tramas.find((t) => t.id === vista.selTrama) || vista.tramas[0];
-            insignia('tramas-fuente', 'info', `${vista.tramas.length} muestra(s) · Status/MODBUS/UltimaTrama*`);
-            $('tramas-lista').replaceChildren(...vista.tramas.map((t) => {
+            const sel = vigentes.find((t) => t.id === vista.selTrama) || lista[0];
+            insignia('tramas-fuente', vista.pausaTramas ? 'warn' : 'info',
+                `${lista.length} de ${vigentes.length} muestra(s)${vista.pausaTramas ? ' · EN PAUSA' : ''}`);
+            if (!lista.length) {
+                $('tramas-lista').replaceChildren(el('p', { className: 'age',
+                    texto: vista.filtroTramas === 'errores' ? 'Ninguna trama con error entre las muestras recibidas.'
+                        : vista.filtroTramas === 'escrituras' ? 'Ninguna escritura FC 05/06 entre las muestras: accioná una salida.'
+                            : 'Todavía no llegó ninguna trama.' }));
+            } else $('tramas-lista').replaceChildren(...lista.map((t) => {
                 const [tono, res] = clasificarTrama(t);
                 const tx = Tr.hexABytes(t.tx);
                 return el('button', { type: 'button', className: 'fi', 'aria-pressed': String(sel && t.id === sel.id),
@@ -924,6 +980,23 @@
 
         $('form-login').addEventListener('submit', alEnviarIngreso);
         $('btn-salir').addEventListener('click', salir);
+        // Tramas en vivo: filtro (todas / errores / escrituras) y pausa (congela la lista; lo que
+        // sigue llegando se acumula y aparece al reanudar).
+        const FILTROS = [['tf-todas', 'todas'], ['tf-errores', 'errores'], ['tf-escrituras', 'escrituras']];
+        for (const [id, filtro] of FILTROS) {
+            $(id).addEventListener('click', () => {
+                vista.filtroTramas = filtro;
+                for (const [otro] of FILTROS) $(otro).setAttribute('aria-pressed', String(otro === id));
+                dibujar();
+            });
+        }
+        $('btn-pausa-tramas').addEventListener('click', () => {
+            vista.pausaTramas = vista.pausaTramas ? null : vista.tramas.slice();
+            const b = $('btn-pausa-tramas');
+            b.setAttribute('aria-pressed', String(Boolean(vista.pausaTramas)));
+            b.textContent = vista.pausaTramas ? 'Reanudar' : 'Pausar';
+            dibujar();
+        });
         for (const p of PESTANAS) $(`t-${p}`).addEventListener('click', () => fijarPestana(p));
         // Flechas izquierda/derecha entre pestanas (patron ARIA de tabs)
         $('t-general').parentElement.addEventListener('keydown', (ev) => {

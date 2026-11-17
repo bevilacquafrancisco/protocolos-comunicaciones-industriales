@@ -134,6 +134,15 @@ eventos: ${(await txt('eventos')).slice(0, 600)}`);
             await hasta(() => document.querySelectorAll('#tramas-lista .fi').length > 0);
             await hasta(() => /✔ coincide/.test(document.getElementById('crc-resultado').textContent));
             assert.equal(await pagina.$$eval('#crc-pasos tr', (f) => f.length), 6, 'un paso por byte de la petición');
+            // Filtro y pausa de las tramas (v2.1): no rompen la lista ni la seleccion
+            await pagina.click('#tf-errores');
+            assert.match(await txt('tramas-fuente'), /^\d+ de \d+ muestra/);
+            await pagina.click('#tf-todas');
+            await pagina.click('#btn-pausa-tramas');
+            assert.match(await txt('tramas-fuente'), /EN PAUSA/);
+            assert.equal(await txt('btn-pausa-tramas'), 'Reanudar');
+            await pagina.click('#btn-pausa-tramas');
+            assert.match(await txt('tramas-tasa'), /^maestro: /);
             await capturar('2-modbus');
 
             // 2d. OPC UA (atributos del nodo) y Sparkplug (payload byte por byte)
