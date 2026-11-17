@@ -5,7 +5,7 @@
   "description": "Tarea 3 - Host Application Sparkplug B (pagina web estatica)",
   "author": "Bevilacqua Francisco, Peralta Agustina",
   "license": "UNLICENSED",
-  "engines": { "node": ">=18.5" },
+  "engines": { "node": ">=21" },
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
     "vendor": "node tools/copiar_vendor.js",
